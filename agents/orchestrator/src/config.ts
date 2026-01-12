@@ -8,7 +8,7 @@ export const config = {
   },
   orchestrator: {
     pollIntervalMs: 60_000, // 1 minute
-    maxParallelAgents: 3,
+    maxParallelAgents: 1,
   },
   paths: {
     dataDir: new URL('../../data', import.meta.url).pathname,

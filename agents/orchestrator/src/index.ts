@@ -93,6 +93,9 @@ async function resetState(): Promise<void> {
     }
   }
 
+  // Close the database connection before deleting
+  closeDb();
+
   if (existsSync(dbPath)) {
     unlinkSync(dbPath);
     console.log('\n✓ Database reset successfully');
@@ -255,8 +258,10 @@ async function processNewIssues(): Promise<void> {
   const issues = await fetchReadyIssues();
   const claimedNumbers = await getClaimedIssueNumbers();
 
-  // Filter to unclaimed issues
-  const unclaimedIssues = issues.filter((issue) => !claimedNumbers.has(issue.number));
+  // Filter to unclaimed issues and sort by issue number (oldest first)
+  const unclaimedIssues = issues
+    .filter((issue) => !claimedNumbers.has(issue.number))
+    .sort((a, b) => a.number - b.number);
 
   if (unclaimedIssues.length === 0) {
     console.log('[Orchestrator] No new issues to process');

@@ -53,22 +53,37 @@ export async function spawnFeatureAgent(
     // Write prompt to a temp file (avoids command line escaping issues)
     const promptDir = `${config.paths.dataDir}`.replace(/^\/([A-Z]):/, '$1:');
     mkdirSync(promptDir, { recursive: true });
-    const promptFile = `${promptDir}/prompt-${agentId}.txt`;
+    const promptFile = `${promptDir}\\prompt-${agentId}.txt`.replace(/\//g, '\\');
     writeFileSync(promptFile, prompt);
 
     // Get the working directory (the main project, not orchestrator)
-    const workingDir = process.cwd().replace(/[\\/]agents[\\/]orchestrator$/, '');
+    const workingDir = process.cwd().replace(/[\\/]agents[\\/]orchestrator$/, '').replace(/\//g, '\\');
 
-    // Spawn Claude Code in a new visible terminal window (Windows)
-    // Using 'start' to open a new cmd window with a title
+    // Create a batch file to run the agent (avoids command line length issues)
+    const batchFile = `${promptDir}\\run-${agentId}.bat`.replace(/\//g, '\\');
+    const batchContent = `@echo off
+cd /d "${workingDir}"
+git checkout ${branchName}
+echo.
+echo ========================================
+echo   Agent working on Issue #${issue.number}
+echo   ${issue.title}
+echo ========================================
+echo.
+claude --dangerously-skip-permissions -p "${promptFile}"
+echo.
+echo Agent finished. Press any key to close.
+pause >nul
+`;
+    writeFileSync(batchFile, batchContent);
+
+    // Spawn the batch file in a new visible terminal window
     const windowTitle = `Agent: Issue #${issue.number}`;
     const subprocess = execa('cmd', [
       '/c',
       'start',
       `"${windowTitle}"`,
-      'cmd',
-      '/k',
-      `cd /d "${workingDir}" && git checkout ${branchName} && claude --dangerously-skip-permissions "${prompt.replace(/"/g, '\\"')}"`,
+      batchFile,
     ], {
       cwd: workingDir,
       detached: true,

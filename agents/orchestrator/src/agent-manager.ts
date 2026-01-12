@@ -50,35 +50,29 @@ export async function spawnFeatureAgent(
   console.log(`[Agent ${agentId.slice(0, 8)}] Opening new terminal window...`);
 
   try {
-    // Write prompt to a temp file (avoids command line escaping issues)
+    // Write prompt to a clearly named file
     const promptDir = `${config.paths.dataDir}`.replace(/^\/([A-Z]):/, '$1:');
     mkdirSync(promptDir, { recursive: true });
-    const promptFile = `${promptDir}\\prompt-${agentId}.txt`.replace(/\//g, '\\');
+    const promptFile = `${promptDir}\\prompt-issue-${issue.number}.txt`.replace(/\//g, '\\');
     writeFileSync(promptFile, prompt);
 
     // Get the working directory (the main project, not orchestrator)
     const workingDir = process.cwd().replace(/[\\/]agents[\\/]orchestrator$/, '').replace(/\//g, '\\');
 
-    // Create a batch file to run the agent
-    const batchFile = `${promptDir}\\run-${agentId}.bat`.replace(/\//g, '\\');
+    // Create batch file for the Claude terminal
+    const batchFile = `${promptDir}\\run-issue-${issue.number}.bat`.replace(/\//g, '\\');
     const batchContent = `@echo off
 cd /d "${workingDir}"
 echo.
 echo ========================================
-echo   Agent working on Issue #${issue.number}
+echo   Agent: Issue #${issue.number}
 echo   ${issue.title}
 echo ========================================
 echo.
 echo Checking out branch ${branchName}...
 git checkout ${branchName} 2>nul || git checkout -b ${branchName}
 echo.
-echo Copying prompt to clipboard...
-type "${promptFile}" | clip
-echo.
-echo *** PROMPT COPIED TO CLIPBOARD ***
-echo *** Press Ctrl+V to paste it into Claude ***
-echo.
-echo Starting Claude Code...
+echo Ready for prompt. Paste from Notepad (Ctrl+V) then press Enter.
 echo.
 claude --dangerously-skip-permissions
 echo.
@@ -89,7 +83,13 @@ pause
 `;
     writeFileSync(batchFile, batchContent);
 
-    // Spawn the batch file in a new visible terminal window
+    // Open Notepad with the prompt file
+    execa('cmd', ['/c', 'start', `"Prompt: Issue #${issue.number}"`, 'notepad', promptFile], {
+      detached: true,
+      shell: true,
+    });
+
+    // Open terminal with Claude Code ready for paste
     const windowTitle = `Agent: Issue #${issue.number}`;
     const subprocess = execa('cmd', [
       '/c',
@@ -107,13 +107,10 @@ pause
       await registerAgent(agentId, issue.number, 'feature-builder', subprocess.pid);
     }
 
-    // Don't wait for completion - the agent runs independently
-    // We mark it as "running" and the user will interact with it
-    console.log(`[Agent ${agentId.slice(0, 8)}] Terminal opened for issue #${issue.number}`);
-    console.log(`[Agent ${agentId.slice(0, 8)}] You can interact with the agent in the new window`);
+    console.log(`[Agent ${agentId.slice(0, 8)}] Opened Notepad with prompt + Claude terminal for issue #${issue.number}`);
+    console.log(`[Agent ${agentId.slice(0, 8)}] Copy prompt from Notepad (Ctrl+A, Ctrl+C) and paste into Claude (Ctrl+V)`);
 
-    // Return immediately - agent is running in visible window
-    return { success: true, output: 'Agent running in terminal window', agentId };
+    return { success: true, output: 'Agent windows opened', agentId };
   } catch (error) {
     runningProcesses.delete(agentId);
 

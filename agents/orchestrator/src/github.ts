@@ -79,11 +79,26 @@ export async function fetchIssue(issueNumber: number): Promise<GitHubIssue | nul
 }
 
 /**
- * Create a new branch for working on an issue
+ * Create a new branch for working on an issue (or reuse existing)
  */
 export async function createBranch(issueNumber: number, baseBranch = 'master'): Promise<string> {
   const { owner, repo } = getRepoOwnerAndName();
   const client = getOctokit();
+  const branchName = `feature/issue-${issueNumber}`;
+
+  // Check if branch already exists
+  try {
+    await client.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branchName}`,
+    });
+    // Branch exists, reuse it
+    console.log(`[GitHub] Branch ${branchName} already exists, reusing`);
+    return branchName;
+  } catch {
+    // Branch doesn't exist, create it
+  }
 
   // Get the SHA of the base branch
   const { data: ref } = await client.git.getRef({
@@ -91,8 +106,6 @@ export async function createBranch(issueNumber: number, baseBranch = 'master'): 
     repo,
     ref: `heads/${baseBranch}`,
   });
-
-  const branchName = `feature/issue-${issueNumber}`;
 
   // Create the new branch
   await client.git.createRef({
@@ -102,6 +115,7 @@ export async function createBranch(issueNumber: number, baseBranch = 'master'): 
     sha: ref.object.sha,
   });
 
+  console.log(`[GitHub] Created branch ${branchName}`);
   return branchName;
 }
 

@@ -34,3 +34,5 @@ coverage/
 
 # Data directory
 server/data/
+agents/data/
+agents/orchestrator/.env

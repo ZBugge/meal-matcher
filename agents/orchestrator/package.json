@@ -1,0 +1,26 @@
+{
+  "name": "agent-orchestrator",
+  "version": "1.0.0",
+  "description": "Multi-agent orchestrator for GitHub issue automation",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "reset": "tsx src/index.ts --reset",
+    "status": "tsx src/index.ts --status",
+    "retry": "tsx src/index.ts --retry"
+  },
+  "dependencies": {
+    "@octokit/rest": "^20.0.2",
+    "dotenv": "^16.4.5",
+    "execa": "^8.0.1",
+    "sql.js": "^1.10.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  }
+}

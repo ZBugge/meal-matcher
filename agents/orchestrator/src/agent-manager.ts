@@ -59,21 +59,33 @@ export async function spawnFeatureAgent(
     // Get the working directory (the main project, not orchestrator)
     const workingDir = process.cwd().replace(/[\\/]agents[\\/]orchestrator$/, '').replace(/\//g, '\\');
 
-    // Create a batch file to run the agent (avoids command line length issues)
+    // Create a batch file to run the agent
     const batchFile = `${promptDir}\\run-${agentId}.bat`.replace(/\//g, '\\');
     const batchContent = `@echo off
 cd /d "${workingDir}"
-git checkout ${branchName}
 echo.
 echo ========================================
 echo   Agent working on Issue #${issue.number}
 echo   ${issue.title}
 echo ========================================
 echo.
-claude --dangerously-skip-permissions -p "${promptFile}"
+echo Checking out branch ${branchName}...
+git checkout ${branchName} 2>nul || git checkout -b ${branchName}
 echo.
-echo Agent finished. Press any key to close.
-pause >nul
+echo Copying prompt to clipboard...
+type "${promptFile}" | clip
+echo.
+echo *** PROMPT COPIED TO CLIPBOARD ***
+echo *** Press Ctrl+V to paste it into Claude ***
+echo.
+echo Starting Claude Code...
+echo.
+claude --dangerously-skip-permissions
+echo.
+echo ========================================
+echo   Agent finished
+echo ========================================
+pause
 `;
     writeFileSync(batchFile, batchContent);
 

@@ -1,4 +1,4 @@
-import { unlinkSync, existsSync } from 'fs';
+import { unlinkSync, existsSync, readdirSync, rmSync } from 'fs';
 import { execSync } from 'child_process';
 import { config, validateConfig } from './config.js';
 import {
@@ -96,12 +96,17 @@ async function resetState(): Promise<void> {
   // Close the database connection before deleting
   closeDb();
 
-  if (existsSync(dbPath)) {
-    unlinkSync(dbPath);
-    console.log('\n✓ Database reset successfully');
-    console.log(`  Deleted: ${dbPath}`);
+  // Clean up all files in the data directory
+  const dataDir = config.paths.dataDir.replace(/^\/([A-Z]):/, '$1:');
+  if (existsSync(dataDir)) {
+    const files = readdirSync(dataDir);
+    for (const file of files) {
+      const filePath = `${dataDir}/${file}`;
+      rmSync(filePath, { force: true });
+    }
+    console.log(`\n✓ Cleaned up ${files.length} file(s) in data directory`);
   } else {
-    console.log('\n✓ No database to reset (already clean)');
+    console.log('\n✓ No data to reset (already clean)');
   }
 
   console.log('\nAll issues will be picked up fresh on next run.');

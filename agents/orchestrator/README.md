@@ -131,7 +131,6 @@ Edit `src/config.ts` to customize:
 |---------|---------|-------------|
 | `pollIntervalMs` | 60000 | How often to check for new issues (ms) |
 | `maxParallelAgents` | 3 | Maximum concurrent Claude Code instances |
-| `agentTimeoutMs` | 1800000 | Agent timeout (30 minutes) |
 
 ## Project Structure
 

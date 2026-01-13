@@ -117,6 +117,14 @@ export function SessionView() {
             <button onClick={handleCopyLink} className="btn btn-primary">
               {copied ? 'Copied!' : 'Copy'}
             </button>
+            <a
+              href={`/join/${session.inviteCode}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary whitespace-nowrap"
+            >
+              Join & Swipe
+            </a>
           </div>
           <p className="text-sm text-gray-500 mt-2">
             Share this link with your group to let them vote on meals

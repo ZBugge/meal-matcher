@@ -172,7 +172,7 @@ git checkout ${branchName} 2>nul || git checkout -b ${branchName}
 echo.
 echo Starting autonomous feature builder agent...
 echo.
-type "${promptFile}" | claude --dangerously-skip-permissions --model ${config.orchestrator.buildingModel}
+type "${promptFile}" | claude --dangerously-skip-permissions --print --model ${config.orchestrator.buildingModel}
 echo.
 echo ========================================
 echo   Build finished

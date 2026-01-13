@@ -88,15 +88,33 @@ export async function getIssueComments(issueNumber: number): Promise<string[]> {
 export async function findGroomedPlan(issueNumber: number): Promise<string | null> {
   const comments = await getIssueComments(issueNumber);
 
-  // Look for the most recent comment containing the groomed plan header
+  console.log(`[GitHub] Found ${comments.length} comments on issue #${issueNumber}`);
+
+  // Look for the most recent comment containing a plan header
+  // Supports multiple formats: markdown headers or plain text
   for (let i = comments.length - 1; i >= 0; i--) {
     const comment = comments[i];
-    if (comment.includes('## Groomed Implementation Plan') ||
-        comment.includes('### Requirements') && comment.includes('### Implementation Steps')) {
+    const preview = comment.substring(0, 100).replace(/\n/g, '\\n');
+    console.log(`[GitHub] Checking comment ${i}: "${preview}..."`);
+
+    // Check for "Implementation Plan" anywhere in the comment (most flexible)
+    if (comment.includes('Implementation Plan')) {
+      console.log(`[GitHub] Found plan in comment ${i}`);
+      return comment;
+    }
+
+    // Check for structured plan with Requirements + Steps/Files sections
+    if (
+      (comment.includes('### Requirements') || comment.includes('## Requirements')) &&
+      (comment.includes('### Steps') || comment.includes('### Files') ||
+       comment.includes('## Steps') || comment.includes('## Files'))
+    ) {
+      console.log(`[GitHub] Found structured plan in comment ${i}`);
       return comment;
     }
   }
 
+  console.log(`[GitHub] No plan found in any comments`);
   return null;
 }
 

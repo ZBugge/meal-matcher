@@ -8,6 +8,7 @@ import {
   removeLabel,
   addLabel,
   findGroomedPlan,
+  getIssueLabels,
 } from './github.js';
 import {
   markIssueActive,
@@ -86,6 +87,30 @@ async function showStatus(): Promise<void> {
   console.log('');
   console.log('Commands:');
   console.log('  npm run reset  - Clear active tracking (does not change GitHub labels)');
+}
+
+/**
+ * Sync active issues with GitHub labels.
+ * If an issue no longer has the expected label, release the hold.
+ */
+async function syncActiveIssues(): Promise<void> {
+  const activeIssues = await getActiveIssues();
+
+  for (const issue of activeIssues) {
+    const labels = await getIssueLabels(issue.issueNumber);
+
+    // Grooming issues should have "grooming" label while active
+    if (issue.agentType === 'grooming' && !labels.includes('grooming')) {
+      console.log(`[Orchestrator] Grooming done for #${issue.issueNumber}, releasing hold`);
+      await clearIssue(issue.issueNumber);
+    }
+
+    // Building issues should have "in-progress" label while active
+    if (issue.agentType === 'building' && !labels.includes(config.github.inProgressLabel)) {
+      console.log(`[Orchestrator] Building done for #${issue.issueNumber}, releasing hold`);
+      await clearIssue(issue.issueNumber);
+    }
+  }
 }
 
 /**
@@ -248,6 +273,9 @@ async function orchestrationLoop(): Promise<void> {
 
   while (!isShuttingDown) {
     try {
+      // Sync: Release holds for completed agents
+      await syncActiveIssues();
+
       // Phase 1: Process grooming issues (one at a time)
       await processGroomingIssues();
 

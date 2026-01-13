@@ -26,6 +26,8 @@ git push -u origin {{BRANCH_NAME}}
 "C:\Program Files\GitHub CLI\gh.exe" pr create --title "feat: {{ISSUE_TITLE}}" --body "Implements #{{ISSUE_NUMBER}}"
 
 "C:\Program Files\GitHub CLI\gh.exe" issue edit {{ISSUE_NUMBER}} --remove-label "in-progress" --add-label "pr-ready"
+
+git checkout master
 ```
 
 ## Rules

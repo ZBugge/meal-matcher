@@ -243,3 +243,11 @@ export async function addLabel(issueNumber: number, label: string): Promise<void
     labels: [label],
   });
 }
+
+/**
+ * Get labels for an issue
+ */
+export async function getIssueLabels(issueNumber: number): Promise<string[]> {
+  const issue = await fetchIssue(issueNumber);
+  return issue?.labels || [];
+}

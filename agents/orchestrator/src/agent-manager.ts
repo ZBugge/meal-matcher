@@ -70,7 +70,7 @@ export async function spawnGroomingAgent(issue: GitHubIssue): Promise<AgentResul
     // Get the working directory (the main project, not orchestrator)
     const workingDir = process.cwd().replace(/[\\/]agents[\\/]orchestrator$/, '').replace(/\//g, '\\');
 
-    // Create batch file for the Claude terminal
+    // Create batch file for the Claude terminal (interactive - user pastes prompt)
     const batchFile = `${promptDir}\\groom-issue-${issue.number}.bat`.replace(/\//g, '\\');
     const ghToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
     const batchContent = `@echo off
@@ -155,7 +155,7 @@ export async function spawnFeatureAgent(
     // Get the working directory (the main project, not orchestrator)
     const workingDir = process.cwd().replace(/[\\/]agents[\\/]orchestrator$/, '').replace(/\//g, '\\');
 
-    // Create batch file for the Claude terminal
+    // Create batch file for the Claude terminal - runs autonomously
     const batchFile = `${promptDir}\\run-issue-${issue.number}.bat`.replace(/\//g, '\\');
     const ghToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
     const batchContent = `@echo off
@@ -170,9 +170,9 @@ echo.
 echo Checking out branch ${branchName}...
 git checkout ${branchName} 2>nul || git checkout -b ${branchName}
 echo.
-echo Ready for prompt. Paste from Notepad (Ctrl+V) then press Enter.
+echo Starting autonomous feature builder agent...
 echo.
-claude --dangerously-skip-permissions --model ${config.orchestrator.buildingModel}
+type "${promptFile}" | claude --dangerously-skip-permissions --model ${config.orchestrator.buildingModel}
 echo.
 echo ========================================
 echo   Build finished
@@ -181,13 +181,7 @@ pause
 `;
     writeFileSync(batchFile, batchContent);
 
-    // Open Notepad with the prompt file
-    execa('cmd', ['/c', 'start', `"Prompt: Issue #${issue.number}"`, 'notepad', promptFile], {
-      detached: true,
-      shell: true,
-    });
-
-    // Open terminal with Claude Code ready for paste
+    // Open terminal with Claude Code running autonomously
     const windowTitle = `Build: Issue #${issue.number}`;
     const subprocess = execa('cmd', [
       '/c',
@@ -204,8 +198,7 @@ pause
       runningProcesses.set(agentId, subprocess);
     }
 
-    console.log(`[Agent ${agentId.slice(0, 8)}] Opened Notepad with prompt + Claude terminal for issue #${issue.number}`);
-    console.log(`[Agent ${agentId.slice(0, 8)}] Copy prompt from Notepad (Ctrl+A, Ctrl+C) and paste into Claude (Ctrl+V)`);
+    console.log(`[Agent ${agentId.slice(0, 8)}] Started autonomous feature builder for issue #${issue.number}`);
 
     return { success: true, output: 'Agent windows opened', agentId };
   } catch (error) {

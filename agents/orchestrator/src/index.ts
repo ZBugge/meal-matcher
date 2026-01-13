@@ -1,26 +1,32 @@
-import { unlinkSync, existsSync, readdirSync, rmSync } from 'fs';
+import { existsSync, readdirSync, rmSync } from 'fs';
 import { execSync } from 'child_process';
 import { config, validateConfig } from './config.js';
 import {
   fetchReadyIssues,
+  fetchGroomingIssues,
   fetchIssue,
   createBranch,
   createPullRequest,
   addIssueComment,
   removeLabel,
   addLabel,
+  findGroomedPlan,
   GitHubIssue,
 } from './github.js';
 import {
   claimIssue,
+  claimIssueForGrooming,
   getClaimedIssueNumbers,
+  getGroomingIssueNumbers,
+  isGroomingInProgress,
   updateIssueStatus,
   closeDb,
-  getInProgressIssues,
+  getAllTrackedIssues,
   resetIssue,
 } from './state.js';
 import {
   spawnFeatureAgent,
+  spawnGroomingAgent,
   getRunningAgentCount,
   cleanupAgents,
 } from './agent-manager.js';
@@ -68,12 +74,10 @@ function getBranchStatus(branchName: string): { exists: boolean; unpushedCommits
 }
 
 async function resetState(): Promise<void> {
-  const dbPath = `${config.paths.dataDir}/agents.db`.replace(/^\/([A-Z]):/, '$1:');
-
   // Get tracked issues before deleting DB so we can reset their labels
-  let trackedIssues: { issueNumber: number }[] = [];
+  let trackedIssues: { issueNumber: number; status: string }[] = [];
   try {
-    trackedIssues = await getInProgressIssues();
+    trackedIssues = await getAllTrackedIssues();
   } catch {
     // DB might not exist
   }
@@ -83,9 +87,15 @@ async function resetState(): Promise<void> {
     console.log('Resetting GitHub labels...');
     for (const issue of trackedIssues) {
       try {
-        await removeLabel(issue.issueNumber, 'in-progress');
-        await removeLabel(issue.issueNumber, 'agent-failed');
-        await addLabel(issue.issueNumber, config.github.issueLabel);
+        // Remove all possible workflow labels
+        await removeLabel(issue.issueNumber, config.github.groomingLabel);
+        await removeLabel(issue.issueNumber, 'grooming');
+        await removeLabel(issue.issueNumber, config.github.awaitingApprovalLabel);
+        await removeLabel(issue.issueNumber, config.github.inProgressLabel);
+        await removeLabel(issue.issueNumber, config.github.prReadyLabel);
+        await removeLabel(issue.issueNumber, config.github.failedLabel);
+        // Add back the grooming label so they can be picked up fresh
+        await addLabel(issue.issueNumber, config.github.groomingLabel);
         console.log(`  ✓ Reset labels for #${issue.issueNumber}`);
       } catch (err) {
         console.log(`  ⚠ Could not reset labels for #${issue.issueNumber}: ${err}`);
@@ -115,36 +125,69 @@ async function resetState(): Promise<void> {
 async function showStatus(): Promise<void> {
   console.log('📊 Agent Orchestrator Status\n');
 
-  const issues = await getInProgressIssues();
+  const issues = await getAllTrackedIssues();
 
   if (issues.length === 0) {
     console.log('No issues currently tracked.\n');
-    console.log('Issues with the "ready" label will be picked up on next run.');
+    console.log('Workflow:');
+    console.log(`  1. Issues with "${config.github.groomingLabel}" label → Grooming phase (interactive)`);
+    console.log(`  2. After grooming, change label to "${config.github.readyLabel}" → Building phase (parallel)`);
     return;
   }
 
+  // Group by status
+  const grooming = issues.filter(i => i.status === 'grooming');
+  const awaitingApproval = issues.filter(i => i.status === 'awaiting_approval');
+  const inProgress = issues.filter(i => i.status === 'in_progress');
+  const prCreated = issues.filter(i => i.status === 'pr_created');
+
   console.log(`Tracked Issues (${issues.length}):\n`);
 
-  for (const issue of issues) {
-    const branchName = issue.branchName || `feature/issue-${issue.issueNumber}`;
-    const branchStatus = getBranchStatus(branchName);
+  if (grooming.length > 0) {
+    console.log('🔍 GROOMING (interactive):');
+    for (const issue of grooming) {
+      console.log(`  #${issue.issueNumber}: ${issue.title}`);
+    }
+    console.log('');
+  }
 
-    console.log(`  #${issue.issueNumber}: ${issue.title}`);
-    console.log(`    Status: ${issue.status}`);
-    console.log(`    Branch: ${branchName}`);
+  if (awaitingApproval.length > 0) {
+    console.log('⏳ AWAITING APPROVAL:');
+    for (const issue of awaitingApproval) {
+      console.log(`  #${issue.issueNumber}: ${issue.title}`);
+      console.log(`    → Change label to "${config.github.readyLabel}" to start building`);
+    }
+    console.log('');
+  }
 
-    if (branchStatus.exists) {
-      if (branchStatus.unpushedCommits > 0) {
-        console.log(`    ⚠️  ${branchStatus.unpushedCommits} unpushed commit(s)`);
+  if (inProgress.length > 0) {
+    console.log('🔨 BUILDING (in progress):');
+    for (const issue of inProgress) {
+      const branchName = issue.branchName || `feature/issue-${issue.issueNumber}`;
+      const branchStatus = getBranchStatus(branchName);
+
+      console.log(`  #${issue.issueNumber}: ${issue.title}`);
+      console.log(`    Branch: ${branchName}`);
+
+      if (branchStatus.exists) {
+        if (branchStatus.unpushedCommits > 0) {
+          console.log(`    ⚠️  ${branchStatus.unpushedCommits} unpushed commit(s)`);
+        }
+        if (branchStatus.hasLocalChanges) {
+          console.log(`    ⚠️  Has uncommitted changes`);
+        }
       }
-      if (branchStatus.hasLocalChanges) {
-        console.log(`    ⚠️  Has uncommitted changes`);
+    }
+    console.log('');
+  }
+
+  if (prCreated.length > 0) {
+    console.log('✅ PR CREATED:');
+    for (const issue of prCreated) {
+      console.log(`  #${issue.issueNumber}: ${issue.title}`);
+      if (issue.prUrl) {
+        console.log(`    PR: ${issue.prUrl}`);
       }
-      if (branchStatus.unpushedCommits === 0 && !branchStatus.hasLocalChanges) {
-        console.log(`    ✓ Branch is clean`);
-      }
-    } else {
-      console.log(`    Branch not found locally`);
     }
     console.log('');
   }
@@ -157,7 +200,7 @@ async function showStatus(): Promise<void> {
 async function retryIssue(issueNumber: number): Promise<void> {
   console.log(`🔄 Retrying issue #${issueNumber}\n`);
 
-  const issues = await getInProgressIssues();
+  const issues = await getAllTrackedIssues();
   const issue = issues.find(i => i.issueNumber === issueNumber);
 
   if (!issue) {
@@ -166,92 +209,134 @@ async function retryIssue(issueNumber: number): Promise<void> {
     return;
   }
 
-  const branchName = issue.branchName || `feature/issue-${issueNumber}`;
-  const branchStatus = getBranchStatus(branchName);
   const workingDir = getWorkingDir();
 
-  // Warn about unpushed work
-  if (branchStatus.unpushedCommits > 0 || branchStatus.hasLocalChanges) {
-    console.log('⚠️  Warning: This branch has unpushed work:\n');
+  // If this was a building issue, handle branch cleanup
+  if (issue.branchName) {
+    const branchStatus = getBranchStatus(issue.branchName);
 
-    if (branchStatus.unpushedCommits > 0) {
-      console.log(`   ${branchStatus.unpushedCommits} unpushed commit(s)`);
-      const commits = runGit(`log origin/master..${branchName} --oneline`, workingDir);
-      commits.split('\n').forEach(c => console.log(`     - ${c}`));
+    // Warn about unpushed work
+    if (branchStatus.unpushedCommits > 0 || branchStatus.hasLocalChanges) {
+      console.log('⚠️  Warning: This branch has unpushed work:\n');
+
+      if (branchStatus.unpushedCommits > 0) {
+        console.log(`   ${branchStatus.unpushedCommits} unpushed commit(s)`);
+        const commits = runGit(`log origin/master..${issue.branchName} --oneline`, workingDir);
+        commits.split('\n').forEach(c => console.log(`     - ${c}`));
+      }
+      if (branchStatus.hasLocalChanges) {
+        console.log('   Uncommitted changes present');
+      }
+
+      console.log('\n   This work will be DISCARDED. The branch will be reset to master.');
+      console.log('   Press Ctrl+C within 5 seconds to cancel...\n');
+
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
-    if (branchStatus.hasLocalChanges) {
-      console.log('   Uncommitted changes present');
+
+    // Reset the branch
+    console.log(`Resetting branch ${issue.branchName}...`);
+
+    // Switch to master first
+    const currentBranch = runGit('branch --show-current', workingDir);
+    if (currentBranch === issue.branchName) {
+      runGit('checkout master', workingDir);
     }
 
-    console.log('\n   This work will be DISCARDED. The branch will be reset to master.');
-    console.log('   Press Ctrl+C within 5 seconds to cancel...\n');
+    // Delete the branch
+    if (branchStatus.exists) {
+      runGit(`branch -D ${issue.branchName}`, workingDir);
+    }
 
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    console.log('✓ Branch cleaned up\n');
   }
-
-  // Reset the branch
-  console.log(`Resetting branch ${branchName}...`);
-
-  // Switch to master first
-  const currentBranch = runGit('branch --show-current', workingDir);
-  if (currentBranch === branchName) {
-    runGit('checkout master', workingDir);
-  }
-
-  // Delete and recreate the branch
-  if (branchStatus.exists) {
-    runGit(`branch -D ${branchName}`, workingDir);
-  }
-  runGit(`checkout -b ${branchName}`, workingDir);
-
-  console.log('✓ Branch reset to master\n');
 
   // Reset the issue in the database
   await resetIssue(issueNumber);
   console.log('✓ Issue state reset\n');
 
-  // Reset GitHub labels
+  // Reset GitHub labels back to needs-grooming
   console.log('Resetting GitHub labels...');
   try {
-    await removeLabel(issueNumber, 'in-progress');
-    await removeLabel(issueNumber, 'agent-failed');
-    console.log('✓ GitHub labels reset\n');
+    await removeLabel(issueNumber, 'grooming');
+    await removeLabel(issueNumber, config.github.awaitingApprovalLabel);
+    await removeLabel(issueNumber, config.github.inProgressLabel);
+    await removeLabel(issueNumber, config.github.prReadyLabel);
+    await removeLabel(issueNumber, config.github.failedLabel);
+    await addLabel(issueNumber, config.github.groomingLabel);
+    console.log('✓ GitHub labels reset (back to needs-grooming)\n');
   } catch {
     console.log('⚠ Could not reset GitHub labels\n');
   }
 
-  // Fetch the issue from GitHub to get full details
-  console.log('Fetching issue details from GitHub...');
-  let githubIssue = await fetchIssue(issueNumber);
-
-  if (!githubIssue) {
-    // Create a minimal issue object from what we have
-    githubIssue = {
-      id: issue.issueId,
-      number: issueNumber,
-      title: issue.title,
-      body: '',
-      labels: [],
-      url: `https://github.com/${config.github.repo}/issues/${issueNumber}`,
-    };
-    console.log('⚠ Could not fetch full issue details, using cached info.\n');
-  } else {
-    console.log('✓ Issue details fetched\n');
-  }
-
-  // Claim the issue and spawn agent
-  await claimIssue(issueNumber, githubIssue.id, githubIssue.title, branchName);
-
-  console.log('Spawning new agent...\n');
-  await spawnFeatureAgent(githubIssue, branchName);
-
-  console.log(`\n✓ Agent spawned for issue #${issueNumber}`);
-  console.log('  Check the new terminal window to interact with the agent.');
+  console.log(`Issue #${issueNumber} has been reset.`);
+  console.log('It will be picked up for grooming on next orchestrator run.');
 }
 
 let isShuttingDown = false;
 
-async function processNewIssues(): Promise<void> {
+/**
+ * Process issues that need grooming (Phase 1)
+ * Only one grooming session at a time
+ */
+async function processGroomingIssues(): Promise<void> {
+  // Check if grooming is already in progress
+  if (await isGroomingInProgress()) {
+    console.log('[Orchestrator] Grooming already in progress, skipping');
+    return;
+  }
+
+  // Fetch issues that need grooming
+  const issues = await fetchGroomingIssues();
+  const groomingNumbers = await getGroomingIssueNumbers();
+
+  // Filter to unclaimed issues and sort by issue number (oldest first)
+  const unclaimedIssues = issues
+    .filter((issue) => !groomingNumbers.has(issue.number))
+    .sort((a, b) => a.number - b.number);
+
+  if (unclaimedIssues.length === 0) {
+    console.log('[Orchestrator] No issues need grooming');
+    return;
+  }
+
+  // Process only the first issue (single grooming at a time)
+  const issue = unclaimedIssues[0];
+
+  try {
+    console.log(`[Orchestrator] Starting grooming for issue #${issue.number}: ${issue.title}`);
+
+    // Claim the issue for grooming
+    const claimed = await claimIssueForGrooming(issue.number, issue.id, issue.title);
+    if (!claimed) {
+      console.log(`[Orchestrator] Issue #${issue.number} already being groomed, skipping`);
+      return;
+    }
+
+    // Update GitHub labels
+    await removeLabel(issue.number, config.github.groomingLabel);
+    await addLabel(issue.number, 'grooming');
+    await addIssueComment(
+      issue.number,
+      `🔍 Starting grooming session for this issue.\n\nThe agent will ask clarifying questions to understand the requirements.`
+    );
+
+    // Spawn the grooming agent
+    const result = await spawnGroomingAgent(issue);
+
+    if (!result.success) {
+      await handleAgentFailure(issue.number, result.output);
+    }
+  } catch (error) {
+    console.error(`[Orchestrator] Error grooming issue #${issue.number}:`, error);
+  }
+}
+
+/**
+ * Process issues that are ready for building (Phase 2)
+ * Can run multiple in parallel
+ */
+async function processReadyIssues(): Promise<void> {
   // Check if we have capacity for more agents
   const runningCount = getRunningAgentCount();
   if (runningCount >= config.orchestrator.maxParallelAgents) {
@@ -269,11 +354,11 @@ async function processNewIssues(): Promise<void> {
     .sort((a, b) => a.number - b.number);
 
   if (unclaimedIssues.length === 0) {
-    console.log('[Orchestrator] No new issues to process');
+    console.log('[Orchestrator] No ready issues to build');
     return;
   }
 
-  console.log(`[Orchestrator] Found ${unclaimedIssues.length} unclaimed issues`);
+  console.log(`[Orchestrator] Found ${unclaimedIssues.length} ready issues for building`);
 
   // Process issues up to capacity
   const availableSlots = config.orchestrator.maxParallelAgents - runningCount;
@@ -283,7 +368,15 @@ async function processNewIssues(): Promise<void> {
     if (isShuttingDown) break;
 
     try {
-      console.log(`[Orchestrator] Processing issue #${issue.number}: ${issue.title}`);
+      console.log(`[Orchestrator] Starting build for issue #${issue.number}: ${issue.title}`);
+
+      // Find the groomed plan from comments
+      const groomedPlan = await findGroomedPlan(issue.number);
+      if (!groomedPlan) {
+        console.log(`[Orchestrator] No groomed plan found for #${issue.number}, skipping`);
+        console.log(`[Orchestrator] Add "${config.github.groomingLabel}" label to groom first`);
+        continue;
+      }
 
       // Create a branch for this issue
       const branchName = await createBranch(issue.number);
@@ -297,23 +390,21 @@ async function processNewIssues(): Promise<void> {
       }
 
       // Update GitHub labels
-      await removeLabel(issue.number, config.github.issueLabel);
-      await addLabel(issue.number, 'in-progress');
+      await removeLabel(issue.number, config.github.readyLabel);
+      await addLabel(issue.number, config.github.inProgressLabel);
       await addIssueComment(
         issue.number,
-        `🤖 An agent has started working on this issue.\n\nBranch: \`${branchName}\``
+        `🔨 Building has started!\n\nBranch: \`${branchName}\`\n\nThe agent is implementing the approved plan.`
       );
 
-      // Spawn the agent in a visible terminal window
-      const result = await spawnFeatureAgent(issue, branchName);
+      // Spawn the feature agent with the groomed plan
+      const result = await spawnFeatureAgent(issue, branchName, groomedPlan);
 
       if (!result.success) {
         await handleAgentFailure(issue.number, result.output);
       }
-      // If successful, agent is running in its own window
-      // User will interact with it and create PR when done
     } catch (error) {
-      console.error(`[Orchestrator] Error processing issue #${issue.number}:`, error);
+      console.error(`[Orchestrator] Error building issue #${issue.number}:`, error);
     }
   }
 }
@@ -353,11 +444,12 @@ async function handleAgentSuccess(
 
 async function handleAgentFailure(issueNumber: number, error: string): Promise<void> {
   try {
-    await removeLabel(issueNumber, 'in-progress');
-    await addLabel(issueNumber, 'agent-failed');
+    await removeLabel(issueNumber, 'grooming');
+    await removeLabel(issueNumber, config.github.inProgressLabel);
+    await addLabel(issueNumber, config.github.failedLabel);
     await addIssueComment(
       issueNumber,
-      `❌ Agent encountered an error while working on this issue.\n\n\`\`\`\n${error.slice(0, 1000)}\n\`\`\`\n\nPlease review and re-add the \`${config.github.issueLabel}\` label to retry.`
+      `❌ Agent encountered an error while working on this issue.\n\n\`\`\`\n${error.slice(0, 1000)}\n\`\`\`\n\nPlease review and re-add the \`${config.github.groomingLabel}\` label to retry from grooming.`
     );
   } catch (commentError) {
     console.error(`[Orchestrator] Error commenting on issue #${issueNumber}:`, commentError);
@@ -368,10 +460,19 @@ async function orchestrationLoop(): Promise<void> {
   console.log('[Orchestrator] Starting orchestration loop...');
   console.log(`[Orchestrator] Polling interval: ${config.orchestrator.pollIntervalMs}ms`);
   console.log(`[Orchestrator] Max parallel agents: ${config.orchestrator.maxParallelAgents}`);
+  console.log('');
+  console.log('[Orchestrator] Two-phase workflow:');
+  console.log(`  Phase 1: Grooming (label: "${config.github.groomingLabel}") - Interactive, one at a time`);
+  console.log(`  Phase 2: Building (label: "${config.github.readyLabel}") - Parallel, autonomous`);
+  console.log('');
 
   while (!isShuttingDown) {
     try {
-      await processNewIssues();
+      // Phase 1: Process grooming issues (one at a time)
+      await processGroomingIssues();
+
+      // Phase 2: Process ready issues (parallel)
+      await processReadyIssues();
     } catch (error) {
       console.error('[Orchestrator] Error in main loop:', error);
     }
@@ -448,19 +549,32 @@ async function main(): Promise<void> {
   // Handle --help command
   if (args.includes('--help') || args.includes('-h')) {
     console.log(`
-Agent Orchestrator - Automatically implement GitHub issues with Claude Code
+Agent Orchestrator - Two-phase workflow for implementing GitHub issues with Claude Code
 
-Usage:
+WORKFLOW:
+  Phase 1 - Grooming (Interactive, one at a time):
+    - Issues with "${config.github.groomingLabel}" label are picked up for grooming
+    - Agent asks clarifying questions and creates implementation plan
+    - Plan is posted as a comment, label changed to "awaiting-approval"
+    - User reviews and changes label to "${config.github.readyLabel}" to approve
+
+  Phase 2 - Building (Parallel, autonomous):
+    - Issues with "${config.github.readyLabel}" label are picked up for building
+    - Agent implements following the approved plan
+    - Can run multiple in parallel (up to maxParallelAgents)
+
+USAGE:
   npm run dev              Start the orchestrator (dev mode)
   npm run status           Show tracked issues and their state
   npm run retry <issue#>   Reset and retry a specific issue
   npm run reset            Clear all tracked issues
   npm start -- --help      Show this help message
 
-Environment Variables:
-  GITHUB_TOKEN    GitHub Personal Access Token (required)
-  GITHUB_REPO     Repository as owner/repo (required)
-  ISSUE_LABEL     Label to filter issues (default: ready)
+ENVIRONMENT VARIABLES:
+  GITHUB_TOKEN      GitHub Personal Access Token (required)
+  GITHUB_REPO       Repository as owner/repo (required)
+  GROOMING_LABEL    Label for issues needing grooming (default: needs-grooming)
+  ISSUE_LABEL       Label for approved issues ready to build (default: ready)
 `);
     process.exit(0);
   }
@@ -475,7 +589,8 @@ Environment Variables:
   }
 
   console.log(`Repository: ${config.github.repo}`);
-  console.log(`Issue label: ${config.github.issueLabel}\n`);
+  console.log(`Grooming label: ${config.github.groomingLabel}`);
+  console.log(`Ready label: ${config.github.readyLabel}\n`);
 
   setupShutdownHandlers();
   await orchestrationLoop();

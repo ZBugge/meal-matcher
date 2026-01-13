@@ -4,7 +4,13 @@ export const config = {
   github: {
     token: process.env.GITHUB_TOKEN || '',
     repo: process.env.GITHUB_REPO || '',
-    issueLabel: process.env.ISSUE_LABEL || 'ready',
+    // Labels for the two-phase workflow
+    groomingLabel: process.env.GROOMING_LABEL || 'needs-grooming',
+    awaitingApprovalLabel: 'awaiting-approval',
+    readyLabel: process.env.ISSUE_LABEL || 'ready',
+    inProgressLabel: 'in-progress',
+    prReadyLabel: 'pr-ready',
+    failedLabel: 'agent-failed',
   },
   orchestrator: {
     pollIntervalMs: 60_000, // 1 minute

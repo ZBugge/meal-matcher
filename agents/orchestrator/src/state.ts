@@ -4,7 +4,7 @@ import { dirname } from 'path';
 import { config } from './config.js';
 
 export type AgentStatus = 'running' | 'completed' | 'failed' | 'timeout';
-export type IssueStatus = 'pending' | 'in_progress' | 'pr_created' | 'completed' | 'failed';
+export type IssueStatus = 'pending' | 'grooming' | 'awaiting_approval' | 'in_progress' | 'pr_created' | 'completed' | 'failed';
 
 export interface TrackedIssue {
   issueNumber: number;
@@ -100,13 +100,12 @@ function saveDb(): void {
 }
 
 /**
- * Claim an issue for processing
+ * Claim an issue for grooming
  */
-export async function claimIssue(
+export async function claimIssueForGrooming(
   issueNumber: number,
   issueId: number,
-  title: string,
-  branchName: string
+  title: string
 ): Promise<boolean> {
   const database = await getDb();
 
@@ -129,11 +128,57 @@ export async function claimIssue(
   if (existing) {
     // Re-claim a failed issue
     database.run(
+      `UPDATE issues SET status = 'grooming', updated_at = ? WHERE issue_number = ?`,
+      [now, issueNumber]
+    );
+  } else {
+    // New claim
+    database.run(
+      `INSERT INTO issues (issue_number, issue_id, title, status, created_at, updated_at) VALUES (?, ?, ?, 'grooming', ?, ?)`,
+      [issueNumber, issueId, title, now, now]
+    );
+  }
+
+  saveDb();
+  return true;
+}
+
+/**
+ * Claim an issue for building (implementation)
+ */
+export async function claimIssue(
+  issueNumber: number,
+  issueId: number,
+  title: string,
+  branchName: string
+): Promise<boolean> {
+  const database = await getDb();
+
+  // Check if already claimed for building
+  const stmt = database.prepare('SELECT status FROM issues WHERE issue_number = ?');
+  stmt.bind([issueNumber]);
+
+  let existing: { status: string } | undefined;
+  if (stmt.step()) {
+    existing = stmt.getAsObject() as { status: string };
+  }
+  stmt.free();
+
+  // Can claim if not exists, failed, or awaiting_approval (approved and ready)
+  if (existing && !['failed', 'awaiting_approval'].includes(existing.status)) {
+    return false; // Already claimed
+  }
+
+  const now = new Date().toISOString();
+
+  if (existing) {
+    // Update existing issue
+    database.run(
       `UPDATE issues SET status = 'in_progress', branch_name = ?, updated_at = ? WHERE issue_number = ?`,
       [branchName, now, issueNumber]
     );
   } else {
-    // New claim
+    // New claim (direct to building, skipping grooming)
     database.run(
       `INSERT INTO issues (issue_number, issue_id, title, status, branch_name, created_at, updated_at) VALUES (?, ?, ?, 'in_progress', ?, ?, ?)`,
       [issueNumber, issueId, title, branchName, now, now]
@@ -263,14 +308,14 @@ export async function getInProgressIssues(): Promise<TrackedIssue[]> {
 }
 
 /**
- * Get all claimed issue numbers
+ * Get all claimed issue numbers (for building phase)
  */
 export async function getClaimedIssueNumbers(): Promise<Set<number>> {
   const database = await getDb();
   const numbers = new Set<number>();
 
   const stmt = database.prepare(
-    `SELECT issue_number FROM issues WHERE status NOT IN ('completed', 'failed')`
+    `SELECT issue_number FROM issues WHERE status IN ('in_progress', 'pr_created')`
   );
   while (stmt.step()) {
     const row = stmt.getAsObject() as { issue_number: number };
@@ -279,6 +324,61 @@ export async function getClaimedIssueNumbers(): Promise<Set<number>> {
   stmt.free();
 
   return numbers;
+}
+
+/**
+ * Get all issue numbers currently being groomed
+ */
+export async function getGroomingIssueNumbers(): Promise<Set<number>> {
+  const database = await getDb();
+  const numbers = new Set<number>();
+
+  const stmt = database.prepare(
+    `SELECT issue_number FROM issues WHERE status = 'grooming'`
+  );
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as { issue_number: number };
+    numbers.add(row.issue_number);
+  }
+  stmt.free();
+
+  return numbers;
+}
+
+/**
+ * Check if any grooming is currently in progress
+ */
+export async function isGroomingInProgress(): Promise<boolean> {
+  const grooming = await getGroomingIssueNumbers();
+  return grooming.size > 0;
+}
+
+/**
+ * Get all tracked issues (for status display)
+ */
+export async function getAllTrackedIssues(): Promise<TrackedIssue[]> {
+  const database = await getDb();
+  const results: TrackedIssue[] = [];
+
+  const stmt = database.prepare(`SELECT * FROM issues ORDER BY issue_number`);
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as Record<string, unknown>;
+    results.push({
+      issueNumber: row.issue_number as number,
+      issueId: row.issue_id as number,
+      title: row.title as string,
+      status: row.status as IssueStatus,
+      branchName: row.branch_name as string | null,
+      prNumber: row.pr_number as number | null,
+      prUrl: row.pr_url as string | null,
+      agentId: row.agent_id as string | null,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
+    });
+  }
+  stmt.free();
+
+  return results;
 }
 
 /**

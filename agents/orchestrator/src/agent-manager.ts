@@ -22,18 +22,118 @@ function loadPrompt(promptName: string): string {
 }
 
 /**
+ * Build the full prompt for a grooming task
+ */
+function buildGroomingPrompt(issue: GitHubIssue): string {
+  const template = loadPrompt('grooming');
+  const { owner, repo } = getRepoOwnerAndName();
+
+  return template
+    .replace(/\{\{ISSUE_NUMBER\}\}/g, String(issue.number))
+    .replace(/\{\{ISSUE_TITLE\}\}/g, issue.title)
+    .replace(/\{\{ISSUE_BODY\}\}/g, issue.body)
+    .replace(/\{\{REPO\}\}/g, `${owner}/${repo}`);
+}
+
+/**
  * Build the full prompt for a feature implementation task
  */
-function buildFeaturePrompt(issue: GitHubIssue, branchName: string): string {
+function buildFeaturePrompt(issue: GitHubIssue, branchName: string, groomedPlan: string): string {
   const template = loadPrompt('feature-builder');
   const { owner, repo } = getRepoOwnerAndName();
 
   return template
-    .replace('{{ISSUE_NUMBER}}', String(issue.number))
-    .replace('{{ISSUE_TITLE}}', issue.title)
-    .replace('{{ISSUE_BODY}}', issue.body)
-    .replace('{{BRANCH_NAME}}', branchName)
-    .replace('{{REPO}}', `${owner}/${repo}`);
+    .replace(/\{\{ISSUE_NUMBER\}\}/g, String(issue.number))
+    .replace(/\{\{ISSUE_TITLE\}\}/g, issue.title)
+    .replace(/\{\{ISSUE_BODY\}\}/g, issue.body)
+    .replace(/\{\{BRANCH_NAME\}\}/g, branchName)
+    .replace(/\{\{REPO\}\}/g, `${owner}/${repo}`)
+    .replace(/\{\{GROOMED_PLAN\}\}/g, groomedPlan);
+}
+
+/**
+ * Spawn a Claude Code instance for grooming (visible in new terminal)
+ */
+export async function spawnGroomingAgent(issue: GitHubIssue): Promise<AgentResult> {
+  const agentId = randomUUID();
+  const prompt = buildGroomingPrompt(issue);
+
+  console.log(`[Agent ${agentId.slice(0, 8)}] Starting grooming agent for issue #${issue.number}`);
+  console.log(`[Agent ${agentId.slice(0, 8)}] Opening new terminal window...`);
+
+  try {
+    // Write prompt to a clearly named file
+    const promptDir = `${config.paths.dataDir}`.replace(/^\/([A-Z]):/, '$1:');
+    mkdirSync(promptDir, { recursive: true });
+    const promptFile = `${promptDir}\\groom-issue-${issue.number}.txt`.replace(/\//g, '\\');
+    writeFileSync(promptFile, prompt);
+
+    // Get the working directory (the main project, not orchestrator)
+    const workingDir = process.cwd().replace(/[\\/]agents[\\/]orchestrator$/, '').replace(/\//g, '\\');
+
+    // Create batch file for the Claude terminal
+    const batchFile = `${promptDir}\\groom-issue-${issue.number}.bat`.replace(/\//g, '\\');
+    const batchContent = `@echo off
+cd /d "${workingDir}"
+echo.
+echo ========================================
+echo   GROOMING: Issue #${issue.number}
+echo   ${issue.title}
+echo ========================================
+echo.
+echo This is a GROOMING session. Ask questions to clarify the issue.
+echo When done, post the plan as a comment and update the label.
+echo.
+echo Ready for prompt. Paste from Notepad (Ctrl+V) then press Enter.
+echo.
+claude --dangerously-skip-permissions
+echo.
+echo ========================================
+echo   Grooming finished
+echo ========================================
+pause
+`;
+    writeFileSync(batchFile, batchContent);
+
+    // Open Notepad with the prompt file
+    execa('cmd', ['/c', 'start', `"Groom Prompt: Issue #${issue.number}"`, 'notepad', promptFile], {
+      detached: true,
+      shell: true,
+    });
+
+    // Open terminal with Claude Code ready for paste
+    const windowTitle = `Groom: Issue #${issue.number}`;
+    const subprocess = execa('cmd', [
+      '/c',
+      'start',
+      `"${windowTitle}"`,
+      batchFile,
+    ], {
+      cwd: workingDir,
+      detached: true,
+      shell: true,
+    });
+
+    if (subprocess.pid) {
+      runningProcesses.set(agentId, subprocess);
+      await registerAgent(agentId, issue.number, 'grooming', subprocess.pid);
+    }
+
+    console.log(`[Agent ${agentId.slice(0, 8)}] Opened Notepad with grooming prompt + Claude terminal`);
+    console.log(`[Agent ${agentId.slice(0, 8)}] Copy prompt from Notepad (Ctrl+A, Ctrl+C) and paste into Claude (Ctrl+V)`);
+
+    return { success: true, output: 'Grooming agent windows opened', agentId };
+  } catch (error) {
+    runningProcesses.delete(agentId);
+
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await updateAgentStatus(agentId, 'failed', errorMessage);
+    await updateIssueStatus(issue.number, 'failed');
+
+    console.error(`[Agent ${agentId.slice(0, 8)}] Error: ${errorMessage}`);
+
+    return { success: false, output: errorMessage, agentId };
+  }
 }
 
 /**
@@ -41,10 +141,11 @@ function buildFeaturePrompt(issue: GitHubIssue, branchName: string): string {
  */
 export async function spawnFeatureAgent(
   issue: GitHubIssue,
-  branchName: string
+  branchName: string,
+  groomedPlan: string
 ): Promise<AgentResult> {
   const agentId = randomUUID();
-  const prompt = buildFeaturePrompt(issue, branchName);
+  const prompt = buildFeaturePrompt(issue, branchName, groomedPlan);
 
   console.log(`[Agent ${agentId.slice(0, 8)}] Starting feature agent for issue #${issue.number}`);
   console.log(`[Agent ${agentId.slice(0, 8)}] Opening new terminal window...`);

@@ -25,9 +25,9 @@ function getOctokit(): Octokit {
 }
 
 /**
- * Fetch all open issues with the configured label
+ * Fetch all open issues with a specific label
  */
-export async function fetchReadyIssues(): Promise<GitHubIssue[]> {
+async function fetchIssuesByLabel(label: string): Promise<GitHubIssue[]> {
   const { owner, repo } = getRepoOwnerAndName();
   const client = getOctokit();
 
@@ -35,7 +35,7 @@ export async function fetchReadyIssues(): Promise<GitHubIssue[]> {
     owner,
     repo,
     state: 'open',
-    labels: config.github.issueLabel,
+    labels: label,
     per_page: 100,
   });
 
@@ -49,6 +49,55 @@ export async function fetchReadyIssues(): Promise<GitHubIssue[]> {
       labels: issue.labels.map((l) => (typeof l === 'string' ? l : l.name || '')),
       url: issue.html_url,
     }));
+}
+
+/**
+ * Fetch all open issues that need grooming
+ */
+export async function fetchGroomingIssues(): Promise<GitHubIssue[]> {
+  return fetchIssuesByLabel(config.github.groomingLabel);
+}
+
+/**
+ * Fetch all open issues ready for implementation
+ */
+export async function fetchReadyIssues(): Promise<GitHubIssue[]> {
+  return fetchIssuesByLabel(config.github.readyLabel);
+}
+
+/**
+ * Get comments on an issue (to find groomed plan)
+ */
+export async function getIssueComments(issueNumber: number): Promise<string[]> {
+  const { owner, repo } = getRepoOwnerAndName();
+  const client = getOctokit();
+
+  const response = await client.issues.listComments({
+    owner,
+    repo,
+    issue_number: issueNumber,
+    per_page: 100,
+  });
+
+  return response.data.map((comment) => comment.body || '');
+}
+
+/**
+ * Find the groomed implementation plan from issue comments
+ */
+export async function findGroomedPlan(issueNumber: number): Promise<string | null> {
+  const comments = await getIssueComments(issueNumber);
+
+  // Look for the most recent comment containing the groomed plan header
+  for (let i = comments.length - 1; i >= 0; i--) {
+    const comment = comments[i];
+    if (comment.includes('## Groomed Implementation Plan') ||
+        comment.includes('### Requirements') && comment.includes('### Implementation Steps')) {
+      return comment;
+    }
+  }
+
+  return null;
 }
 
 /**

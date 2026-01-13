@@ -134,7 +134,7 @@ router.post('/swipes/:sessionId', (req, res) => {
     // Verify session is still open
     const session = getOne<Session>('SELECT status FROM sessions WHERE id = ?', [sessionId]);
     if (!session || session.status === 'closed') {
-      res.status(400).json({ error: 'Session is closed' });
+      res.status(400).json({ error: 'This session has ended', sessionClosed: true });
       return;
     }
 

@@ -15,9 +15,11 @@ Implement the plan above. Don't ask questions - the plan is approved.
 
 ### Steps
 1. Implement following the plan
-2. Make small, logical commits
-3. Push to `{{BRANCH_NAME}}`
-4. Create PR and update labels
+2. **Write tests for your code** (see Testing section below)
+3. Run tests to verify everything works
+4. Make small, logical commits
+5. Push to `{{BRANCH_NAME}}`
+6. Create PR and update labels
 
 ### On Completion
 ```
@@ -30,11 +32,33 @@ git push -u origin {{BRANCH_NAME}}
 git checkout master
 ```
 
+## Testing Requirements
+**Every feature must include tests.** This is not optional.
+
+### What to Test
+- New API endpoints: test success cases, error cases, auth requirements
+- New UI components: test rendering and key interactions
+- Business logic: test core functionality and edge cases
+- Database changes: test queries return expected results
+
+### How to Test
+- Run `npm test` from the project root
+- Backend tests go in `server/src/**/*.test.ts`
+- Frontend tests go in `client/src/**/*.test.ts` or `client/src/**/*.test.tsx`
+- Use Vitest (already configured)
+
+### Test Before Committing
+```
+npm test
+```
+If tests fail, fix them before pushing. Don't push broken tests.
+
 ## Rules
 - Be concise
 - Follow the plan exactly
 - Don't add extra features
 - Don't ask clarifying questions
+- **Always write tests for new code**
 
 ## Token Efficiency
 **CRITICAL:** The plan is already approved - minimize exploration.

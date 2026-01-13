@@ -3,31 +3,22 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { config } from './config.js';
 
-export type AgentStatus = 'running' | 'completed' | 'failed' | 'timeout';
-export type IssueStatus = 'pending' | 'grooming' | 'awaiting_approval' | 'in_progress' | 'pr_created' | 'completed' | 'failed';
+/**
+ * Simplified state tracking.
+ *
+ * GitHub labels are the source of truth for issue status.
+ * This DB only tracks which issues are "active" (currently being processed)
+ * to prevent duplicate pickup in the same poll cycle.
+ */
 
-export interface TrackedIssue {
+export type AgentType = 'grooming' | 'building';
+
+export interface ActiveIssue {
   issueNumber: number;
-  issueId: number;
-  title: string;
-  status: IssueStatus;
-  branchName: string | null;
-  prNumber: number | null;
-  prUrl: string | null;
+  agentType: AgentType;
   agentId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface TrackedAgent {
-  agentId: string;
-  issueNumber: number;
-  agentType: string;
-  status: AgentStatus;
-  pid: number | null;
+  branchName: string | null;
   startedAt: string;
-  completedAt: string | null;
-  output: string | null;
 }
 
 let db: Database | null = null;
@@ -61,31 +52,14 @@ async function getDb(): Promise<Database> {
 function initSchema(): void {
   const database = db!;
 
+  // Simple table: just track which issues are actively being processed
   database.run(`
-    CREATE TABLE IF NOT EXISTS issues (
+    CREATE TABLE IF NOT EXISTS active_issues (
       issue_number INTEGER PRIMARY KEY,
-      issue_id INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending',
-      branch_name TEXT,
-      pr_number INTEGER,
-      pr_url TEXT,
-      agent_id TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-  `);
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS agents (
-      agent_id TEXT PRIMARY KEY,
-      issue_number INTEGER NOT NULL,
       agent_type TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'running',
-      pid INTEGER,
-      started_at TEXT NOT NULL DEFAULT (datetime('now')),
-      completed_at TEXT,
-      output TEXT
+      agent_id TEXT,
+      branch_name TEXT,
+      started_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
 
@@ -100,178 +74,87 @@ function saveDb(): void {
 }
 
 /**
- * Claim an issue for grooming
+ * Mark an issue as actively being processed
  */
-export async function claimIssueForGrooming(
+export async function markIssueActive(
   issueNumber: number,
-  issueId: number,
-  title: string
+  agentType: AgentType,
+  agentId?: string,
+  branchName?: string
 ): Promise<boolean> {
   const database = await getDb();
 
-  // Check if already claimed
-  const stmt = database.prepare('SELECT status FROM issues WHERE issue_number = ?');
+  // Check if already active
+  const stmt = database.prepare('SELECT issue_number FROM active_issues WHERE issue_number = ?');
   stmt.bind([issueNumber]);
-
-  let existing: { status: string } | undefined;
-  if (stmt.step()) {
-    existing = stmt.getAsObject() as { status: string };
-  }
+  const exists = stmt.step();
   stmt.free();
 
-  if (existing && existing.status !== 'failed') {
-    return false; // Already claimed
+  if (exists) {
+    return false; // Already being processed
   }
 
   const now = new Date().toISOString();
-
-  if (existing) {
-    // Re-claim a failed issue
-    database.run(
-      `UPDATE issues SET status = 'grooming', updated_at = ? WHERE issue_number = ?`,
-      [now, issueNumber]
-    );
-  } else {
-    // New claim
-    database.run(
-      `INSERT INTO issues (issue_number, issue_id, title, status, created_at, updated_at) VALUES (?, ?, ?, 'grooming', ?, ?)`,
-      [issueNumber, issueId, title, now, now]
-    );
-  }
+  database.run(
+    `INSERT INTO active_issues (issue_number, agent_type, agent_id, branch_name, started_at) VALUES (?, ?, ?, ?, ?)`,
+    [issueNumber, agentType, agentId || null, branchName || null, now]
+  );
 
   saveDb();
   return true;
 }
 
 /**
- * Claim an issue for building (implementation)
+ * Update agent ID for an active issue
  */
-export async function claimIssue(
+export async function updateActiveIssueAgent(
   issueNumber: number,
-  issueId: number,
-  title: string,
-  branchName: string
-): Promise<boolean> {
+  agentId: string
+): Promise<void> {
   const database = await getDb();
+  database.run(
+    `UPDATE active_issues SET agent_id = ? WHERE issue_number = ?`,
+    [agentId, issueNumber]
+  );
+  saveDb();
+}
 
-  // Check if already claimed for building
-  const stmt = database.prepare('SELECT status FROM issues WHERE issue_number = ?');
+/**
+ * Check if an issue is currently being processed
+ */
+export async function isIssueActive(issueNumber: number): Promise<boolean> {
+  const database = await getDb();
+  const stmt = database.prepare('SELECT issue_number FROM active_issues WHERE issue_number = ?');
   stmt.bind([issueNumber]);
-
-  let existing: { status: string } | undefined;
-  if (stmt.step()) {
-    existing = stmt.getAsObject() as { status: string };
-  }
+  const exists = stmt.step();
   stmt.free();
+  return exists;
+}
 
-  // Can claim if not exists, failed, or awaiting_approval (approved and ready)
-  if (existing && !['failed', 'awaiting_approval'].includes(existing.status)) {
-    return false; // Already claimed
+/**
+ * Get all active issues of a specific type
+ */
+export async function getActiveIssues(agentType?: AgentType): Promise<ActiveIssue[]> {
+  const database = await getDb();
+  const results: ActiveIssue[] = [];
+
+  const query = agentType
+    ? 'SELECT * FROM active_issues WHERE agent_type = ?'
+    : 'SELECT * FROM active_issues';
+
+  const stmt = database.prepare(query);
+  if (agentType) {
+    stmt.bind([agentType]);
   }
 
-  const now = new Date().toISOString();
-
-  if (existing) {
-    // Update existing issue
-    database.run(
-      `UPDATE issues SET status = 'in_progress', branch_name = ?, updated_at = ? WHERE issue_number = ?`,
-      [branchName, now, issueNumber]
-    );
-  } else {
-    // New claim (direct to building, skipping grooming)
-    database.run(
-      `INSERT INTO issues (issue_number, issue_id, title, status, branch_name, created_at, updated_at) VALUES (?, ?, ?, 'in_progress', ?, ?, ?)`,
-      [issueNumber, issueId, title, branchName, now, now]
-    );
-  }
-
-  saveDb();
-  return true;
-}
-
-/**
- * Register a new agent for an issue
- */
-export async function registerAgent(
-  agentId: string,
-  issueNumber: number,
-  agentType: string,
-  pid: number
-): Promise<void> {
-  const database = await getDb();
-  const now = new Date().toISOString();
-
-  database.run(
-    `INSERT INTO agents (agent_id, issue_number, agent_type, pid, started_at) VALUES (?, ?, ?, ?, ?)`,
-    [agentId, issueNumber, agentType, pid, now]
-  );
-
-  database.run(
-    `UPDATE issues SET agent_id = ?, updated_at = ? WHERE issue_number = ?`,
-    [agentId, now, issueNumber]
-  );
-
-  saveDb();
-}
-
-/**
- * Update agent status
- */
-export async function updateAgentStatus(
-  agentId: string,
-  status: AgentStatus,
-  output?: string
-): Promise<void> {
-  const database = await getDb();
-  const now = new Date().toISOString();
-
-  database.run(
-    `UPDATE agents SET status = ?, completed_at = ?, output = ? WHERE agent_id = ?`,
-    [status, now, output || null, agentId]
-  );
-
-  saveDb();
-}
-
-/**
- * Update issue status
- */
-export async function updateIssueStatus(
-  issueNumber: number,
-  status: IssueStatus,
-  prNumber?: number,
-  prUrl?: string
-): Promise<void> {
-  const database = await getDb();
-  const now = new Date().toISOString();
-
-  database.run(
-    `UPDATE issues SET status = ?, pr_number = ?, pr_url = ?, updated_at = ? WHERE issue_number = ?`,
-    [status, prNumber || null, prUrl || null, now, issueNumber]
-  );
-
-  saveDb();
-}
-
-/**
- * Get all running agents
- */
-export async function getRunningAgents(): Promise<TrackedAgent[]> {
-  const database = await getDb();
-  const results: TrackedAgent[] = [];
-
-  const stmt = database.prepare(`SELECT * FROM agents WHERE status = 'running'`);
   while (stmt.step()) {
     const row = stmt.getAsObject() as Record<string, unknown>;
     results.push({
-      agentId: row.agent_id as string,
       issueNumber: row.issue_number as number,
-      agentType: row.agent_type as string,
-      status: row.status as AgentStatus,
-      pid: row.pid as number | null,
+      agentType: row.agent_type as AgentType,
+      agentId: row.agent_id as string | null,
+      branchName: row.branch_name as string | null,
       startedAt: row.started_at as string,
-      completedAt: row.completed_at as string | null,
-      output: row.output as string | null,
     });
   }
   stmt.free();
@@ -280,119 +163,28 @@ export async function getRunningAgents(): Promise<TrackedAgent[]> {
 }
 
 /**
- * Get issues that are in progress
+ * Get set of active issue numbers (for quick lookup)
  */
-export async function getInProgressIssues(): Promise<TrackedIssue[]> {
-  const database = await getDb();
-  const results: TrackedIssue[] = [];
-
-  const stmt = database.prepare(`SELECT * FROM issues WHERE status = 'in_progress'`);
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as Record<string, unknown>;
-    results.push({
-      issueNumber: row.issue_number as number,
-      issueId: row.issue_id as number,
-      title: row.title as string,
-      status: row.status as IssueStatus,
-      branchName: row.branch_name as string | null,
-      prNumber: row.pr_number as number | null,
-      prUrl: row.pr_url as string | null,
-      agentId: row.agent_id as string | null,
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
-    });
-  }
-  stmt.free();
-
-  return results;
+export async function getActiveIssueNumbers(agentType?: AgentType): Promise<Set<number>> {
+  const issues = await getActiveIssues(agentType);
+  return new Set(issues.map(i => i.issueNumber));
 }
 
 /**
- * Get all claimed issue numbers (for building phase)
+ * Clear an issue from active tracking (done processing)
  */
-export async function getClaimedIssueNumbers(): Promise<Set<number>> {
+export async function clearIssue(issueNumber: number): Promise<void> {
   const database = await getDb();
-  const numbers = new Set<number>();
-
-  const stmt = database.prepare(
-    `SELECT issue_number FROM issues WHERE status IN ('in_progress', 'pr_created')`
-  );
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as { issue_number: number };
-    numbers.add(row.issue_number);
-  }
-  stmt.free();
-
-  return numbers;
+  database.run('DELETE FROM active_issues WHERE issue_number = ?', [issueNumber]);
+  saveDb();
 }
 
 /**
- * Get all issue numbers currently being groomed
+ * Clear all active issues
  */
-export async function getGroomingIssueNumbers(): Promise<Set<number>> {
+export async function clearAllIssues(): Promise<void> {
   const database = await getDb();
-  const numbers = new Set<number>();
-
-  const stmt = database.prepare(
-    `SELECT issue_number FROM issues WHERE status = 'grooming'`
-  );
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as { issue_number: number };
-    numbers.add(row.issue_number);
-  }
-  stmt.free();
-
-  return numbers;
-}
-
-/**
- * Check if any grooming is currently in progress
- */
-export async function isGroomingInProgress(): Promise<boolean> {
-  const grooming = await getGroomingIssueNumbers();
-  return grooming.size > 0;
-}
-
-/**
- * Get all tracked issues (for status display)
- */
-export async function getAllTrackedIssues(): Promise<TrackedIssue[]> {
-  const database = await getDb();
-  const results: TrackedIssue[] = [];
-
-  const stmt = database.prepare(`SELECT * FROM issues ORDER BY issue_number`);
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as Record<string, unknown>;
-    results.push({
-      issueNumber: row.issue_number as number,
-      issueId: row.issue_id as number,
-      title: row.title as string,
-      status: row.status as IssueStatus,
-      branchName: row.branch_name as string | null,
-      prNumber: row.pr_number as number | null,
-      prUrl: row.pr_url as string | null,
-      agentId: row.agent_id as string | null,
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
-    });
-  }
-  stmt.free();
-
-  return results;
-}
-
-/**
- * Reset a specific issue (delete from tracking)
- */
-export async function resetIssue(issueNumber: number): Promise<void> {
-  const database = await getDb();
-
-  // Delete associated agents
-  database.run(`DELETE FROM agents WHERE issue_number = ?`, [issueNumber]);
-
-  // Delete the issue
-  database.run(`DELETE FROM issues WHERE issue_number = ?`, [issueNumber]);
-
+  database.run('DELETE FROM active_issues');
   saveDb();
 }
 

@@ -15,6 +15,8 @@ export const config = {
   orchestrator: {
     pollIntervalMs: 60_000, // 1 minute
     maxParallelAgents: 1,
+    groomingModel: 'opus', // Best model for planning
+    buildingModel: 'sonnet', // Good balance for implementation
   },
   paths: {
     dataDir: new URL('../../data', import.meta.url).pathname,

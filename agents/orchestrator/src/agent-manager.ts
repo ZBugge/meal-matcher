@@ -2,7 +2,6 @@ import { execa, ExecaChildProcess } from 'execa';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { randomUUID } from 'crypto';
 import { config, getRepoOwnerAndName } from './config.js';
-import { registerAgent, updateAgentStatus, updateIssueStatus } from './state.js';
 import type { GitHubIssue } from './github.js';
 
 export interface AgentResult {
@@ -73,8 +72,10 @@ export async function spawnGroomingAgent(issue: GitHubIssue): Promise<AgentResul
 
     // Create batch file for the Claude terminal
     const batchFile = `${promptDir}\\groom-issue-${issue.number}.bat`.replace(/\//g, '\\');
+    const ghToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
     const batchContent = `@echo off
 cd /d "${workingDir}"
+set GH_TOKEN=${ghToken}
 echo.
 echo ========================================
 echo   GROOMING: Issue #${issue.number}
@@ -86,7 +87,7 @@ echo When done, post the plan as a comment and update the label.
 echo.
 echo Ready for prompt. Paste from Notepad (Ctrl+V) then press Enter.
 echo.
-claude --dangerously-skip-permissions
+claude --dangerously-skip-permissions --model ${config.orchestrator.groomingModel}
 echo.
 echo ========================================
 echo   Grooming finished
@@ -116,7 +117,6 @@ pause
 
     if (subprocess.pid) {
       runningProcesses.set(agentId, subprocess);
-      await registerAgent(agentId, issue.number, 'grooming', subprocess.pid);
     }
 
     console.log(`[Agent ${agentId.slice(0, 8)}] Opened Notepad with grooming prompt + Claude terminal`);
@@ -125,13 +125,8 @@ pause
     return { success: true, output: 'Grooming agent windows opened', agentId };
   } catch (error) {
     runningProcesses.delete(agentId);
-
     const errorMessage = error instanceof Error ? error.message : String(error);
-    await updateAgentStatus(agentId, 'failed', errorMessage);
-    await updateIssueStatus(issue.number, 'failed');
-
     console.error(`[Agent ${agentId.slice(0, 8)}] Error: ${errorMessage}`);
-
     return { success: false, output: errorMessage, agentId };
   }
 }
@@ -162,11 +157,13 @@ export async function spawnFeatureAgent(
 
     // Create batch file for the Claude terminal
     const batchFile = `${promptDir}\\run-issue-${issue.number}.bat`.replace(/\//g, '\\');
+    const ghToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
     const batchContent = `@echo off
 cd /d "${workingDir}"
+set GH_TOKEN=${ghToken}
 echo.
 echo ========================================
-echo   Agent: Issue #${issue.number}
+echo   BUILDING: Issue #${issue.number}
 echo   ${issue.title}
 echo ========================================
 echo.
@@ -175,10 +172,10 @@ git checkout ${branchName} 2>nul || git checkout -b ${branchName}
 echo.
 echo Ready for prompt. Paste from Notepad (Ctrl+V) then press Enter.
 echo.
-claude --dangerously-skip-permissions
+claude --dangerously-skip-permissions --model ${config.orchestrator.buildingModel}
 echo.
 echo ========================================
-echo   Agent finished
+echo   Build finished
 echo ========================================
 pause
 `;
@@ -191,7 +188,7 @@ pause
     });
 
     // Open terminal with Claude Code ready for paste
-    const windowTitle = `Agent: Issue #${issue.number}`;
+    const windowTitle = `Build: Issue #${issue.number}`;
     const subprocess = execa('cmd', [
       '/c',
       'start',
@@ -205,7 +202,6 @@ pause
 
     if (subprocess.pid) {
       runningProcesses.set(agentId, subprocess);
-      await registerAgent(agentId, issue.number, 'feature-builder', subprocess.pid);
     }
 
     console.log(`[Agent ${agentId.slice(0, 8)}] Opened Notepad with prompt + Claude terminal for issue #${issue.number}`);
@@ -214,29 +210,10 @@ pause
     return { success: true, output: 'Agent windows opened', agentId };
   } catch (error) {
     runningProcesses.delete(agentId);
-
     const errorMessage = error instanceof Error ? error.message : String(error);
-    await updateAgentStatus(agentId, 'failed', errorMessage);
-    await updateIssueStatus(issue.number, 'failed');
-
     console.error(`[Agent ${agentId.slice(0, 8)}] Error: ${errorMessage}`);
-
     return { success: false, output: errorMessage, agentId };
   }
-}
-
-/**
- * Kill a running agent process
- */
-export async function killAgent(agentId: string): Promise<boolean> {
-  const process = runningProcesses.get(agentId);
-  if (process) {
-    process.kill('SIGTERM');
-    runningProcesses.delete(agentId);
-    await updateAgentStatus(agentId, 'failed', 'Killed by orchestrator');
-    return true;
-  }
-  return false;
 }
 
 /**
@@ -253,7 +230,6 @@ export async function cleanupAgents(): Promise<void> {
   for (const [agentId, process] of runningProcesses) {
     console.log(`[Cleanup] Killing agent ${agentId.slice(0, 8)}`);
     process.kill('SIGTERM');
-    await updateAgentStatus(agentId, 'failed', 'Orchestrator shutdown');
   }
   runningProcesses.clear();
 }

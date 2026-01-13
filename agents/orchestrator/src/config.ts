@@ -14,7 +14,7 @@ export const config = {
   },
   orchestrator: {
     pollIntervalMs: 60_000, // 1 minute
-    maxParallelAgents: 1,
+    maxParallelAgents: 2,
     groomingModel: 'opus', // Best model for planning
     buildingModel: 'sonnet', // Good balance for implementation
   },

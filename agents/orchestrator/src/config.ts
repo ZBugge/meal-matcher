@@ -13,10 +13,10 @@ export const config = {
     failedLabel: 'agent-failed',
   },
   orchestrator: {
-    pollIntervalMs: 60_000, // 1 minute
-    maxParallelAgents: 2,
-    groomingModel: 'opus', // Best model for planning
-    buildingModel: 'sonnet', // Good balance for implementation
+    pollIntervalMs: parseInt(process.env.POLL_INTERVAL_MS || '60000', 10),
+    maxParallelAgents: parseInt(process.env.MAX_PARALLEL_AGENTS || '1', 10),
+    groomingModel: process.env.GROOMING_MODEL || 'opus',
+    buildingModel: process.env.BUILDING_MODEL || 'sonnet',
   },
   paths: {
     dataDir: new URL('../../data', import.meta.url).pathname,

@@ -3,12 +3,14 @@ import { execSync } from 'child_process';
 import { config, validateConfig } from './config.js';
 import {
   fetchReadyIssues,
+  fetchPRReadyIssues,
   fetchIssue,
   createBranch,
   createPullRequest,
   addIssueComment,
   removeLabel,
   addLabel,
+  getPullRequestForBranch,
   GitHubIssue,
 } from './github.js';
 import {
@@ -21,6 +23,7 @@ import {
 } from './state.js';
 import {
   spawnFeatureAgent,
+  spawnReviewerAgent,
   getRunningAgentCount,
   cleanupAgents,
 } from './agent-manager.js';
@@ -313,6 +316,78 @@ async function processNewIssues(): Promise<void> {
   }
 }
 
+async function processPRReadyIssues(): Promise<void> {
+  // Check if we have capacity for more agents
+  const runningCount = getRunningAgentCount();
+  if (runningCount >= config.orchestrator.maxParallelAgents) {
+    return;
+  }
+
+  // Fetch issues with pr-ready label
+  const issues = await fetchPRReadyIssues();
+
+  if (issues.length === 0) {
+    return;
+  }
+
+  console.log(`[Orchestrator] Found ${issues.length} PR(s) ready for review`);
+
+  // Process PRs up to capacity
+  const availableSlots = config.orchestrator.maxParallelAgents - runningCount;
+  const prsToReview = issues.slice(0, availableSlots);
+
+  for (const issue of prsToReview) {
+    if (isShuttingDown) break;
+
+    try {
+      const branchName = `feature/issue-${issue.number}`;
+      const pr = await getPullRequestForBranch(branchName);
+
+      if (!pr) {
+        console.log(`[Orchestrator] No PR found for issue #${issue.number}, skipping`);
+        continue;
+      }
+
+      console.log(`[Orchestrator] Starting review for PR #${pr.number} (issue #${issue.number})`);
+
+      // Get the approved plan from issue comments
+      // For now, we'll use the issue body as the plan
+      const approvedPlan = issue.body;
+
+      // Update labels
+      await removeLabel(issue.number, 'pr-ready');
+      await addLabel(issue.number, 'reviewing');
+      await addIssueComment(
+        issue.number,
+        `🤖 A reviewer agent has started reviewing PR #${pr.number}.\n\nThe agent will check spec compliance and test coverage.`
+      );
+
+      // Spawn the reviewer agent
+      const result = await spawnReviewerAgent(issue, branchName, pr.number, approvedPlan);
+
+      if (!result.success) {
+        await handleReviewerFailure(issue.number, pr.number, result.output);
+      }
+      // If successful, agent is running in its own window
+    } catch (error) {
+      console.error(`[Orchestrator] Error processing PR for issue #${issue.number}:`, error);
+    }
+  }
+}
+
+async function handleReviewerFailure(issueNumber: number, prNumber: number, error: string): Promise<void> {
+  try {
+    await removeLabel(issueNumber, 'reviewing');
+    await addLabel(issueNumber, 'needs-fixes');
+    await addIssueComment(
+      issueNumber,
+      `❌ Reviewer agent encountered an error.\n\n\`\`\`\n${error.slice(0, 1000)}\n\`\`\``
+    );
+  } catch (commentError) {
+    console.error(`[Orchestrator] Error commenting on issue #${issueNumber}:`, commentError);
+  }
+}
+
 async function handleAgentSuccess(
   issueNumber: number,
   branchName: string,
@@ -366,7 +441,11 @@ async function orchestrationLoop(): Promise<void> {
 
   while (!isShuttingDown) {
     try {
+      // Phase 1: Process new issues (ready label)
       await processNewIssues();
+
+      // Phase 3: Process PRs ready for review (pr-ready label)
+      await processPRReadyIssues();
     } catch (error) {
       console.error('[Orchestrator] Error in main loop:', error);
     }

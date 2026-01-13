@@ -10,6 +10,15 @@ export const config = {
     pollIntervalMs: 60_000, // 1 minute
     maxParallelAgents: 1,
   },
+  labels: {
+    ready: 'ready',
+    inProgress: 'in-progress',
+    prReady: 'pr-ready',
+    reviewing: 'reviewing',
+    merged: 'merged',
+    needsFixes: 'needs-fixes',
+    agentFailed: 'agent-failed',
+  },
   paths: {
     dataDir: new URL('../../data', import.meta.url).pathname,
     promptsDir: new URL('../../prompts', import.meta.url).pathname,

@@ -167,15 +167,43 @@ echo   BUILDING: Issue #${issue.number}
 echo   ${issue.title}
 echo ========================================
 echo.
-echo Checking out branch ${branchName}...
-git checkout ${branchName} 2>nul || git checkout -b ${branchName}
+echo [%TIME%] Working directory: %CD%
+echo [%TIME%] Branch: ${branchName}
+echo [%TIME%] Model: ${config.orchestrator.buildingModel}
+echo [%TIME%] Prompt file: ${promptFile}
 echo.
-echo Starting autonomous feature builder agent...
+echo [%TIME%] Checking out branch...
+git checkout ${branchName} 2>nul || git checkout -b ${branchName}
+if errorlevel 1 (
+    echo [%TIME%] ERROR: Failed to checkout branch
+    pause
+    exit /b 1
+)
+echo [%TIME%] On branch:
+git branch --show-current
+echo.
+echo ----------------------------------------
+echo [%TIME%] Starting Claude Code agent...
+echo ----------------------------------------
 echo.
 type "${promptFile}" | claude --dangerously-skip-permissions --print --model ${config.orchestrator.buildingModel}
+set CLAUDE_EXIT=%errorlevel%
+echo.
+echo ----------------------------------------
+echo [%TIME%] Claude Code finished with exit code: %CLAUDE_EXIT%
+echo ----------------------------------------
+echo.
+if %CLAUDE_EXIT% EQU 0 (
+    echo [%TIME%] SUCCESS - Agent completed successfully
+) else (
+    echo [%TIME%] WARNING - Agent exited with non-zero code
+)
+echo.
+echo [%TIME%] Final git status:
+git status --short
 echo.
 echo ========================================
-echo   Build finished
+echo   Build finished at %TIME%
 echo ========================================
 pause
 `;

@@ -46,3 +46,25 @@ Or if user approves during session, use `--add-label "ready"` instead.
 - Be concise in all responses
 - Max 3-5 questions at a time
 - Focus only on what's needed for implementation
+
+## Token Efficiency
+**CRITICAL:** Minimize token usage during exploration.
+
+### Search Before Reading
+- Use `Grep` to search file contents before reading files
+- Use `Glob` to find files by pattern before reading them
+- Only `Read` files after confirming they're relevant
+
+### Use Task Tool for Open-Ended Exploration
+- For questions like "where is X handled?" use Task tool with `subagent_type=Explore`
+- For codebase structure questions, use Task tool instead of manual exploration
+- Let specialized agents handle multi-file searches
+
+### Read Strategically
+- Read only relevant sections of large files using `offset`/`limit` parameters
+- Don't read entire directories - search first
+- Skip files that aren't directly related to the issue
+
+### Example Flow
+❌ **Bad:** Read 10 files to find authentication logic
+✅ **Good:** Grep for "authenticate" → Read only matching files

@@ -22,6 +22,7 @@ export function SwipeSession() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [sessionClosed, setSessionClosed] = useState(false);
 
   // Initialize progress hook with placeholder values first
   const displayName = sessionData?.displayName || '';
@@ -89,10 +90,36 @@ export function SwipeSession() {
         navigate(`/results/${sessionId}`);
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit votes');
+      // Check if the session was closed
+      if (err && typeof err === 'object' && 'sessionClosed' in err && err.sessionClosed) {
+        // Clear storage
+        clearProgress();
+        sessionStorage.removeItem(`session_${sessionId}`);
+        setSessionClosed(true);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to submit votes');
+      }
       setSubmitting(false);
     }
   };
+
+  if (sessionClosed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="card text-center max-w-md">
+          <div className="text-6xl mb-4">🔒</div>
+          <h1 className="text-2xl font-bold mb-2">Session Ended</h1>
+          <p className="text-gray-600 mb-4">This session has been ended.</p>
+          <button
+            onClick={() => navigate('/')}
+            className="btn btn-primary"
+          >
+            Go Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (error && !sessionData) {
     return (

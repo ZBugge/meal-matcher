@@ -10,9 +10,18 @@ export interface GitHubIssue {
   url: string;
 }
 
+export interface SimplePullRequest {
+  number: number;
+  url: string;
+}
+
 export interface PullRequest {
   number: number;
   url: string;
+  title: string;
+  body: string;
+  head: string;
+  diff: string;
 }
 
 let octokit: Octokit | null = null;
@@ -63,6 +72,13 @@ export async function fetchGroomingIssues(): Promise<GitHubIssue[]> {
  */
 export async function fetchReadyIssues(): Promise<GitHubIssue[]> {
   return fetchIssuesByLabel(config.github.readyLabel);
+}
+
+/**
+ * Fetch all open issues with PRs ready for review
+ */
+export async function fetchPRReadyIssues(): Promise<GitHubIssue[]> {
+  return fetchIssuesByLabel(config.github.prReadyLabel);
 }
 
 /**
@@ -194,7 +210,7 @@ export async function createPullRequest(
   branchName: string,
   title: string,
   body: string
-): Promise<PullRequest> {
+): Promise<SimplePullRequest> {
   const { owner, repo } = getRepoOwnerAndName();
   const client = getOctokit();
 
@@ -268,4 +284,64 @@ export async function addLabel(issueNumber: number, label: string): Promise<void
 export async function getIssueLabels(issueNumber: number): Promise<string[]> {
   const issue = await fetchIssue(issueNumber);
   return issue?.labels || [];
+}
+
+/**
+ * Get pull request for a branch
+ */
+export async function getPullRequestForBranch(branchName: string): Promise<PullRequest | null> {
+  const { owner, repo } = getRepoOwnerAndName();
+  const client = getOctokit();
+
+  try {
+    const { data: pulls } = await client.pulls.list({
+      owner,
+      repo,
+      state: 'open',
+      head: `${owner}:${branchName}`,
+      per_page: 1,
+    });
+
+    if (pulls.length === 0) {
+      return null;
+    }
+
+    const pr = pulls[0];
+
+    // Get the diff
+    const { data: diff } = await client.pulls.get({
+      owner,
+      repo,
+      pull_number: pr.number,
+      mediaType: {
+        format: 'diff',
+      },
+    });
+
+    return {
+      number: pr.number,
+      url: pr.html_url,
+      title: pr.title,
+      body: pr.body || '',
+      head: pr.head.ref,
+      diff: diff as unknown as string,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Merge a pull request
+ */
+export async function mergePullRequest(prNumber: number): Promise<void> {
+  const { owner, repo } = getRepoOwnerAndName();
+  const client = getOctokit();
+
+  await client.pulls.merge({
+    owner,
+    repo,
+    pull_number: prNumber,
+    merge_method: 'squash',
+  });
 }

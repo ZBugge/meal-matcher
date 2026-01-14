@@ -11,7 +11,7 @@ import { config } from './config.js';
  * to prevent duplicate pickup in the same poll cycle.
  */
 
-export type AgentType = 'grooming' | 'building';
+export type AgentType = 'grooming' | 'building' | 'reviewing';
 
 export interface ActiveIssue {
   issueNumber: number;

@@ -51,6 +51,23 @@ function buildFeaturePrompt(issue: GitHubIssue, branchName: string, groomedPlan:
 }
 
 /**
+ * Build the full prompt for a PR review task
+ */
+function buildReviewPrompt(issue: GitHubIssue, branchName: string, groomedPlan: string, prNumber: number): string {
+  const template = loadPrompt('pr-reviewer');
+  const { owner, repo } = getRepoOwnerAndName();
+
+  return template
+    .replace(/\{\{ISSUE_NUMBER\}\}/g, String(issue.number))
+    .replace(/\{\{ISSUE_TITLE\}\}/g, issue.title)
+    .replace(/\{\{ISSUE_BODY\}\}/g, issue.body)
+    .replace(/\{\{BRANCH_NAME\}\}/g, branchName)
+    .replace(/\{\{REPO\}\}/g, `${owner}/${repo}`)
+    .replace(/\{\{GROOMED_PLAN\}\}/g, groomedPlan)
+    .replace(/\{\{PR_NUMBER\}\}/g, String(prNumber));
+}
+
+/**
  * Spawn a Claude Code instance for grooming (visible in new terminal)
  */
 export async function spawnGroomingAgent(issue: GitHubIssue): Promise<AgentResult> {
@@ -229,6 +246,113 @@ pause
     console.log(`[Agent ${agentId.slice(0, 8)}] Started autonomous feature builder for issue #${issue.number}`);
 
     return { success: true, output: 'Agent windows opened', agentId };
+  } catch (error) {
+    runningProcesses.delete(agentId);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[Agent ${agentId.slice(0, 8)}] Error: ${errorMessage}`);
+    return { success: false, output: errorMessage, agentId };
+  }
+}
+
+/**
+ * Spawn a Claude Code instance to review a PR (visible in new terminal)
+ */
+export async function spawnReviewerAgent(
+  issue: GitHubIssue,
+  branchName: string,
+  groomedPlan: string,
+  prNumber: number
+): Promise<AgentResult> {
+  const agentId = randomUUID();
+  const prompt = buildReviewPrompt(issue, branchName, groomedPlan, prNumber);
+
+  console.log(`[Agent ${agentId.slice(0, 8)}] Starting reviewer agent for issue #${issue.number}, PR #${prNumber}`);
+  console.log(`[Agent ${agentId.slice(0, 8)}] Opening new terminal window...`);
+
+  try {
+    // Write prompt to a clearly named file
+    const promptDir = `${config.paths.dataDir}`.replace(/^\/([A-Z]):/, '$1:');
+    mkdirSync(promptDir, { recursive: true });
+    const promptFile = `${promptDir}\\review-issue-${issue.number}.txt`.replace(/\//g, '\\');
+    writeFileSync(promptFile, prompt);
+
+    // Get the working directory (the main project, not orchestrator)
+    const workingDir = process.cwd().replace(/[\\/]agents[\\/]orchestrator$/, '').replace(/\//g, '\\');
+
+    // Create batch file for the Claude terminal - runs autonomously
+    const batchFile = `${promptDir}\\review-issue-${issue.number}.bat`.replace(/\//g, '\\');
+    const ghToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
+    const batchContent = `@echo off
+cd /d "${workingDir}"
+set GH_TOKEN=${ghToken}
+echo.
+echo ========================================
+echo   REVIEWING: Issue #${issue.number}, PR #${prNumber}
+echo   ${issue.title}
+echo ========================================
+echo.
+echo [%TIME%] Working directory: %CD%
+echo [%TIME%] Branch: ${branchName}
+echo [%TIME%] Model: ${config.orchestrator.buildingModel}
+echo [%TIME%] Prompt file: ${promptFile}
+echo.
+echo [%TIME%] Checking out branch...
+git checkout ${branchName} 2>nul
+if errorlevel 1 (
+    echo [%TIME%] ERROR: Failed to checkout branch
+    pause
+    exit /b 1
+)
+echo [%TIME%] On branch:
+git branch --show-current
+echo.
+echo ----------------------------------------
+echo [%TIME%] Starting Claude Code reviewer...
+echo ----------------------------------------
+echo.
+type "${promptFile}" | claude --dangerously-skip-permissions --print --model ${config.orchestrator.buildingModel}
+set CLAUDE_EXIT=%errorlevel%
+echo.
+echo ----------------------------------------
+echo [%TIME%] Claude Code finished with exit code: %CLAUDE_EXIT%
+echo ----------------------------------------
+echo.
+if %CLAUDE_EXIT% EQU 0 (
+    echo [%TIME%] SUCCESS - Review completed
+) else (
+    echo [%TIME%] WARNING - Review exited with non-zero code
+)
+echo.
+echo [%TIME%] Final git status:
+git status --short
+echo.
+echo ========================================
+echo   Review finished at %TIME%
+echo ========================================
+pause
+`;
+    writeFileSync(batchFile, batchContent);
+
+    // Open terminal with Claude Code running autonomously
+    const windowTitle = `Review: Issue #${issue.number}, PR #${prNumber}`;
+    const subprocess = execa('cmd', [
+      '/c',
+      'start',
+      `"${windowTitle}"`,
+      batchFile,
+    ], {
+      cwd: workingDir,
+      detached: true,
+      shell: true,
+    });
+
+    if (subprocess.pid) {
+      runningProcesses.set(agentId, subprocess);
+    }
+
+    console.log(`[Agent ${agentId.slice(0, 8)}] Started autonomous PR reviewer for issue #${issue.number}`);
+
+    return { success: true, output: 'Reviewer agent window opened', agentId };
   } catch (error) {
     runningProcesses.delete(agentId);
     const errorMessage = error instanceof Error ? error.message : String(error);

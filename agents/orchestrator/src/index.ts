@@ -3,12 +3,14 @@ import { config, validateConfig } from './config.js';
 import {
   fetchReadyIssues,
   fetchGroomingIssues,
+  fetchPRReadyIssues,
   createBranch,
   addIssueComment,
   removeLabel,
   addLabel,
   findGroomedPlan,
   getIssueLabels,
+  getPullRequestForBranch,
 } from './github.js';
 import {
   markIssueActive,
@@ -21,6 +23,7 @@ import {
 import {
   spawnFeatureAgent,
   spawnGroomingAgent,
+  spawnReviewerAgent,
   getRunningAgentCount,
   cleanupAgents,
 } from './agent-manager.js';
@@ -108,6 +111,12 @@ async function syncActiveIssues(): Promise<void> {
     // Building issues should have "in-progress" label while active
     if (issue.agentType === 'building' && !labels.includes(config.github.inProgressLabel)) {
       console.log(`[Orchestrator] Building done for #${issue.issueNumber}, releasing hold`);
+      await clearIssue(issue.issueNumber);
+    }
+
+    // Reviewing issues should have "reviewing" label while active
+    if (issue.agentType === 'reviewing' && !labels.includes(config.github.reviewingLabel)) {
+      console.log(`[Orchestrator] Review done for #${issue.issueNumber}, releasing hold`);
       await clearIssue(issue.issueNumber);
     }
   }
@@ -247,10 +256,95 @@ async function processReadyIssues(): Promise<void> {
   }
 }
 
+/**
+ * Process PRs that are ready for review (Phase 3)
+ * Can run multiple in parallel
+ */
+async function processPRReadyIssues(): Promise<void> {
+  // Check capacity
+  const runningCount = getRunningAgentCount();
+  if (runningCount >= config.orchestrator.maxParallelAgents) {
+    console.log(`[Orchestrator] At max capacity (${runningCount} agents running)`);
+    return;
+  }
+
+  // Fetch pr-ready issues from GitHub (source of truth)
+  const issues = await fetchPRReadyIssues();
+  const activeReviewing = await getActiveIssueNumbers('reviewing');
+
+  // Filter out already active issues
+  const availableIssues = issues
+    .filter(issue => !activeReviewing.has(issue.number))
+    .sort((a, b) => a.number - b.number);
+
+  if (availableIssues.length === 0) {
+    console.log('[Orchestrator] No PRs ready for review');
+    return;
+  }
+
+  console.log(`[Orchestrator] Found ${availableIssues.length} PRs ready for review`);
+
+  // Process issues up to capacity
+  const availableSlots = config.orchestrator.maxParallelAgents - runningCount;
+  const issuesToProcess = availableIssues.slice(0, availableSlots);
+
+  for (const issue of issuesToProcess) {
+    if (isShuttingDown) break;
+
+    // Mark as active
+    const marked = await markIssueActive(issue.number, 'reviewing');
+    if (!marked) {
+      console.log(`[Orchestrator] Issue #${issue.number} already active, skipping`);
+      continue;
+    }
+
+    try {
+      console.log(`[Orchestrator] Starting review for issue #${issue.number}: ${issue.title}`);
+
+      // Find the groomed plan from comments
+      const groomedPlan = await findGroomedPlan(issue.number);
+      if (!groomedPlan) {
+        console.log(`[Orchestrator] No groomed plan found for #${issue.number}, skipping`);
+        await clearIssue(issue.number);
+        continue;
+      }
+
+      // Get the branch name and PR
+      const branchName = `feature/issue-${issue.number}`;
+      const pr = await getPullRequestForBranch(branchName);
+      if (!pr) {
+        console.log(`[Orchestrator] No PR found for branch ${branchName}, skipping`);
+        await clearIssue(issue.number);
+        continue;
+      }
+
+      // Update GitHub labels
+      await removeLabel(issue.number, config.github.prReadyLabel);
+      await addLabel(issue.number, config.github.reviewingLabel);
+      await addIssueComment(
+        issue.number,
+        `🔍 PR review started!\n\nPR: #${pr.number}\nBranch: \`${branchName}\`\n\nThe agent will review for spec compliance and test coverage.`
+      );
+
+      // Spawn the reviewer agent
+      const result = await spawnReviewerAgent(issue, branchName, groomedPlan, pr.number);
+
+      if (!result.success) {
+        await handleAgentFailure(issue.number, result.output);
+        await clearIssue(issue.number);
+      }
+    } catch (error) {
+      console.error(`[Orchestrator] Error reviewing issue #${issue.number}:`, error);
+      await clearIssue(issue.number);
+    }
+  }
+}
+
 async function handleAgentFailure(issueNumber: number, error: string): Promise<void> {
   try {
     await removeLabel(issueNumber, 'grooming');
     await removeLabel(issueNumber, config.github.inProgressLabel);
+    await removeLabel(issueNumber, config.github.reviewingLabel);
     await addLabel(issueNumber, config.github.failedLabel);
     await addIssueComment(
       issueNumber,
@@ -269,6 +363,7 @@ async function orchestrationLoop(): Promise<void> {
   console.log('[Orchestrator] GitHub labels are the source of truth:');
   console.log(`  Phase 1 (Grooming): "${config.github.groomingLabel}" → "grooming" → "${config.github.awaitingApprovalLabel}"`);
   console.log(`  Phase 2 (Building): "${config.github.readyLabel}" → "${config.github.inProgressLabel}" → "${config.github.prReadyLabel}"`);
+  console.log(`  Phase 3 (Reviewing): "${config.github.prReadyLabel}" → "${config.github.reviewingLabel}" → "${config.github.mergedLabel}"`);
   console.log('');
 
   while (!isShuttingDown) {
@@ -281,6 +376,9 @@ async function orchestrationLoop(): Promise<void> {
 
       // Phase 2: Process ready issues (parallel)
       await processReadyIssues();
+
+      // Phase 3: Process PR ready issues (parallel)
+      await processPRReadyIssues();
     } catch (error) {
       console.error('[Orchestrator] Error in main loop:', error);
     }

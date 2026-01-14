@@ -4,12 +4,15 @@ export const config = {
   github: {
     token: process.env.GITHUB_TOKEN || '',
     repo: process.env.GITHUB_REPO || '',
-    // Labels for the two-phase workflow
+    // Labels for the three-phase workflow
     groomingLabel: process.env.GROOMING_LABEL || 'needs-grooming',
     awaitingApprovalLabel: 'awaiting-approval',
     readyLabel: process.env.ISSUE_LABEL || 'ready',
     inProgressLabel: 'in-progress',
     prReadyLabel: 'pr-ready',
+    reviewingLabel: 'reviewing',
+    mergedLabel: 'merged',
+    needsFixesLabel: 'needs-fixes',
     failedLabel: 'agent-failed',
   },
   orchestrator: {

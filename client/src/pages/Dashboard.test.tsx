@@ -30,7 +30,7 @@ const mockMeals = [
     title: 'Pizza',
     description: 'Pepperoni pizza',
     type: 'meal',
-    archived: 0,
+    archived: false,
     pickCount: 5,
     createdAt: '2024-01-01',
   },
@@ -40,7 +40,7 @@ const mockMeals = [
     title: 'Tacos',
     description: 'Beef tacos',
     type: 'meal',
-    archived: 0,
+    archived: false,
     pickCount: 3,
     createdAt: '2024-01-02',
   },
@@ -50,7 +50,7 @@ const mockMeals = [
     title: 'Pasta',
     description: 'Spaghetti',
     type: 'meal',
-    archived: 0,
+    archived: false,
     pickCount: 0,
     createdAt: '2024-01-03',
   },
@@ -233,7 +233,7 @@ describe('Dashboard - Edit Mode and Delete', () => {
   });
 
   it('should delete meal when confirmed', async () => {
-    vi.mocked(mealsApi.delete).mockResolvedValue(undefined);
+    vi.mocked(mealsApi.delete).mockResolvedValue({ message: 'Deleted' });
 
     render(
       <BrowserRouter>
@@ -257,7 +257,7 @@ describe('Dashboard - Edit Mode and Delete', () => {
   });
 
   it('should delete multiple meals in bulk', async () => {
-    vi.mocked(mealsApi.delete).mockResolvedValue(undefined);
+    vi.mocked(mealsApi.delete).mockResolvedValue({ message: 'Deleted' });
 
     render(
       <BrowserRouter>
@@ -289,7 +289,7 @@ describe('Dashboard - Edit Mode and Delete', () => {
   });
 
   it('should exit edit mode after bulk delete', async () => {
-    vi.mocked(mealsApi.delete).mockResolvedValue(undefined);
+    vi.mocked(mealsApi.delete).mockResolvedValue({ message: 'Deleted' });
 
     render(
       <BrowserRouter>
@@ -321,7 +321,7 @@ describe('Dashboard - Edit Mode and Delete', () => {
   it('should apply red background during single meal deletion', async () => {
     vi.mocked(mealsApi.delete).mockImplementation(() => {
       return new Promise((resolve) => {
-        setTimeout(() => resolve(undefined), 100);
+        setTimeout(() => resolve({ message: 'Deleted' }), 100);
       });
     });
 
@@ -351,7 +351,7 @@ describe('Dashboard - Edit Mode and Delete', () => {
   it('should apply red background during bulk deletion', async () => {
     vi.mocked(mealsApi.delete).mockImplementation(() => {
       return new Promise((resolve) => {
-        setTimeout(() => resolve(undefined), 100);
+        setTimeout(() => resolve({ message: 'Deleted' }), 100);
       });
     });
 

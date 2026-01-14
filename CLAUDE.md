@@ -23,6 +23,10 @@ food-app/
 │       ├── middleware/  # Auth middleware
 │       ├── routes/   # API routes
 │       └── services/ # Matching algorithm
+├── agents/           # AI agent orchestrator
+│   ├── orchestrator/ # Node.js orchestration service
+│   │   └── src/      # index.ts, github.ts, agent-manager.ts, state.ts
+│   └── prompts/      # Agent prompt templates (grooming.md, feature-builder.md, pr-reviewer.md)
 └── SPEC.MD           # Full product specification
 ```
 
@@ -100,6 +104,63 @@ SQLite stores booleans as 0/1. Always use ternary when rendering:
 - Meals are soft-deleted (archived flag)
 - Session meal pool is locked after creation
 - Results include voter breakdown for hosts only
+
+---
+
+## Agent Orchestrator
+
+The `agents/` directory contains an automated GitHub issue implementation system using Claude Code.
+
+### Workflow Phases
+```
+needs-grooming → grooming → awaiting-approval → ready → in-progress → pr-ready → merged
+```
+
+1. **Grooming** (interactive): Agent asks clarifying questions, produces implementation plan
+2. **Building** (autonomous): Agent implements the approved plan, creates PR
+3. **Reviewing** (autonomous): Agent reviews PR against plan, merges if tests pass
+
+### Labels
+| Label | Meaning |
+|-------|---------|
+| `needs-grooming` | New issue, needs clarification |
+| `grooming` | Agent is asking questions |
+| `awaiting-approval` | Plan posted, waiting for review |
+| `ready` | Plan approved, start building |
+| `in-progress` | Agent is implementing |
+| `pr-ready` | PR created, ready for review |
+| `merged` | PR merged, issue closed |
+
+### Orchestrator Commands
+```bash
+cd agents/orchestrator
+
+npm run dev              # Start the orchestrator
+npm run status           # Show tracked issues by phase
+npm run retry <issue#>   # Reset and retry a specific issue
+npm run reset            # Clear all tracked issues
+```
+
+### Key Files
+- **`agents/orchestrator/src/index.ts`** - Main loop, polls GitHub, routes issues to agents
+- **`agents/orchestrator/src/github.ts`** - GitHub API wrapper (Octokit)
+- **`agents/orchestrator/src/agent-manager.ts`** - Spawns Claude Code in terminal windows
+- **`agents/orchestrator/src/state.ts`** - SQLite tracking of issue/agent state
+- **`agents/orchestrator/src/config.ts`** - Environment variables and settings
+
+### Prompt Templates
+- **`agents/prompts/grooming.md`** - Interactive requirements gathering
+- **`agents/prompts/feature-builder.md`** - Autonomous implementation
+- **`agents/prompts/pr-reviewer.md`** - PR review and merge
+
+### Environment Variables
+```env
+GITHUB_TOKEN=ghp_...     # GitHub PAT with repo, read:org, workflow scopes
+GH_TOKEN=ghp_...         # Same token (for gh CLI)
+GITHUB_REPO=owner/repo   # Target repository
+GROOMING_LABEL=needs-grooming
+ISSUE_LABEL=ready
+```
 
 ---
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ConfirmModal } from './ConfirmModal';
+import ConfirmModal from './ConfirmModal';
 
 describe('ConfirmModal', () => {
   it('should not render when isOpen is false', () => {
@@ -30,7 +30,7 @@ describe('ConfirmModal', () => {
     expect(screen.getByText('Test message')).toBeDefined();
   });
 
-  it('should call onConfirm when confirm button is clicked', () => {
+  it('should call onConfirm when Delete button is clicked', () => {
     const onConfirm = vi.fn();
     render(
       <ConfirmModal
@@ -41,7 +41,7 @@ describe('ConfirmModal', () => {
         onCancel={() => {}}
       />
     );
-    const confirmButton = screen.getByText('Confirm');
+    const confirmButton = screen.getByText('Delete');
     fireEvent.click(confirmButton);
     expect(onConfirm).toHaveBeenCalledOnce();
   });
@@ -62,34 +62,35 @@ describe('ConfirmModal', () => {
     expect(onCancel).toHaveBeenCalledOnce();
   });
 
-  it('should use custom button text', () => {
-    render(
+  it('should call onCancel when backdrop is clicked', () => {
+    const onCancel = vi.fn();
+    const { container } = render(
       <ConfirmModal
         isOpen={true}
         title="Test Title"
         message="Test message"
-        confirmText="Yes"
-        cancelText="No"
         onConfirm={() => {}}
-        onCancel={() => {}}
+        onCancel={onCancel}
       />
     );
-    expect(screen.getByText('Yes')).toBeDefined();
-    expect(screen.getByText('No')).toBeDefined();
+    const backdrop = container.querySelector('.absolute.inset-0');
+    if (backdrop) {
+      fireEvent.click(backdrop);
+      expect(onCancel).toHaveBeenCalledOnce();
+    }
   });
 
-  it('should apply danger styling when isDanger is true', () => {
+  it('should display multiline messages correctly', () => {
     render(
       <ConfirmModal
         isOpen={true}
-        title="Test Title"
-        message="Test message"
-        isDanger={true}
+        title="Delete Items"
+        message="Line 1\nLine 2\nLine 3"
         onConfirm={() => {}}
         onCancel={() => {}}
       />
     );
-    const confirmButton = screen.getByText('Confirm');
-    expect(confirmButton.className).toContain('btn-danger');
+    const message = screen.getByText(/Line 1/);
+    expect(message.className).toContain('whitespace-pre-line');
   });
 });

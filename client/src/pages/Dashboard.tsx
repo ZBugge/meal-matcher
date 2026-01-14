@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { mealsApi, sessionsApi, Meal, Session } from '../api/client';
+import ConfirmModal from '../components/ConfirmModal';
 
 export function Dashboard() {
   const { user, logout } = useAuth();
@@ -17,6 +18,14 @@ export function Dashboard() {
   const [newMealTitle, setNewMealTitle] = useState('');
   const [newMealDescription, setNewMealDescription] = useState('');
   const [selectedMealIds, setSelectedMealIds] = useState<string[]>([]);
+
+  // Edit mode states
+  const [editMode, setEditMode] = useState(false);
+  const [selectedForDeletion, setSelectedForDeletion] = useState<string[]>([]);
+
+  // Confirmation modal states
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [mealToDelete, setMealToDelete] = useState<Meal | null>(null);
 
   useEffect(() => {
     loadData();
@@ -57,6 +66,46 @@ export function Dashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete meal');
     }
+  };
+
+  const confirmDeleteSingleMeal = (meal: Meal) => {
+    setMealToDelete(meal);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmSingleDelete = async () => {
+    if (!mealToDelete) return;
+
+    await handleDeleteMeal(mealToDelete.id);
+    setShowDeleteConfirm(false);
+    setMealToDelete(null);
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await Promise.all(selectedForDeletion.map((id) => mealsApi.delete(id)));
+      setMeals(meals.filter((m) => !selectedForDeletion.includes(m.id)));
+      setSelectedForDeletion([]);
+      setEditMode(false);
+      setShowDeleteConfirm(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete meals');
+    }
+  };
+
+  const confirmBulkDelete = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const toggleEditMode = () => {
+    setEditMode(!editMode);
+    setSelectedForDeletion([]);
+  };
+
+  const toggleMealForDeletion = (id: string) => {
+    setSelectedForDeletion((prev) =>
+      prev.includes(id) ? prev.filter((mId) => mId !== id) : [...prev, id]
+    );
   };
 
   const handleCreateSession = async () => {
@@ -125,10 +174,32 @@ export function Dashboard() {
         {/* Meals Section */}
         <section className="mb-12">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">My Meals</h2>
-            <button onClick={() => setShowAddMeal(true)} className="btn btn-primary">
-              Add Meal
-            </button>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold">My Meals</h2>
+              {meals.length > 0 && (
+                <>
+                  <button
+                    onClick={toggleEditMode}
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    {editMode ? 'Done' : 'Edit'}
+                  </button>
+                  {editMode && selectedForDeletion.length > 0 && (
+                    <button
+                      onClick={confirmBulkDelete}
+                      className="text-sm text-red-600 hover:text-red-700 font-medium"
+                    >
+                      Delete Selected ({selectedForDeletion.length})
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+            {!editMode && (
+              <button onClick={() => setShowAddMeal(true)} className="btn btn-primary">
+                Add Meal
+              </button>
+            )}
           </div>
 
           {meals.length === 0 ? (
@@ -142,8 +213,16 @@ export function Dashboard() {
             <div className="grid gap-4 sm:grid-cols-2">
               {meals.map((meal) => (
                 <div key={meal.id} className="card">
-                  <div className="flex justify-between items-start">
-                    <div>
+                  <div className="flex justify-between items-start gap-3">
+                    {editMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedForDeletion.includes(meal.id)}
+                        onChange={() => toggleMealForDeletion(meal.id)}
+                        className="w-5 h-5 mt-1 text-primary-600 cursor-pointer"
+                      />
+                    )}
+                    <div className="flex-1">
                       <h3 className="font-semibold text-lg">{meal.title}</h3>
                       {meal.description && (
                         <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
@@ -154,15 +233,17 @@ export function Dashboard() {
                         </p>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleDeleteMeal(meal.id)}
-                      className="text-gray-400 hover:text-red-500"
-                      title="Archive meal"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    {!editMode && (
+                      <button
+                        onClick={() => confirmDeleteSingleMeal(meal)}
+                        className="text-gray-400 hover:text-red-500"
+                        title="Archive meal"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -331,6 +412,25 @@ export function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        title={mealToDelete ? 'Delete Meal?' : `Delete ${selectedForDeletion.length} Meal${selectedForDeletion.length !== 1 ? 's' : ''}?`}
+        message={
+          mealToDelete
+            ? `Are you sure you want to delete "${mealToDelete.title}"?`
+            : `Are you sure you want to delete the following meals?\n\n${meals
+                .filter((m) => selectedForDeletion.includes(m.id))
+                .map((m) => `• ${m.title}`)
+                .join('\n')}`
+        }
+        onConfirm={mealToDelete ? handleConfirmSingleDelete : handleBulkDelete}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setMealToDelete(null);
+        }}
+      />
     </div>
   );
 }

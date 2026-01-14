@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { mealsApi, sessionsApi, Meal, Session } from '../api/client';
 import ConfirmModal from '../components/ConfirmModal';
@@ -26,6 +27,9 @@ export function Dashboard() {
   // Confirmation modal states
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [mealToDelete, setMealToDelete] = useState<Meal | null>(null);
+
+  // Animation states
+  const [deletingMealIds, setDeletingMealIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadData();
@@ -61,10 +65,19 @@ export function Dashboard() {
 
   const handleDeleteMeal = async (id: string) => {
     try {
+      // Mark as deleting to trigger animation
+      setDeletingMealIds([id]);
+
       await mealsApi.delete(id);
-      setMeals(meals.filter((m) => m.id !== id));
+
+      // Wait for animation to complete before removing from state
+      setTimeout(() => {
+        setMeals(meals.filter((m) => m.id !== id));
+        setDeletingMealIds([]);
+      }, 400);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete meal');
+      setDeletingMealIds([]);
     }
   };
 
@@ -83,13 +96,22 @@ export function Dashboard() {
 
   const handleBulkDelete = async () => {
     try {
+      // Mark all selected meals as deleting to trigger animation
+      setDeletingMealIds(selectedForDeletion);
+
       await Promise.all(selectedForDeletion.map((id) => mealsApi.delete(id)));
-      setMeals(meals.filter((m) => !selectedForDeletion.includes(m.id)));
-      setSelectedForDeletion([]);
-      setEditMode(false);
-      setShowDeleteConfirm(false);
+
+      // Wait for animation to complete before removing from state
+      setTimeout(() => {
+        setMeals(meals.filter((m) => !selectedForDeletion.includes(m.id)));
+        setSelectedForDeletion([]);
+        setDeletingMealIds([]);
+        setEditMode(false);
+        setShowDeleteConfirm(false);
+      }, 400);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete meals');
+      setDeletingMealIds([]);
     }
   };
 
@@ -211,42 +233,68 @@ export function Dashboard() {
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
-              {meals.map((meal) => (
-                <div key={meal.id} className="card">
-                  <div className="flex justify-between items-start gap-3">
-                    {editMode && (
-                      <input
-                        type="checkbox"
-                        checked={selectedForDeletion.includes(meal.id)}
-                        onChange={() => toggleMealForDeletion(meal.id)}
-                        className="w-5 h-5 mt-1 text-primary-600 cursor-pointer"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg">{meal.title}</h3>
-                      {meal.description && (
-                        <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
-                      )}
-                      {meal.pickCount > 0 && (
-                        <p className="text-xs text-gray-400 mt-2">
-                          Selected {meal.pickCount} time{meal.pickCount !== 1 ? 's' : ''}
-                        </p>
-                      )}
-                    </div>
-                    {!editMode && (
-                      <button
-                        onClick={() => confirmDeleteSingleMeal(meal)}
-                        className="text-gray-400 hover:text-red-500"
-                        title="Archive meal"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+              <AnimatePresence mode="popLayout">
+                {meals.map((meal) => {
+                  const isDeleting = deletingMealIds.includes(meal.id);
+                  const isSingleDelete = deletingMealIds.length === 1 && isDeleting;
+
+                  return (
+                    <motion.div
+                      key={meal.id}
+                      layout
+                      initial={{ opacity: 1 }}
+                      exit={
+                        isSingleDelete
+                          ? {
+                              x: -100,
+                              opacity: 0,
+                              transition: { duration: 0.3 },
+                            }
+                          : {
+                              opacity: 0,
+                              transition: { duration: 0.3 },
+                            }
+                      }
+                      className={`card transition-colors duration-150 ${
+                        isDeleting ? 'bg-red-50' : ''
+                      }`}
+                    >
+                      <div className="flex justify-between items-start gap-3">
+                        {editMode && (
+                          <input
+                            type="checkbox"
+                            checked={selectedForDeletion.includes(meal.id)}
+                            onChange={() => toggleMealForDeletion(meal.id)}
+                            className="w-5 h-5 mt-1 text-primary-600 cursor-pointer"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg">{meal.title}</h3>
+                          {meal.description && (
+                            <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
+                          )}
+                          {meal.pickCount > 0 && (
+                            <p className="text-xs text-gray-400 mt-2">
+                              Selected {meal.pickCount} time{meal.pickCount !== 1 ? 's' : ''}
+                            </p>
+                          )}
+                        </div>
+                        {!editMode && (
+                          <button
+                            onClick={() => confirmDeleteSingleMeal(meal)}
+                            className="text-gray-400 hover:text-red-500"
+                            title="Archive meal"
+                          >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             </div>
           )}
         </section>

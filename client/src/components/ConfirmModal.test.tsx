@@ -30,7 +30,7 @@ describe('ConfirmModal', () => {
     expect(screen.getByText('Test message')).toBeDefined();
   });
 
-  it('should call onConfirm when Delete button is clicked', () => {
+  it('should call onConfirm when Confirm button is clicked', () => {
     const onConfirm = vi.fn();
     render(
       <ConfirmModal
@@ -41,7 +41,7 @@ describe('ConfirmModal', () => {
         onCancel={() => {}}
       />
     );
-    const confirmButton = screen.getByText('Delete');
+    const confirmButton = screen.getByText('Confirm');
     fireEvent.click(confirmButton);
     expect(onConfirm).toHaveBeenCalledOnce();
   });

@@ -30,7 +30,7 @@ const mockMeals = [
     title: 'Pizza',
     description: 'Pepperoni pizza',
     type: 'meal',
-    archived: 0,
+    archived: false,
     pickCount: 5,
     createdAt: '2024-01-01',
   },
@@ -40,7 +40,7 @@ const mockMeals = [
     title: 'Tacos',
     description: 'Beef tacos',
     type: 'meal',
-    archived: 0,
+    archived: false,
     pickCount: 3,
     createdAt: '2024-01-02',
   },
@@ -50,7 +50,7 @@ const mockMeals = [
     title: 'Pasta',
     description: 'Spaghetti',
     type: 'meal',
-    archived: 0,
+    archived: false,
     pickCount: 0,
     createdAt: '2024-01-03',
   },
@@ -233,7 +233,7 @@ describe('Dashboard - Edit Mode and Delete', () => {
   });
 
   it('should delete meal when confirmed', async () => {
-    vi.mocked(mealsApi.delete).mockResolvedValue(undefined);
+    vi.mocked(mealsApi.delete).mockResolvedValue({ message: 'Deleted' });
 
     render(
       <BrowserRouter>
@@ -248,7 +248,7 @@ describe('Dashboard - Edit Mode and Delete', () => {
     const deleteButton = screen.getAllByTitle('Archive meal')[0];
     fireEvent.click(deleteButton);
 
-    const confirmButton = screen.getByText('Delete');
+    const confirmButton = screen.getByText('Confirm');
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
@@ -257,7 +257,7 @@ describe('Dashboard - Edit Mode and Delete', () => {
   });
 
   it('should delete multiple meals in bulk', async () => {
-    vi.mocked(mealsApi.delete).mockResolvedValue(undefined);
+    vi.mocked(mealsApi.delete).mockResolvedValue({ message: 'Deleted' });
 
     render(
       <BrowserRouter>
@@ -279,7 +279,7 @@ describe('Dashboard - Edit Mode and Delete', () => {
     const bulkDeleteButton = screen.getByText('Delete Selected (2)');
     fireEvent.click(bulkDeleteButton);
 
-    const confirmButton = screen.getByText('Delete');
+    const confirmButton = screen.getByText('Confirm');
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
@@ -289,7 +289,7 @@ describe('Dashboard - Edit Mode and Delete', () => {
   });
 
   it('should exit edit mode after bulk delete', async () => {
-    vi.mocked(mealsApi.delete).mockResolvedValue(undefined);
+    vi.mocked(mealsApi.delete).mockResolvedValue({ message: 'Deleted' });
 
     render(
       <BrowserRouter>
@@ -310,11 +310,80 @@ describe('Dashboard - Edit Mode and Delete', () => {
     const bulkDeleteButton = screen.getByText('Delete Selected (1)');
     fireEvent.click(bulkDeleteButton);
 
-    const confirmButton = screen.getByText('Delete');
+    const confirmButton = screen.getByText('Confirm');
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
       expect(screen.getByText('Edit')).toBeDefined();
+    });
+  });
+
+  it('should apply red background during single meal deletion', async () => {
+    vi.mocked(mealsApi.delete).mockImplementation(() => {
+      return new Promise((resolve) => {
+        setTimeout(() => resolve({ message: 'Deleted' }), 100);
+      });
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pizza')).toBeDefined();
+    });
+
+    const deleteButton = screen.getAllByTitle('Archive meal')[0];
+    fireEvent.click(deleteButton);
+
+    const confirmButton = screen.getByText('Confirm');
+    fireEvent.click(confirmButton);
+
+    // Check if red background is applied during deletion
+    await waitFor(() => {
+      const mealCard = screen.getByText('Pizza').closest('.card');
+      expect(mealCard?.className).toContain('bg-red-50');
+    });
+  });
+
+  it('should apply red background during bulk deletion', async () => {
+    vi.mocked(mealsApi.delete).mockImplementation(() => {
+      return new Promise((resolve) => {
+        setTimeout(() => resolve({ message: 'Deleted' }), 100);
+      });
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit')).toBeDefined();
+    });
+
+    const editButton = screen.getByText('Edit');
+    fireEvent.click(editButton);
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[0]);
+    fireEvent.click(checkboxes[1]);
+
+    const bulkDeleteButton = screen.getByText('Delete Selected (2)');
+    fireEvent.click(bulkDeleteButton);
+
+    const confirmButton = screen.getByText('Confirm');
+    fireEvent.click(confirmButton);
+
+    // Check if red background is applied during deletion
+    await waitFor(() => {
+      const pizzaCard = screen.getByText('Pizza').closest('.card');
+      const tacosCard = screen.getByText('Tacos').closest('.card');
+      expect(pizzaCard?.className).toContain('bg-red-50');
+      expect(tacosCard?.className).toContain('bg-red-50');
     });
   });
 

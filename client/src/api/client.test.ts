@@ -3,7 +3,7 @@ import { participantApi } from './client';
 
 // Mock fetch
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+(globalThis as any).fetch = mockFetch;
 
 describe('API Client - Session Closed Handling', () => {
   beforeEach(() => {

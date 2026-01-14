@@ -16,6 +16,7 @@ import {
   markIssueActive,
   getActiveIssueNumbers,
   getActiveIssues,
+  getActiveAgentCount,
   clearIssue,
   clearAllIssues,
   closeDb,
@@ -24,7 +25,6 @@ import {
   spawnFeatureAgent,
   spawnGroomingAgent,
   spawnReviewerAgent,
-  getRunningAgentCount,
   cleanupAgents,
 } from './agent-manager.js';
 
@@ -181,10 +181,10 @@ async function processGroomingIssues(): Promise<void> {
  * Can run multiple in parallel
  */
 async function processReadyIssues(): Promise<void> {
-  // Check capacity
-  const runningCount = getRunningAgentCount();
-  if (runningCount >= config.orchestrator.maxParallelAgents) {
-    console.log(`[Orchestrator] At max capacity (${runningCount} agents running)`);
+  // Check capacity using DB state (synced with GitHub labels)
+  const activeCount = await getActiveAgentCount();
+  if (activeCount >= config.orchestrator.maxParallelAgents) {
+    console.log(`[Orchestrator] At max capacity (${activeCount} agents active)`);
     return;
   }
 
@@ -205,7 +205,7 @@ async function processReadyIssues(): Promise<void> {
   console.log(`[Orchestrator] Found ${availableIssues.length} ready issues for building`);
 
   // Process issues up to capacity
-  const availableSlots = config.orchestrator.maxParallelAgents - runningCount;
+  const availableSlots = config.orchestrator.maxParallelAgents - activeCount;
   const issuesToProcess = availableIssues.slice(0, availableSlots);
 
   for (const issue of issuesToProcess) {
@@ -261,10 +261,10 @@ async function processReadyIssues(): Promise<void> {
  * Can run multiple in parallel
  */
 async function processPRReadyIssues(): Promise<void> {
-  // Check capacity
-  const runningCount = getRunningAgentCount();
-  if (runningCount >= config.orchestrator.maxParallelAgents) {
-    console.log(`[Orchestrator] At max capacity (${runningCount} agents running)`);
+  // Check capacity using DB state (synced with GitHub labels)
+  const activeCount = await getActiveAgentCount();
+  if (activeCount >= config.orchestrator.maxParallelAgents) {
+    console.log(`[Orchestrator] At max capacity (${activeCount} agents active)`);
     return;
   }
 
@@ -285,7 +285,7 @@ async function processPRReadyIssues(): Promise<void> {
   console.log(`[Orchestrator] Found ${availableIssues.length} PRs ready for review`);
 
   // Process issues up to capacity
-  const availableSlots = config.orchestrator.maxParallelAgents - runningCount;
+  const availableSlots = config.orchestrator.maxParallelAgents - activeCount;
   const issuesToProcess = availableIssues.slice(0, availableSlots);
 
   for (const issue of issuesToProcess) {

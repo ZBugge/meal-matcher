@@ -171,6 +171,19 @@ export async function getActiveIssueNumbers(agentType?: AgentType): Promise<Set<
 }
 
 /**
+ * Get count of active agents (for capacity tracking)
+ * This is the source of truth for capacity - not the process map
+ */
+export async function getActiveAgentCount(): Promise<number> {
+  const database = await getDb();
+  const stmt = database.prepare('SELECT COUNT(*) as count FROM active_issues');
+  stmt.step();
+  const result = stmt.getAsObject() as { count: number };
+  stmt.free();
+  return result.count;
+}
+
+/**
  * Clear an issue from active tracking (done processing)
  */
 export async function clearIssue(issueNumber: number): Promise<void> {

@@ -134,6 +134,10 @@ pause
 
     if (subprocess.pid) {
       runningProcesses.set(agentId, subprocess);
+      // Clean up when the cmd /c start process exits (happens immediately after spawning window)
+      subprocess.on('exit', () => {
+        runningProcesses.delete(agentId);
+      });
     }
 
     console.log(`[Agent ${agentId.slice(0, 8)}] Opened Notepad with grooming prompt + Claude terminal`);
@@ -241,6 +245,10 @@ pause
 
     if (subprocess.pid) {
       runningProcesses.set(agentId, subprocess);
+      // Clean up when the cmd /c start process exits (happens immediately after spawning window)
+      subprocess.on('exit', () => {
+        runningProcesses.delete(agentId);
+      });
     }
 
     console.log(`[Agent ${agentId.slice(0, 8)}] Started autonomous feature builder for issue #${issue.number}`);
@@ -348,6 +356,10 @@ pause
 
     if (subprocess.pid) {
       runningProcesses.set(agentId, subprocess);
+      // Clean up when the cmd /c start process exits (happens immediately after spawning window)
+      subprocess.on('exit', () => {
+        runningProcesses.delete(agentId);
+      });
     }
 
     console.log(`[Agent ${agentId.slice(0, 8)}] Started autonomous PR reviewer for issue #${issue.number}`);

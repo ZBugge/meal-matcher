@@ -162,7 +162,6 @@ export function SessionView() {
               <button
                 onClick={handleCloseSession}
                 className="btn btn-danger"
-                disabled={submittedCount === 0}
               >
                 Close Session
               </button>

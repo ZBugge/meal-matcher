@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { sessionsApi, SessionDetails, MatchResult } from '../api/client';
-import { ConfirmModal } from '../components/ConfirmModal';
+import ConfirmModal from '../components/ConfirmModal';
 
 export function SessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();

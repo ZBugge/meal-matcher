@@ -6,6 +6,9 @@ interface ConfirmModalProps {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  confirmText?: string;
+  cancelText?: string;
+  isDanger?: boolean;
 }
 
 export default function ConfirmModal({
@@ -14,6 +17,9 @@ export default function ConfirmModal({
   message,
   onConfirm,
   onCancel,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  isDanger = false,
 }: ConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -43,13 +49,17 @@ export default function ConfirmModal({
             onClick={onCancel}
             className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
-            Cancel
+            {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+            className={`px-4 py-2 text-white rounded-lg transition-colors ${
+              isDanger
+                ? 'bg-red-500 hover:bg-red-600'
+                : 'bg-blue-500 hover:bg-blue-600'
+            }`}
           >
-            Delete
+            {confirmText}
           </button>
         </div>
       </motion.div>

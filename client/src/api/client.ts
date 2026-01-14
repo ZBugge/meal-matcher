@@ -5,6 +5,16 @@ interface ApiError {
   sessionClosed?: boolean;
 }
 
+class ApiException extends Error {
+  sessionClosed: boolean;
+
+  constructor(message: string, sessionClosed: boolean = false) {
+    super(message);
+    this.name = 'ApiException';
+    this.sessionClosed = sessionClosed;
+  }
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -22,7 +32,7 @@ async function request<T>(
 
   if (!response.ok) {
     const error = data as ApiError;
-    throw new Error(error.error || 'An error occurred');
+    throw new ApiException(error.error || 'An error occurred', error.sessionClosed || false);
   }
 
   return data as T;

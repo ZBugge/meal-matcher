@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { sessionsApi, SessionDetails, MatchResult } from '../api/client';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 export function SessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -8,6 +9,7 @@ export function SessionView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   useEffect(() => {
     loadSession();
@@ -36,10 +38,26 @@ export function SessionView() {
   };
 
   const handleCloseSession = async () => {
+    if (!sessionId || !session) return;
+
+    // Check if there are unsubmitted participants
+    const unsubmittedCount = session.participants.filter((p) => !p.submitted).length;
+
+    if (unsubmittedCount > 0) {
+      // Show confirmation modal if there are unsubmitted participants
+      setShowConfirmModal(true);
+    } else {
+      // Close immediately if all participants have submitted
+      await closeSession();
+    }
+  };
+
+  const closeSession = async () => {
     if (!sessionId) return;
 
     try {
       await sessionsApi.close(sessionId);
+      setShowConfirmModal(false);
       loadSession(); // Reload to get results
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to close session');
@@ -213,6 +231,17 @@ export function SessionView() {
           </div>
         </section>
       </main>
+
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        title="End Session Early?"
+        message={`${session.participants.filter((p) => !p.submitted).length} participant(s) haven't finished voting. End session anyway?`}
+        confirmText="End Session"
+        cancelText="Cancel"
+        isDanger={true}
+        onConfirm={closeSession}
+        onCancel={() => setShowConfirmModal(false)}
+      />
     </div>
   );
 }

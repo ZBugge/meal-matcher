@@ -39,9 +39,12 @@ Review the PR against the approved plan. Focus on **spec compliance** and **test
 
 ### On Success
 ```
-"C:\Program Files\GitHub CLI\gh.exe" pr merge {{PR_NUMBER}} --squash --auto
+"C:\Program Files\GitHub CLI\gh.exe" pr merge {{PR_NUMBER}} --squash --delete-branch
 
-"C:\Program Files\GitHub CLI\gh.exe" issue edit {{ISSUE_NUMBER}} --remove-label "pr-ready" --add-label "merged"
+"C:\Program Files\GitHub CLI\gh.exe" issue close {{ISSUE_NUMBER}}
+
+git checkout master
+git pull origin master
 ```
 
 ### On Failure (Unfixable Issues)

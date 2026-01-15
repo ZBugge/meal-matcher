@@ -81,3 +81,14 @@ If tests fail, fix them before pushing. Don't push broken tests.
 ### Example Flow
 ❌ **Bad:** Plan says modify auth.ts → Search for auth patterns → Read 5 auth files → Read auth.ts
 ✅ **Good:** Plan says modify auth.ts → Read auth.ts → Make changes
+
+## Common Mistakes
+**Learn from past PR reviews.** The PR reviewer agent has identified these recurring patterns. Avoid them.
+
+<!-- PR reviewer agent: Add recurring patterns here using the format below -->
+
+<!-- Example format:
+**Pattern:** [describe the recurring mistake]
+**Prevention:** [how to avoid it in the future]
+**Example:** [code example of correct approach]
+-->

@@ -41,6 +41,54 @@ Review the PR against the approved plan. Focus on **spec compliance** and **test
 - Don't add features beyond the plan
 - Don't refactor working code
 
+### Commenting on Auto-Fixes
+**IMPORTANT:** When you make auto-fixes, you MUST document them with PR review comments.
+
+For each auto-fix:
+1. **Post an inline PR review comment** using `gh pr review` with the file and line number
+2. **Explain what was wrong** and what you fixed
+3. **Track all fixes** throughout the review process
+
+Comment format:
+```
+gh pr review {{PR_NUMBER}} --comment --body "**Auto-fix applied:** [brief description]
+
+**Issue:** [what was wrong]
+**Fix:** [what you changed]
+**File:** [file_path:line_number]
+```
+
+Examples:
+- "**Auto-fix applied:** Fixed TypeScript error\n\n**Issue:** Property 'id' does not exist on type 'Meal | undefined'\n**Fix:** Added optional chaining: `meal?.id`\n**File:** client/src/pages/Dashboard.tsx:45"
+- "**Auto-fix applied:** Fixed missing import\n\n**Issue:** 'Button' is used but not imported\n**Fix:** Added `import { Button } from '../components/Button'`\n**File:** client/src/pages/Settings.tsx:3"
+
+### Learning Capture
+After completing the PR review, analyze the fixes you made:
+
+1. **Categorize the issues:**
+   - One-off mistakes (specific to this PR)
+   - Recurring patterns (seen multiple times or in multiple PRs)
+
+2. **For recurring patterns, persist learnings:**
+   - Update `CLAUDE.md` if the pattern is a general codebase rule
+   - Update `agents/prompts/feature-builder.md` in the "Common Mistakes" section if it's an agent-specific issue
+
+3. **Format for learnings:**
+```
+**Pattern:** [describe the recurring mistake]
+**Prevention:** [how to avoid it in the future]
+**Example:** [code example of correct approach]
+```
+
+4. **When to add learnings:**
+   - Same type of error appears 2+ times in this PR
+   - Same type of error has appeared in previous PRs
+   - Error relates to project-specific patterns (SQLite booleans, export conventions, etc.)
+
+5. **Commit learnings:**
+   - Make a separate commit for documentation updates
+   - Use commit message: "docs: Add learning from PR review - [brief description]"
+
 ### On Success
 ```
 "C:\Program Files\GitHub CLI\gh.exe" pr merge {{PR_NUMBER}} --squash --delete-branch

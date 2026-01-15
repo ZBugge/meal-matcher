@@ -10,7 +10,9 @@
     "dev": "tsx watch src/index.ts",
     "reset": "tsx src/index.ts --reset",
     "status": "tsx src/index.ts --status",
-    "retry": "tsx src/index.ts --retry"
+    "retry": "tsx src/index.ts --retry",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@octokit/rest": "^20.0.2",
@@ -21,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^20.11.24",
     "tsx": "^4.7.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
   }
 }

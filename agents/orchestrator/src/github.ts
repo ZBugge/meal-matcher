@@ -1,5 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { config, getRepoOwnerAndName } from './config.js';
+import type { TokenUsage } from './state.js';
 
 export interface GitHubIssue {
   id: number;
@@ -344,4 +345,50 @@ export async function mergePullRequest(prNumber: number): Promise<void> {
     pull_number: prNumber,
     merge_method: 'squash',
   });
+}
+
+/**
+ * Post a comment with token usage summary for an issue
+ */
+export async function postTokenUsageComment(issueNumber: number, tokenUsage: TokenUsage[]): Promise<void> {
+  if (tokenUsage.length === 0) {
+    return;
+  }
+
+  // Calculate totals
+  let totalInput = 0;
+  let totalOutput = 0;
+  const byType: Record<string, { input: number; output: number }> = {};
+
+  for (const usage of tokenUsage) {
+    totalInput += usage.inputTokens;
+    totalOutput += usage.outputTokens;
+
+    if (!byType[usage.agentType]) {
+      byType[usage.agentType] = { input: 0, output: 0 };
+    }
+    byType[usage.agentType].input += usage.inputTokens;
+    byType[usage.agentType].output += usage.outputTokens;
+  }
+
+  const totalTokens = totalInput + totalOutput;
+
+  // Build comment body
+  let comment = `## 🤖 Token Usage Report\n\n`;
+  comment += `**Total tokens used:** ${totalTokens.toLocaleString()} (${totalInput.toLocaleString()} input + ${totalOutput.toLocaleString()} output)\n\n`;
+
+  comment += `### By Agent Type\n\n`;
+  for (const [agentType, tokens] of Object.entries(byType)) {
+    const typeTotal = tokens.input + tokens.output;
+    comment += `- **${agentType}**: ${typeTotal.toLocaleString()} tokens (${tokens.input.toLocaleString()} in + ${tokens.output.toLocaleString()} out)\n`;
+  }
+
+  comment += `\n### Session Details\n\n`;
+  for (const usage of tokenUsage) {
+    const sessionTotal = usage.inputTokens + usage.outputTokens;
+    const date = new Date(usage.completedAt).toLocaleString();
+    comment += `- ${usage.agentType} - ${sessionTotal.toLocaleString()} tokens (${date})\n`;
+  }
+
+  await addIssueComment(issueNumber, comment);
 }

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmSync } from 'fs';
+import { existsSync, readdirSync, rmSync, readFileSync } from 'fs';
 import { config, validateConfig } from './config.js';
 import {
   fetchReadyIssues,
@@ -11,6 +11,7 @@ import {
   findGroomedPlan,
   getIssueLabels,
   getPullRequestForBranch,
+  postTokenUsageComment,
 } from './github.js';
 import {
   markIssueActive,
@@ -20,12 +21,17 @@ import {
   clearIssue,
   clearAllIssues,
   closeDb,
+  recordTokenUsage,
+  parseTokenUsageFromLog,
+  getTokenUsageForIssue,
+  getTokenUsageSummary,
 } from './state.js';
 import {
   spawnFeatureAgent,
   spawnGroomingAgent,
   spawnReviewerAgent,
   cleanupAgents,
+  getAgentLogPath,
 } from './agent-manager.js';
 
 /**
@@ -79,6 +85,24 @@ async function showStatus(): Promise<void> {
     console.log('No issues currently being processed.\n');
   }
 
+  // Show token usage summary
+  const tokenSummary = await getTokenUsageSummary();
+  if (tokenSummary.size > 0) {
+    console.log('💰 TOKEN USAGE BY AGENT TYPE:\n');
+    let grandTotal = 0;
+    for (const [agentType, stats] of tokenSummary) {
+      const total = stats.inputTokens + stats.outputTokens;
+      grandTotal += total;
+      console.log(`  ${agentType}:`);
+      console.log(`    Sessions: ${stats.count}`);
+      console.log(`    Total: ${total.toLocaleString()} tokens`);
+      console.log(`    Input: ${stats.inputTokens.toLocaleString()} tokens`);
+      console.log(`    Output: ${stats.outputTokens.toLocaleString()} tokens`);
+      console.log('');
+    }
+    console.log(`  GRAND TOTAL: ${grandTotal.toLocaleString()} tokens\n`);
+  }
+
   console.log('GitHub labels are the source of truth for issue status.');
   console.log('Check your repo for issues with these labels:');
   console.log(`  • "${config.github.groomingLabel}" - Ready for grooming`);
@@ -111,14 +135,51 @@ async function syncActiveIssues(): Promise<void> {
     // Building issues should have "in-progress" label while active
     if (issue.agentType === 'building' && !labels.includes(config.github.inProgressLabel)) {
       console.log(`[Orchestrator] Building done for #${issue.issueNumber}, releasing hold`);
+      await processCompletedAgent(issue.issueNumber, 'building');
       await clearIssue(issue.issueNumber);
     }
 
     // Reviewing issues should have "reviewing" label while active
     if (issue.agentType === 'reviewing' && !labels.includes(config.github.reviewingLabel)) {
       console.log(`[Orchestrator] Review done for #${issue.issueNumber}, releasing hold`);
+      await processCompletedAgent(issue.issueNumber, 'reviewing');
       await clearIssue(issue.issueNumber);
     }
+  }
+}
+
+/**
+ * Process a completed agent: parse logs, record tokens, post comment
+ */
+async function processCompletedAgent(issueNumber: number, agentType: 'building' | 'reviewing'): Promise<void> {
+  try {
+    const logPath = getAgentLogPath(issueNumber, agentType);
+
+    if (!existsSync(logPath)) {
+      console.log(`[Orchestrator] No log file found for #${issueNumber} (${agentType})`);
+      return;
+    }
+
+    const logContent = readFileSync(logPath, 'utf-8');
+    const tokenUsage = parseTokenUsageFromLog(logContent);
+
+    if (!tokenUsage) {
+      console.log(`[Orchestrator] Could not parse token usage from log for #${issueNumber} (${agentType})`);
+      return;
+    }
+
+    console.log(`[Orchestrator] Parsed token usage for #${issueNumber}: ${tokenUsage.inputTokens} in, ${tokenUsage.outputTokens} out`);
+
+    // Record in database
+    await recordTokenUsage(issueNumber, agentType, tokenUsage.inputTokens, tokenUsage.outputTokens);
+
+    // Get all token usage for this issue
+    const allUsage = await getTokenUsageForIssue(issueNumber);
+
+    // Post comment to GitHub
+    await postTokenUsageComment(issueNumber, allUsage);
+  } catch (error) {
+    console.error(`[Orchestrator] Error processing completed agent for #${issueNumber}:`, error);
   }
 }
 

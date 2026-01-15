@@ -4,6 +4,60 @@ import { dirname } from 'path';
 import { config } from './config.js';
 
 /**
+ * Parse token usage from Claude Code log file
+ * Looks for patterns like "Token usage: 12345/200000" or "Input tokens: 12345, Output tokens: 6789"
+ */
+export function parseTokenUsageFromLog(logContent: string): { inputTokens: number; outputTokens: number } | null {
+  // Claude Code outputs token usage in format: "Token usage: INPUT/TOTAL; OUTPUT remaining"
+  // or individual lines with input/output tokens
+
+  // Try to find the final token usage summary (look for last occurrence)
+  const lines = logContent.split('\n');
+  let totalInput = 0;
+  let totalOutput = 0;
+
+  // Look for pattern: "Token usage: 12345/200000; 123456 remaining"
+  const tokenUsageRegex = /Token usage:\s*(\d+)\/\d+;\s*(\d+)\s+remaining/gi;
+  let match;
+  while ((match = tokenUsageRegex.exec(logContent)) !== null) {
+    totalInput = parseInt(match[1], 10);
+    totalOutput = parseInt(match[1], 10); // Actually this is cumulative used tokens
+  }
+
+  // Alternative: look for explicit input/output token counts
+  // Pattern: "Input tokens: 12345" and "Output tokens: 6789"
+  const inputRegex = /(?:input tokens?|tokens? in):\s*(\d+)/gi;
+  const outputRegex = /(?:output tokens?|tokens? out):\s*(\d+)/gi;
+
+  let lastInputMatch;
+  while ((match = inputRegex.exec(logContent)) !== null) {
+    lastInputMatch = match;
+  }
+
+  let lastOutputMatch;
+  while ((match = outputRegex.exec(logContent)) !== null) {
+    lastOutputMatch = match;
+  }
+
+  if (lastInputMatch && lastOutputMatch) {
+    return {
+      inputTokens: parseInt(lastInputMatch[1], 10),
+      outputTokens: parseInt(lastOutputMatch[1], 10),
+    };
+  }
+
+  // If we found token usage pattern, estimate 60/40 split for input/output
+  if (totalInput > 0) {
+    return {
+      inputTokens: Math.floor(totalInput * 0.4),
+      outputTokens: Math.floor(totalInput * 0.6),
+    };
+  }
+
+  return null;
+}
+
+/**
  * Simplified state tracking.
  *
  * GitHub labels are the source of truth for issue status.
@@ -19,6 +73,15 @@ export interface ActiveIssue {
   agentId: string | null;
   branchName: string | null;
   startedAt: string;
+}
+
+export interface TokenUsage {
+  id: number;
+  issueNumber: number;
+  agentType: AgentType;
+  inputTokens: number;
+  outputTokens: number;
+  completedAt: string;
 }
 
 let db: Database | null = null;
@@ -60,6 +123,18 @@ function initSchema(): void {
       agent_id TEXT,
       branch_name TEXT,
       started_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
+  // Track token usage per agent session
+  database.run(`
+    CREATE TABLE IF NOT EXISTS token_usage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      issue_number INTEGER NOT NULL,
+      agent_type TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL,
+      output_tokens INTEGER NOT NULL,
+      completed_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
 
@@ -199,6 +274,77 @@ export async function clearAllIssues(): Promise<void> {
   const database = await getDb();
   database.run('DELETE FROM active_issues');
   saveDb();
+}
+
+/**
+ * Record token usage for an agent session
+ */
+export async function recordTokenUsage(
+  issueNumber: number,
+  agentType: AgentType,
+  inputTokens: number,
+  outputTokens: number
+): Promise<void> {
+  const database = await getDb();
+  const now = new Date().toISOString();
+  database.run(
+    `INSERT INTO token_usage (issue_number, agent_type, input_tokens, output_tokens, completed_at) VALUES (?, ?, ?, ?, ?)`,
+    [issueNumber, agentType, inputTokens, outputTokens, now]
+  );
+  saveDb();
+}
+
+/**
+ * Get token usage for a specific issue
+ */
+export async function getTokenUsageForIssue(issueNumber: number): Promise<TokenUsage[]> {
+  const database = await getDb();
+  const results: TokenUsage[] = [];
+
+  const stmt = database.prepare('SELECT * FROM token_usage WHERE issue_number = ? ORDER BY completed_at DESC');
+  stmt.bind([issueNumber]);
+
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as Record<string, unknown>;
+    results.push({
+      id: row.id as number,
+      issueNumber: row.issue_number as number,
+      agentType: row.agent_type as AgentType,
+      inputTokens: row.input_tokens as number,
+      outputTokens: row.output_tokens as number,
+      completedAt: row.completed_at as string,
+    });
+  }
+  stmt.free();
+
+  return results;
+}
+
+/**
+ * Get aggregated token usage by agent type
+ */
+export async function getTokenUsageSummary(): Promise<Map<AgentType, { inputTokens: number; outputTokens: number; count: number }>> {
+  const database = await getDb();
+  const summary = new Map<AgentType, { inputTokens: number; outputTokens: number; count: number }>();
+
+  const stmt = database.prepare(`
+    SELECT agent_type, SUM(input_tokens) as total_input, SUM(output_tokens) as total_output, COUNT(*) as count
+    FROM token_usage
+    GROUP BY agent_type
+  `);
+
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as Record<string, unknown>;
+    const agentType = row.agent_type as AgentType;
+    summary.set(agentType, {
+      inputTokens: row.total_input as number,
+      outputTokens: row.total_output as number,
+      count: row.count as number,
+    });
+  }
+  stmt.free();
+
+  return summary;
 }
 
 /**

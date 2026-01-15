@@ -178,6 +178,7 @@ export async function spawnFeatureAgent(
 
     // Create batch file for the Claude terminal - runs autonomously
     const batchFile = `${promptDir}\\run-issue-${issue.number}.bat`.replace(/\//g, '\\');
+    const logFile = `${promptDir}\\build-issue-${issue.number}.log`.replace(/\//g, '\\');
     const ghToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
     const batchContent = `@echo off
 cd /d "${workingDir}"
@@ -192,6 +193,7 @@ echo [%TIME%] Working directory: %CD%
 echo [%TIME%] Branch: ${branchName}
 echo [%TIME%] Model: ${config.orchestrator.buildingModel}
 echo [%TIME%] Prompt file: ${promptFile}
+echo [%TIME%] Log file: ${logFile}
 echo.
 echo [%TIME%] Checking out branch...
 git checkout ${branchName} 2>nul || git checkout -b ${branchName}
@@ -207,7 +209,7 @@ echo ----------------------------------------
 echo [%TIME%] Starting Claude Code agent...
 echo ----------------------------------------
 echo.
-type "${promptFile}" | claude --dangerously-skip-permissions --print --model ${config.orchestrator.buildingModel}
+type "${promptFile}" | claude --dangerously-skip-permissions --print --model ${config.orchestrator.buildingModel} > "${logFile}" 2>&1
 set CLAUDE_EXIT=%errorlevel%
 echo.
 echo ----------------------------------------
@@ -222,6 +224,8 @@ if %CLAUDE_EXIT% EQU 0 (
 echo.
 echo [%TIME%] Final git status:
 git status --short
+echo.
+echo [%TIME%] Output saved to: ${logFile}
 echo.
 echo ========================================
 echo   Build finished at %TIME%
@@ -289,6 +293,7 @@ export async function spawnReviewerAgent(
 
     // Create batch file for the Claude terminal - runs autonomously
     const batchFile = `${promptDir}\\review-issue-${issue.number}.bat`.replace(/\//g, '\\');
+    const logFile = `${promptDir}\\review-issue-${issue.number}.log`.replace(/\//g, '\\');
     const ghToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
     const batchContent = `@echo off
 cd /d "${workingDir}"
@@ -303,6 +308,7 @@ echo [%TIME%] Working directory: %CD%
 echo [%TIME%] Branch: ${branchName}
 echo [%TIME%] Model: ${config.orchestrator.buildingModel}
 echo [%TIME%] Prompt file: ${promptFile}
+echo [%TIME%] Log file: ${logFile}
 echo.
 echo [%TIME%] Checking out branch...
 git checkout ${branchName} 2>nul
@@ -318,7 +324,7 @@ echo ----------------------------------------
 echo [%TIME%] Starting Claude Code reviewer...
 echo ----------------------------------------
 echo.
-type "${promptFile}" | claude --dangerously-skip-permissions --print --model ${config.orchestrator.buildingModel}
+type "${promptFile}" | claude --dangerously-skip-permissions --print --model ${config.orchestrator.buildingModel} > "${logFile}" 2>&1
 set CLAUDE_EXIT=%errorlevel%
 echo.
 echo ----------------------------------------
@@ -333,6 +339,8 @@ if %CLAUDE_EXIT% EQU 0 (
 echo.
 echo [%TIME%] Final git status:
 git status --short
+echo.
+echo [%TIME%] Output saved to: ${logFile}
 echo.
 echo ========================================
 echo   Review finished at %TIME%
@@ -378,6 +386,15 @@ pause
  */
 export function getRunningAgentCount(): number {
   return runningProcesses.size;
+}
+
+/**
+ * Get log file path for an agent
+ */
+export function getAgentLogPath(issueNumber: number, agentType: 'building' | 'reviewing'): string {
+  const promptDir = `${config.paths.dataDir}`.replace(/^\/([A-Z]):/, '$1:');
+  const prefix = agentType === 'building' ? 'build' : 'review';
+  return `${promptDir}\\${prefix}-issue-${issueNumber}.log`.replace(/\//g, '\\');
 }
 
 /**

@@ -19,6 +19,7 @@ export function Dashboard() {
   const [newMealTitle, setNewMealTitle] = useState('');
   const [newMealDescription, setNewMealDescription] = useState('');
   const [selectedMealIds, setSelectedMealIds] = useState<string[]>([]);
+  const [quickAddTitle, setQuickAddTitle] = useState('');
 
   // Edit mode states
   const [editMode, setEditMode] = useState(false);
@@ -158,6 +159,20 @@ export function Dashboard() {
     setSelectedMealIds((prev) =>
       prev.includes(id) ? prev.filter((mId) => mId !== id) : [...prev, id]
     );
+  };
+
+  const handleQuickAddMeal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickAddTitle.trim()) return;
+
+    try {
+      const meal = await mealsApi.create(quickAddTitle.trim(), undefined);
+      setMeals([meal, ...meals]);
+      setSelectedMealIds([...selectedMealIds, meal.id]);
+      setQuickAddTitle('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add meal');
+    }
   };
 
   if (loading) {
@@ -415,6 +430,30 @@ export function Dashboard() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="card w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
             <h3 className="text-xl font-bold mb-4">Create Session</h3>
+
+            {/* Quick Add Meal */}
+            <form onSubmit={handleQuickAddMeal} className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Quick add meal
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={quickAddTitle}
+                  onChange={(e) => setQuickAddTitle(e.target.value)}
+                  className="input flex-1"
+                  placeholder="e.g., Pizza"
+                />
+                <button
+                  type="submit"
+                  disabled={!quickAddTitle.trim()}
+                  className="btn btn-primary"
+                >
+                  Add
+                </button>
+              </div>
+            </form>
+
             <p className="text-gray-600 text-sm mb-4">
               Select meals to include in this session:
             </p>

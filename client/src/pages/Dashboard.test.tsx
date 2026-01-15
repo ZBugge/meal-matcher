@@ -414,3 +414,228 @@ describe('Dashboard - Edit Mode and Delete', () => {
     expect(screen.queryByText(/Delete Selected/)).toBeNull();
   });
 });
+
+describe('Dashboard - Quick Add Meal in Create Session', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(mealsApi.list).mockResolvedValue(mockMeals);
+    vi.mocked(sessionsApi.list).mockResolvedValue([]);
+  });
+
+  it('should display quick add input in create session modal', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Session')).toBeDefined();
+    });
+
+    const createSessionButton = screen.getByText('Create New Session');
+    fireEvent.click(createSessionButton);
+
+    expect(screen.getByText('Quick add meal')).toBeDefined();
+    expect(screen.getByPlaceholderText('e.g., Pizza')).toBeDefined();
+  });
+
+  it('should add meal via quick add and auto-select it', async () => {
+    const newMeal = {
+      id: '4',
+      hostId: 'host1',
+      title: 'Burger',
+      description: '',
+      type: 'meal',
+      archived: false,
+      pickCount: 0,
+      createdAt: '2024-01-04',
+    };
+
+    vi.mocked(mealsApi.create).mockResolvedValue(newMeal);
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Session')).toBeDefined();
+    });
+
+    const createSessionButton = screen.getByText('Create New Session');
+    fireEvent.click(createSessionButton);
+
+    const quickAddInput = screen.getByPlaceholderText('e.g., Pizza');
+    fireEvent.change(quickAddInput, { target: { value: 'Burger' } });
+
+    const addButton = screen.getByRole('button', { name: 'Add' });
+    fireEvent.click(addButton);
+
+    await waitFor(() => {
+      expect(mealsApi.create).toHaveBeenCalledWith('Burger', undefined);
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Burger').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('should clear input after quick add', async () => {
+    const newMeal = {
+      id: '4',
+      hostId: 'host1',
+      title: 'Burger',
+      description: '',
+      type: 'meal',
+      archived: false,
+      pickCount: 0,
+      createdAt: '2024-01-04',
+    };
+
+    vi.mocked(mealsApi.create).mockResolvedValue(newMeal);
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Session')).toBeDefined();
+    });
+
+    const createSessionButton = screen.getByText('Create New Session');
+    fireEvent.click(createSessionButton);
+
+    const quickAddInput = screen.getByPlaceholderText('e.g., Pizza') as HTMLInputElement;
+    fireEvent.change(quickAddInput, { target: { value: 'Burger' } });
+
+    const addButton = screen.getByRole('button', { name: 'Add' });
+    fireEvent.click(addButton);
+
+    await waitFor(() => {
+      expect(quickAddInput.value).toBe('');
+    });
+  });
+
+  it('should submit quick add on Enter key', async () => {
+    const newMeal = {
+      id: '4',
+      hostId: 'host1',
+      title: 'Burger',
+      description: '',
+      type: 'meal',
+      archived: false,
+      pickCount: 0,
+      createdAt: '2024-01-04',
+    };
+
+    vi.mocked(mealsApi.create).mockResolvedValue(newMeal);
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Session')).toBeDefined();
+    });
+
+    const createSessionButton = screen.getByText('Create New Session');
+    fireEvent.click(createSessionButton);
+
+    const quickAddInput = screen.getByPlaceholderText('e.g., Pizza');
+    fireEvent.change(quickAddInput, { target: { value: 'Burger' } });
+    fireEvent.submit(quickAddInput.closest('form')!);
+
+    await waitFor(() => {
+      expect(mealsApi.create).toHaveBeenCalledWith('Burger', undefined);
+    });
+  });
+
+  it('should disable Add button when input is empty', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Session')).toBeDefined();
+    });
+
+    const createSessionButton = screen.getByText('Create New Session');
+    fireEvent.click(createSessionButton);
+
+    const addButton = screen.getByRole('button', { name: 'Add' });
+    expect(addButton).toBeDisabled();
+  });
+
+  it('should trim whitespace from quick add input', async () => {
+    const newMeal = {
+      id: '4',
+      hostId: 'host1',
+      title: 'Burger',
+      description: '',
+      type: 'meal',
+      archived: false,
+      pickCount: 0,
+      createdAt: '2024-01-04',
+    };
+
+    vi.mocked(mealsApi.create).mockResolvedValue(newMeal);
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Session')).toBeDefined();
+    });
+
+    const createSessionButton = screen.getByText('Create New Session');
+    fireEvent.click(createSessionButton);
+
+    const quickAddInput = screen.getByPlaceholderText('e.g., Pizza');
+    fireEvent.change(quickAddInput, { target: { value: '  Burger  ' } });
+
+    const addButton = screen.getByRole('button', { name: 'Add' });
+    fireEvent.click(addButton);
+
+    await waitFor(() => {
+      expect(mealsApi.create).toHaveBeenCalledWith('Burger', undefined);
+    });
+  });
+
+  it('should handle API error in quick add', async () => {
+    vi.mocked(mealsApi.create).mockRejectedValue(new Error('Failed to create meal'));
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Create New Session')).toBeDefined();
+    });
+
+    const createSessionButton = screen.getByText('Create New Session');
+    fireEvent.click(createSessionButton);
+
+    const quickAddInput = screen.getByPlaceholderText('e.g., Pizza');
+    fireEvent.change(quickAddInput, { target: { value: 'Burger' } });
+
+    const addButton = screen.getByRole('button', { name: 'Add' });
+    fireEvent.click(addButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to create meal')).toBeDefined();
+    });
+  });
+});

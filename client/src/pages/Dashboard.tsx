@@ -82,10 +82,13 @@ export function Dashboard() {
     if (!editingMeal) return;
 
     try {
-      await mealsApi.update(editingMeal.id, editTitle, editDescription || undefined);
+      await mealsApi.update(editingMeal.id, {
+        title: editTitle,
+        description: editDescription || undefined,
+      });
       setMeals(meals.map((m) =>
         m.id === editingMeal.id
-          ? { ...m, title: editTitle, description: editDescription || undefined }
+          ? { ...m, title: editTitle, description: editDescription || null }
           : m
       ));
       setShowEditMeal(false);

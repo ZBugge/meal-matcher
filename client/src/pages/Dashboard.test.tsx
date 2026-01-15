@@ -524,7 +524,6 @@ describe('Dashboard - Edit Meal Functionality', () => {
   it('should update meal when form is submitted', async () => {
     vi.mocked(mealsApi.update).mockResolvedValue({
       id: '1',
-      hostId: 'host1',
       title: 'Updated Pizza',
       description: 'Updated description',
       type: 'meal',
@@ -556,14 +555,13 @@ describe('Dashboard - Edit Meal Functionality', () => {
     fireEvent.click(saveButton);
 
     await waitFor(() => {
-      expect(mealsApi.update).toHaveBeenCalledWith('1', 'Updated Pizza', 'Updated description');
+      expect(mealsApi.update).toHaveBeenCalledWith('1', { title: 'Updated Pizza', description: 'Updated description' });
     });
   });
 
   it('should update meal list after successful edit', async () => {
     vi.mocked(mealsApi.update).mockResolvedValue({
       id: '1',
-      hostId: 'host1',
       title: 'Updated Pizza',
       description: 'New description',
       type: 'meal',
@@ -618,9 +616,8 @@ describe('Dashboard - Edit Meal Functionality', () => {
   it('should handle description as optional', async () => {
     vi.mocked(mealsApi.update).mockResolvedValue({
       id: '1',
-      hostId: 'host1',
       title: 'Pizza Without Description',
-      description: undefined,
+      description: null,
       type: 'meal',
       archived: false,
       pickCount: 5,
@@ -650,7 +647,7 @@ describe('Dashboard - Edit Meal Functionality', () => {
     fireEvent.click(saveButton);
 
     await waitFor(() => {
-      expect(mealsApi.update).toHaveBeenCalledWith('1', 'Pizza Without Description', undefined);
+      expect(mealsApi.update).toHaveBeenCalledWith('1', { title: 'Pizza Without Description', description: undefined });
     });
   });
 

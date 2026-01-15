@@ -29,6 +29,12 @@ export function Dashboard() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [mealToDelete, setMealToDelete] = useState<Meal | null>(null);
 
+  // Edit modal states
+  const [showEditMeal, setShowEditMeal] = useState(false);
+  const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+
   // Animation states
   const [deletingMealIds, setDeletingMealIds] = useState<string[]>([]);
 
@@ -61,6 +67,33 @@ export function Dashboard() {
       setShowAddMeal(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add meal');
+    }
+  };
+
+  const openEditMeal = (meal: Meal) => {
+    setEditingMeal(meal);
+    setEditTitle(meal.title);
+    setEditDescription(meal.description || '');
+    setShowEditMeal(true);
+  };
+
+  const handleUpdateMeal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMeal) return;
+
+    try {
+      await mealsApi.update(editingMeal.id, editTitle, editDescription || undefined);
+      setMeals(meals.map((m) =>
+        m.id === editingMeal.id
+          ? { ...m, title: editTitle, description: editDescription || undefined }
+          : m
+      ));
+      setShowEditMeal(false);
+      setEditingMeal(null);
+      setEditTitle('');
+      setEditDescription('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update meal');
     }
   };
 
@@ -295,15 +328,26 @@ export function Dashboard() {
                           )}
                         </div>
                         {!editMode && (
-                          <button
-                            onClick={() => confirmDeleteSingleMeal(meal)}
-                            className="text-gray-400 hover:text-red-500"
-                            title="Archive meal"
-                          >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => openEditMeal(meal)}
+                              className="text-gray-400 hover:text-primary-500"
+                              title="Edit meal"
+                            >
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => confirmDeleteSingleMeal(meal)}
+                              className="text-gray-400 hover:text-red-500"
+                              title="Archive meal"
+                            >
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
                         )}
                       </div>
                     </motion.div>
@@ -418,6 +462,55 @@ export function Dashboard() {
                 </button>
                 <button type="submit" className="btn btn-primary flex-1">
                   Add Meal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Meal Modal */}
+      {showEditMeal && editingMeal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="card w-full max-w-md">
+            <h3 className="text-xl font-bold mb-4">Edit Meal</h3>
+            <form onSubmit={handleUpdateMeal} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="input"
+                  placeholder="e.g., Tacos"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="input"
+                  rows={3}
+                  placeholder="e.g., Beef tacos with all the fixings"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditMeal(false)}
+                  className="btn btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary flex-1">
+                  Save
                 </button>
               </div>
             </form>

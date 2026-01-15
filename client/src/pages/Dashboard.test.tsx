@@ -15,6 +15,7 @@ vi.mock('../api/client', () => ({
   mealsApi: {
     list: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
     delete: vi.fn(),
   },
   sessionsApi: {
@@ -412,6 +413,269 @@ describe('Dashboard - Edit Mode and Delete', () => {
     fireEvent.click(screen.getByText('Edit'));
 
     expect(screen.queryByText(/Delete Selected/)).toBeNull();
+  });
+});
+
+describe('Dashboard - Edit Meal Functionality', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(mealsApi.list).mockResolvedValue(mockMeals);
+    vi.mocked(sessionsApi.list).mockResolvedValue([]);
+  });
+
+  it('should show edit button for each meal', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pizza')).toBeDefined();
+    });
+
+    const editButtons = screen.getAllByTitle('Edit meal');
+    expect(editButtons.length).toBe(mockMeals.length);
+  });
+
+  it('should hide edit buttons in edit mode', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pizza')).toBeDefined();
+    });
+
+    const editButtons = screen.getAllByTitle('Edit meal');
+    expect(editButtons.length).toBeGreaterThan(0);
+
+    const editModeButton = screen.getByText('Edit');
+    fireEvent.click(editModeButton);
+
+    expect(screen.queryByTitle('Edit meal')).toBeNull();
+  });
+
+  it('should open edit modal when edit button is clicked', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pizza')).toBeDefined();
+    });
+
+    const editButton = screen.getAllByTitle('Edit meal')[0];
+    fireEvent.click(editButton);
+
+    expect(screen.getByText('Edit Meal')).toBeDefined();
+    expect(screen.getByDisplayValue('Pizza')).toBeDefined();
+    expect(screen.getByDisplayValue('Pepperoni pizza')).toBeDefined();
+  });
+
+  it('should populate form with meal data', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Tacos')).toBeDefined();
+    });
+
+    const editButton = screen.getAllByTitle('Edit meal')[1];
+    fireEvent.click(editButton);
+
+    const titleInput = screen.getByDisplayValue('Tacos');
+    const descriptionInput = screen.getByDisplayValue('Beef tacos');
+
+    expect(titleInput).toBeDefined();
+    expect(descriptionInput).toBeDefined();
+  });
+
+  it('should close modal when Cancel is clicked', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pizza')).toBeDefined();
+    });
+
+    const editButton = screen.getAllByTitle('Edit meal')[0];
+    fireEvent.click(editButton);
+
+    expect(screen.getByText('Edit Meal')).toBeDefined();
+
+    const cancelButton = screen.getByText('Cancel');
+    fireEvent.click(cancelButton);
+
+    expect(screen.queryByText('Edit Meal')).toBeNull();
+    expect(mealsApi.update).not.toHaveBeenCalled();
+  });
+
+  it('should update meal when form is submitted', async () => {
+    vi.mocked(mealsApi.update).mockResolvedValue({
+      id: '1',
+      title: 'Updated Pizza',
+      description: 'Updated description',
+      type: 'meal',
+      archived: false,
+      pickCount: 5,
+      createdAt: '2024-01-01',
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pizza')).toBeDefined();
+    });
+
+    const editButton = screen.getAllByTitle('Edit meal')[0];
+    fireEvent.click(editButton);
+
+    const titleInput = screen.getByDisplayValue('Pizza');
+    const descriptionInput = screen.getByDisplayValue('Pepperoni pizza');
+
+    fireEvent.change(titleInput, { target: { value: 'Updated Pizza' } });
+    fireEvent.change(descriptionInput, { target: { value: 'Updated description' } });
+
+    const saveButton = screen.getByText('Save');
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(mealsApi.update).toHaveBeenCalledWith('1', { title: 'Updated Pizza', description: 'Updated description' });
+    });
+  });
+
+  it('should update meal list after successful edit', async () => {
+    vi.mocked(mealsApi.update).mockResolvedValue({
+      id: '1',
+      title: 'Updated Pizza',
+      description: 'New description',
+      type: 'meal',
+      archived: false,
+      pickCount: 5,
+      createdAt: '2024-01-01',
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pizza')).toBeDefined();
+    });
+
+    const editButton = screen.getAllByTitle('Edit meal')[0];
+    fireEvent.click(editButton);
+
+    const titleInput = screen.getByDisplayValue('Pizza');
+    fireEvent.change(titleInput, { target: { value: 'Updated Pizza' } });
+
+    const saveButton = screen.getByText('Save');
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Edit Meal')).toBeNull();
+      expect(screen.getByText('Updated Pizza')).toBeDefined();
+    });
+  });
+
+  it('should require title field', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pizza')).toBeDefined();
+    });
+
+    const editButton = screen.getAllByTitle('Edit meal')[0];
+    fireEvent.click(editButton);
+
+    const titleInput = screen.getByDisplayValue('Pizza') as HTMLInputElement;
+    expect(titleInput.required).toBe(true);
+  });
+
+  it('should handle description as optional', async () => {
+    vi.mocked(mealsApi.update).mockResolvedValue({
+      id: '1',
+      title: 'Pizza Without Description',
+      description: null,
+      type: 'meal',
+      archived: false,
+      pickCount: 5,
+      createdAt: '2024-01-01',
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pizza')).toBeDefined();
+    });
+
+    const editButton = screen.getAllByTitle('Edit meal')[0];
+    fireEvent.click(editButton);
+
+    const titleInput = screen.getByDisplayValue('Pizza');
+    const descriptionInput = screen.getByDisplayValue('Pepperoni pizza');
+
+    fireEvent.change(titleInput, { target: { value: 'Pizza Without Description' } });
+    fireEvent.change(descriptionInput, { target: { value: '' } });
+
+    const saveButton = screen.getByText('Save');
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(mealsApi.update).toHaveBeenCalledWith('1', { title: 'Pizza Without Description', description: undefined });
+    });
+  });
+
+  it('should show error message when update fails', async () => {
+    vi.mocked(mealsApi.update).mockRejectedValue(new Error('Update failed'));
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pizza')).toBeDefined();
+    });
+
+    const editButton = screen.getAllByTitle('Edit meal')[0];
+    fireEvent.click(editButton);
+
+    const titleInput = screen.getByDisplayValue('Pizza');
+    fireEvent.change(titleInput, { target: { value: 'Updated Pizza' } });
+
+    const saveButton = screen.getByText('Save');
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Update failed')).toBeDefined();
+    });
   });
 });
 

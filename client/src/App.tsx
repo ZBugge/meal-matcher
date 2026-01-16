@@ -7,6 +7,7 @@ import { SessionView } from './pages/SessionView';
 import { JoinSession } from './pages/JoinSession';
 import { SwipeSession } from './pages/SwipeSession';
 import { Results } from './pages/Results';
+import QuickSession from './pages/QuickSession';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -48,6 +49,7 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public routes */}
+      <Route path="/" element={<QuickSession />} />
       <Route
         path="/login"
         element={
@@ -67,7 +69,7 @@ function AppRoutes() {
 
       {/* Participant routes (no auth required) */}
       <Route path="/join/:inviteCode" element={<JoinSession />} />
-      <Route path="/swipe/:sessionId" element={<SwipeSession />} />
+      <Route path="/session/:sessionId/swipe" element={<SwipeSession />} />
       <Route path="/results/:sessionId" element={<Results />} />
 
       {/* Protected routes */}
@@ -88,9 +90,8 @@ function AppRoutes() {
         }
       />
 
-      {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

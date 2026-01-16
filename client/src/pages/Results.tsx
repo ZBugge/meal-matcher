@@ -1,14 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { participantApi, ResultsResponse, MatchResult } from '../api/client';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { participantApi, ResultsResponse, MatchResult, mealsApi } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 
 export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [results, setResults] = useState<ResultsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isCreator, setIsCreator] = useState(false);
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
+  const [savingMeals, setSavingMeals] = useState(false);
 
   const loadResults = useCallback(async () => {
     if (!sessionId) return;
@@ -20,6 +24,14 @@ export function Results() {
       // If still waiting, poll for updates
       if (data.status === 'waiting') {
         setTimeout(loadResults, 3000);
+      } else {
+        // Check if user is creator (has creator token and session is closed)
+        const creatorToken = sessionStorage.getItem('creatorToken');
+        const storedSessionId = sessionStorage.getItem('sessionId');
+        if (creatorToken && storedSessionId === sessionId) {
+          setIsCreator(true);
+          setShowSavePrompt(true);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load results');
@@ -31,6 +43,36 @@ export function Results() {
   useEffect(() => {
     loadResults();
   }, [loadResults]);
+
+  const handleSaveMeals = async () => {
+    if (!results?.results) return;
+
+    setSavingMeals(true);
+    try {
+      // Save all meals to the user's library
+      for (const result of results.results) {
+        await mealsApi.create(result.title, result.description || undefined);
+      }
+
+      // Clear creator token
+      sessionStorage.removeItem('creatorToken');
+      sessionStorage.removeItem('sessionId');
+      setShowSavePrompt(false);
+
+      // Navigate to dashboard
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save meals');
+    } finally {
+      setSavingMeals(false);
+    }
+  };
+
+  const handleDismissPrompt = () => {
+    sessionStorage.removeItem('creatorToken');
+    sessionStorage.removeItem('sessionId');
+    setShowSavePrompt(false);
+  };
 
   if (loading) {
     return (
@@ -122,8 +164,61 @@ export function Results() {
           </section>
         )}
 
+        {/* Save meals prompt for anonymous creators */}
+        {isCreator && showSavePrompt && !user ? (
+          <div className="card bg-orange-50 border-2 border-orange-500 mt-8">
+            <div className="text-center">
+              <h3 className="font-bold text-lg">Save these meals?</h3>
+              <p className="text-gray-600 mt-1 mb-4">
+                Create an account to save these meals to your library and host more sessions!
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={handleDismissPrompt}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  No thanks
+                </button>
+                <Link
+                  to="/register"
+                  className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
+                >
+                  Create Account
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Save meals for logged-in creators */}
+        {isCreator && showSavePrompt && user ? (
+          <div className="card bg-green-50 border-2 border-green-500 mt-8">
+            <div className="text-center">
+              <h3 className="font-bold text-lg">Save these meals to your library?</h3>
+              <p className="text-gray-600 mt-1 mb-4">
+                Add all meals from this session to your permanent collection.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={handleDismissPrompt}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  No thanks
+                </button>
+                <button
+                  onClick={handleSaveMeals}
+                  disabled={savingMeals}
+                  className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+                >
+                  {savingMeals ? 'Saving...' : 'Save Meals'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {/* Account prompt for non-logged in users */}
-        {!user && (
+        {!user && !isCreator ? (
           <div className="card bg-primary-50 border border-primary-200 mt-8">
             <div className="text-center">
               <h3 className="font-bold text-lg">Want to host your own sessions?</h3>
@@ -135,7 +230,7 @@ export function Results() {
               </Link>
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Back to dashboard for logged in users */}
         {user && results.isHost && (

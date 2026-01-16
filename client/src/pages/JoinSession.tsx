@@ -55,7 +55,7 @@ export function JoinSession() {
         })
       );
 
-      navigate(`/swipe/${response.sessionId}`);
+      navigate(`/session/${response.sessionId}/swipe`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join session');
       setJoining(false);

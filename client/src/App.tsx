@@ -8,6 +8,7 @@ import { JoinSession } from './pages/JoinSession';
 import { SwipeSession } from './pages/SwipeSession';
 import { Results } from './pages/Results';
 import QuickSession from './pages/QuickSession';
+import { ShareSession } from './pages/ShareSession';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -69,6 +70,7 @@ function AppRoutes() {
 
       {/* Participant routes (no auth required) */}
       <Route path="/join/:inviteCode" element={<JoinSession />} />
+      <Route path="/session/:sessionId/share" element={<ShareSession />} />
       <Route path="/session/:sessionId/swipe" element={<SwipeSession />} />
       <Route path="/results/:sessionId" element={<Results />} />
 

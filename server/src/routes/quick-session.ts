@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
-import { runQuery, getOne } from '../db/schema.js';
-import { QuickSessionRequest, Session, Participant } from '../types.js';
+import { runQuery } from '../db/schema.js';
+import { QuickSessionRequest } from '../types.js';
 
 const router = Router();
 
@@ -45,7 +45,7 @@ router.post('/', async (req: Request, res: Response) => {
     );
 
     // Create temporary meals and add to session
-    const mealIds: string[] = [];
+    const sessionMeals: Array<{ id: string; title: string; description: string | null; sessionMealId: string }> = [];
     for (let i = 0; i < meals.length; i++) {
       const mealId = uuidv4();
       const meal = meals[i];
@@ -64,7 +64,12 @@ router.post('/', async (req: Request, res: Response) => {
         [sessionMealId, sessionId, mealId, i]
       );
 
-      mealIds.push(mealId);
+      sessionMeals.push({
+        id: mealId,
+        title: meal.title,
+        description: meal.description || null,
+        sessionMealId
+      });
     }
 
     // Auto-join creator as participant
@@ -75,17 +80,15 @@ router.post('/', async (req: Request, res: Response) => {
       [participantId, sessionId, creatorName, isAuthenticated ? hostId : null]
     );
 
-    // Get the created session
-    const session = getOne<Session>(
-      'SELECT * FROM sessions WHERE id = ?',
-      [sessionId]
-    );
-
     res.json({
-      session,
+      session: {
+        id: sessionId,
+        inviteCode,
+        status: 'open'
+      },
       participantId,
       creatorToken: isAuthenticated ? null : creatorToken,
-      mealIds
+      meals: sessionMeals
     });
   } catch (error) {
     console.error('Error creating quick session:', error);

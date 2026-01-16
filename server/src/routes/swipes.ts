@@ -222,6 +222,65 @@ router.get('/results/:sessionId', (req, res) => {
   }
 });
 
+// POST /api/close-session/:sessionId - Close session with creator token (no auth required)
+router.post('/close-session/:sessionId', (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { creatorToken } = req.body;
+
+    if (!creatorToken) {
+      res.status(400).json({ error: 'Creator token is required' });
+      return;
+    }
+
+    // Get the session
+    const session = getOne<Session>(
+      'SELECT * FROM sessions WHERE id = ?',
+      [sessionId]
+    );
+
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    // Verify the creator token matches any meal in this session
+    const mealWithToken = getOne<{ id: string }>(
+      `SELECT m.id FROM meals m
+       JOIN session_meals sm ON m.id = sm.meal_id
+       WHERE sm.session_id = ? AND m.creator_token = ?
+       LIMIT 1`,
+      [sessionId, creatorToken]
+    );
+
+    if (!mealWithToken) {
+      res.status(403).json({ error: 'Invalid creator token' });
+      return;
+    }
+
+    if (session.status === 'closed') {
+      res.status(400).json({ error: 'Session is already closed' });
+      return;
+    }
+
+    runQuery(
+      'UPDATE sessions SET status = ?, closed_at = CURRENT_TIMESTAMP WHERE id = ?',
+      ['closed', sessionId]
+    );
+
+    // Calculate and return results
+    const results = calculateResults(sessionId, true);
+
+    res.json({
+      message: 'Session closed successfully',
+      results,
+    });
+  } catch (error) {
+    console.error('Close session error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/session-status/:sessionId - Check session status (for polling)
 router.get('/session-status/:sessionId', (req, res) => {
   try {
@@ -234,9 +293,23 @@ router.get('/session-status/:sessionId', (req, res) => {
       return;
     }
 
+    // Get participants with their status
+    const participants = getAll<Participant>(
+      `SELECT id, display_name, submitted, created_at
+       FROM participants
+       WHERE session_id = ?
+       ORDER BY created_at`,
+      [sessionId]
+    );
+
     res.json({
       status: session.status,
       selectedMealId: session.selected_meal_id,
+      participants: participants.map(p => ({
+        id: p.id,
+        displayName: p.display_name,
+        submitted: p.submitted === 1,
+      })),
     });
   } catch (error) {
     console.error('Get session status error:', error);

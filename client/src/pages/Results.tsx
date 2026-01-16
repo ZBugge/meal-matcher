@@ -1,18 +1,37 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { participantApi, ResultsResponse, MatchResult, mealsApi } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+
+interface Participant {
+  id: string;
+  displayName: string;
+  submitted: boolean;
+}
 
 export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [results, setResults] = useState<ResultsResponse | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isCreator, setIsCreator] = useState(false);
   const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [savingMeals, setSavingMeals] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const pollTimeoutRef = useRef<number | null>(null);
+
+  // Check if user is the creator
+  useEffect(() => {
+    const creatorToken = sessionStorage.getItem('creatorToken');
+    const storedSessionId = sessionStorage.getItem('sessionId');
+    if (creatorToken && storedSessionId === sessionId) {
+      setIsCreator(true);
+    }
+  }, [sessionId]);
 
   const loadResults = useCallback(async () => {
     if (!sessionId) return;
@@ -21,15 +40,14 @@ export function Results() {
       const data = await participantApi.getResults(sessionId, !!user);
       setResults(data);
 
-      // If still waiting, poll for updates
+      // If still waiting, poll for session status (includes participants)
       if (data.status === 'waiting') {
-        setTimeout(loadResults, 3000);
+        const statusData = await participantApi.getSessionStatus(sessionId);
+        setParticipants(statusData.participants);
+        pollTimeoutRef.current = window.setTimeout(loadResults, 3000);
       } else {
-        // Check if user is creator (has creator token and session is closed)
-        const creatorToken = sessionStorage.getItem('creatorToken');
-        const storedSessionId = sessionStorage.getItem('sessionId');
-        if (creatorToken && storedSessionId === sessionId) {
-          setIsCreator(true);
+        // Session closed, show save prompt for creator
+        if (isCreator) {
           setShowSavePrompt(true);
         }
       }
@@ -38,7 +56,35 @@ export function Results() {
     } finally {
       setLoading(false);
     }
-  }, [sessionId, user]);
+  }, [sessionId, user, isCreator]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCloseSession = async () => {
+    if (!sessionId) return;
+
+    const creatorToken = sessionStorage.getItem('creatorToken');
+    if (!creatorToken) return;
+
+    setClosing(true);
+    try {
+      await participantApi.closeSession(sessionId, creatorToken);
+      setShowCloseConfirm(false);
+      // Reload results to get the final data
+      await loadResults();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to close session');
+    } finally {
+      setClosing(false);
+    }
+  };
 
   useEffect(() => {
     loadResults();
@@ -95,17 +141,133 @@ export function Results() {
   }
 
   if (!results || results.status === 'waiting') {
+    const inviteCode = sessionStorage.getItem('inviteCode');
+    const shareUrl = inviteCode ? `${window.location.origin}/join/${inviteCode}` : null;
+
+    const handleCopyLink = async () => {
+      if (!shareUrl) return;
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+      } catch {
+        const input = document.createElement('input');
+        input.value = shareUrl;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+      }
+    };
+
+    const submittedCount = participants.filter(p => p.submitted).length;
+
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="card text-center max-w-md">
+        <div className="card text-center max-w-md w-full">
           <div className="animate-pulse text-6xl mb-4">⏳</div>
-          <h1 className="text-2xl font-bold mb-2">Waiting for Results</h1>
+          <h1 className="text-2xl font-bold mb-2">Waiting for Votes</h1>
           <p className="text-gray-600">
-            {results?.message || 'The host will close the session when everyone has voted.'}
+            {submittedCount} of {participants.length} people have finished voting
           </p>
-          <div className="mt-6">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mx-auto" />
-          </div>
+
+          {/* Participant list */}
+          {participants.length > 0 ? (
+            <div className="mt-6 text-left">
+              <div className="space-y-2">
+                {participants.map(p => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg"
+                  >
+                    <span className="font-medium">{p.displayName}</span>
+                    {p.submitted ? (
+                      <span className="text-green-600 text-sm flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Done
+                      </span>
+                    ) : (
+                      <span className="text-orange-500 text-sm flex items-center gap-1">
+                        <svg className="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="4" />
+                        </svg>
+                        Swiping...
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* End Session button for creator */}
+          {isCreator ? (
+            <div className="mt-6">
+              <button
+                onClick={() => setShowCloseConfirm(true)}
+                className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-lg transition-colors"
+              >
+                End Session & Show Results
+              </button>
+            </div>
+          ) : (
+            <div className="mt-6">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mx-auto" />
+            </div>
+          )}
+
+          {shareUrl ? (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-sm text-gray-500 mb-3">Invite more people to vote:</p>
+              <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={shareUrl}
+                  readOnly
+                  className="flex-1 bg-transparent text-sm text-gray-700 outline-none truncate"
+                />
+                <button
+                  onClick={handleCopyLink}
+                  className="text-primary-600 hover:text-primary-700 font-medium text-sm whitespace-nowrap"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Close confirmation modal */}
+          {showCloseConfirm ? (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-left">
+                <h2 className="text-xl font-bold mb-2">End Session?</h2>
+                <p className="text-gray-600 mb-6">
+                  This will close voting and show results to everyone.
+                  {participants.length - submittedCount > 0 && (
+                    <span className="block mt-2 text-orange-600">
+                      {participants.length - submittedCount} {participants.length - submittedCount === 1 ? 'person hasn\'t' : 'people haven\'t'} finished voting yet.
+                    </span>
+                  )}
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowCloseConfirm(false)}
+                    disabled={closing}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCloseSession}
+                    disabled={closing}
+                    className="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+                  >
+                    {closing ? 'Closing...' : 'End Session'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     );

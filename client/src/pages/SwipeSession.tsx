@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { participantApi, sessionsApi } from '../api/client';
+import { participantApi } from '../api/client';
 import { SwipeDeck } from '../components/SwipeDeck';
 import { useSwipeProgress } from '../hooks/useLocalStorage';
 
@@ -23,8 +23,6 @@ export function SwipeSession() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [sessionClosed, setSessionClosed] = useState(false);
-  const [isCreator, setIsCreator] = useState(false);
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   // Initialize progress hook with placeholder values first
   const displayName = sessionData?.displayName || '';
@@ -47,27 +45,6 @@ export function SwipeSession() {
     } else {
       // No session data - redirect to join
       setError('Session data not found. Please rejoin the session.');
-    }
-
-    // Check if user is the creator
-    const creatorToken = sessionStorage.getItem('creatorToken');
-    if (creatorToken && sessionStorage.getItem('sessionId') === sessionId) {
-      setIsCreator(true);
-    }
-  };
-
-  const handleCloseSession = async () => {
-    if (!sessionId) return;
-
-    const creatorToken = sessionStorage.getItem('creatorToken');
-    if (!creatorToken) return;
-
-    try {
-      await sessionsApi.close(sessionId, creatorToken);
-      navigate(`/results/${sessionId}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to close session');
-      setShowCloseConfirm(false);
     }
   };
 
@@ -201,20 +178,11 @@ export function SwipeSession() {
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-lg mx-auto">
         {/* Header */}
-        <div className="text-center mb-8 relative">
+        <div className="text-center mb-8">
           <h1 className="text-xl font-bold text-primary-600">MealMatch</h1>
           <p className="text-gray-600 mt-1">
             Hey {sessionData.displayName}! Swipe right on meals you'd like to eat.
           </p>
-
-          {isCreator ? (
-            <button
-              onClick={() => setShowCloseConfirm(true)}
-              className="absolute top-0 right-0 px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-            >
-              End Session
-            </button>
-          ) : null}
         </div>
 
         {error && (
@@ -222,32 +190,6 @@ export function SwipeSession() {
             {error}
           </div>
         )}
-
-        {/* Close confirmation modal */}
-        {showCloseConfirm ? (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-              <h2 className="text-xl font-bold mb-2">End Session?</h2>
-              <p className="text-gray-600 mb-6">
-                This will close the session and show results to all participants.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowCloseConfirm(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCloseSession}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                >
-                  End Session
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
 
         {/* Swipe deck */}
         <SwipeDeck

@@ -117,7 +117,10 @@ describe('QuickSession', () => {
       },
       participantId: 'participant-123',
       creatorToken: 'token-123',
-      mealIds: ['meal-1', 'meal-2']
+      meals: [
+        { id: 'meal-1', title: 'Pizza', description: null, sessionMealId: 'sm-1' },
+        { id: 'meal-2', title: 'Tacos', description: null, sessionMealId: 'sm-2' }
+      ]
     };
 
     vi.mocked(client.quickSessionApi.create).mockResolvedValue(mockResponse);

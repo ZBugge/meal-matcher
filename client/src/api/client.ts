@@ -210,9 +210,21 @@ export const participantApi = {
     request<ResultsResponse>(`/results/${sessionId}?host=${isHost}`),
 
   getSessionStatus: (sessionId: string) =>
-    request<{ status: string; selectedMealId: string | null }>(
-      `/session-status/${sessionId}`
-    ),
+    request<{
+      status: string;
+      selectedMealId: string | null;
+      participants: Array<{
+        id: string;
+        displayName: string;
+        submitted: boolean;
+      }>;
+    }>(`/session-status/${sessionId}`),
+
+  closeSession: (sessionId: string, creatorToken: string) =>
+    request<{ message: string; results: MatchResult[] }>(`/close-session/${sessionId}`, {
+      method: 'POST',
+      body: JSON.stringify({ creatorToken }),
+    }),
 };
 
 // Quick Session API
@@ -224,7 +236,12 @@ export interface QuickSessionResponse {
   };
   participantId: string;
   creatorToken: string | null;
-  mealIds: string[];
+  meals: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    sessionMealId: string;
+  }>;
 }
 
 export const quickSessionApi = {

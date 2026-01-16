@@ -1,24 +1,29 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { quickSessionApi } from '../api/client';
 
 interface MealInput {
   id: string;
   title: string;
-  description: string;
 }
 
 export default function QuickSession() {
   const navigate = useNavigate();
   const [creatorName, setCreatorName] = useState('');
   const [meals, setMeals] = useState<MealInput[]>([
-    { id: crypto.randomUUID(), title: '', description: '' }
+    { id: crypto.randomUUID(), title: '' }
   ]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const mealInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
 
   const addMeal = () => {
-    setMeals([...meals, { id: crypto.randomUUID(), title: '', description: '' }]);
+    const newMeal = { id: crypto.randomUUID(), title: '' };
+    setMeals([...meals, newMeal]);
+    // Focus the new input after render
+    setTimeout(() => {
+      mealInputRefs.current.get(newMeal.id)?.focus();
+    }, 0);
   };
 
   const removeMeal = (id: string) => {
@@ -27,8 +32,24 @@ export default function QuickSession() {
     }
   };
 
-  const updateMeal = (id: string, field: 'title' | 'description', value: string) => {
-    setMeals(meals.map(m => m.id === id ? { ...m, [field]: value } : m));
+  const updateMeal = (id: string, value: string) => {
+    setMeals(meals.map(m => m.id === id ? { ...m, title: value } : m));
+  };
+
+  const handleMealKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, mealId: string, index: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const currentMeal = meals.find(m => m.id === mealId);
+      if (currentMeal?.title.trim()) {
+        // If there's a next meal, focus it; otherwise add a new one
+        if (index < meals.length - 1) {
+          const nextMeal = meals[index + 1];
+          mealInputRefs.current.get(nextMeal.id)?.focus();
+        } else {
+          addMeal();
+        }
+      }
+    }
   };
 
   const handleCreateSession = async () => {
@@ -51,20 +72,28 @@ export default function QuickSession() {
       const response = await quickSessionApi.create(
         creatorName.trim(),
         validMeals.map(m => ({
-          title: m.title.trim(),
-          description: m.description.trim() || undefined
+          title: m.title.trim()
         }))
       );
 
-      // Store session info
+      // Store session info in the format SwipeSession expects
+      sessionStorage.setItem(
+        `session_${response.session.id}`,
+        JSON.stringify({
+          participantId: response.participantId,
+          displayName: creatorName.trim(),
+          meals: response.meals
+        })
+      );
       sessionStorage.setItem('sessionId', response.session.id);
       sessionStorage.setItem('participantId', response.participantId);
+      sessionStorage.setItem('inviteCode', response.session.inviteCode);
       if (response.creatorToken) {
         sessionStorage.setItem('creatorToken', response.creatorToken);
       }
 
-      // Navigate to swipe session
-      navigate(`/session/${response.session.id}/swipe`);
+      // Navigate to share page so creator can share the link
+      navigate(`/session/${response.session.id}/share`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session');
     } finally {
@@ -98,6 +127,12 @@ export default function QuickSession() {
               type="text"
               value={creatorName}
               onChange={(e) => setCreatorName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && creatorName.trim()) {
+                  e.preventDefault();
+                  mealInputRefs.current.get(meals[0].id)?.focus();
+                }
+              }}
               placeholder="Enter your name"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
@@ -110,22 +145,18 @@ export default function QuickSession() {
             <div className="space-y-3">
               {meals.map((meal, index) => (
                 <div key={meal.id} className="flex gap-2">
-                  <div className="flex-1 space-y-2">
-                    <input
-                      type="text"
-                      value={meal.title}
-                      onChange={(e) => updateMeal(meal.id, 'title', e.target.value)}
-                      placeholder={`Option ${index + 1}`}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    />
-                    <input
-                      type="text"
-                      value={meal.description}
-                      onChange={(e) => updateMeal(meal.id, 'description', e.target.value)}
-                      placeholder="Description (optional)"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
-                    />
-                  </div>
+                  <input
+                    ref={(el) => {
+                      if (el) mealInputRefs.current.set(meal.id, el);
+                      else mealInputRefs.current.delete(meal.id);
+                    }}
+                    type="text"
+                    value={meal.title}
+                    onChange={(e) => updateMeal(meal.id, e.target.value)}
+                    onKeyDown={(e) => handleMealKeyDown(e, meal.id, index)}
+                    placeholder={`Option ${index + 1}`}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
                   {meals.length > 1 ? (
                     <button
                       onClick={() => removeMeal(meal.id)}

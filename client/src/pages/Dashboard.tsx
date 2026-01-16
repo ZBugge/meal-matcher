@@ -361,17 +361,30 @@ export function Dashboard() {
           )}
         </section>
 
-        {/* Create Session Button */}
-        {meals.length > 0 && (
-          <section className="mb-12">
+        {/* Create Session Buttons */}
+        <section className="mb-12">
+          <div className="grid grid-cols-2 gap-4">
             <button
-              onClick={openCreateSession}
-              className="btn btn-success w-full py-4 text-lg"
+              onClick={() => navigate('/')}
+              className="btn btn-secondary py-4 text-lg"
             >
-              Create New Session
+              Quick Session
             </button>
-          </section>
-        )}
+            {meals.length > 0 ? (
+              <button
+                onClick={openCreateSession}
+                className="btn btn-success py-4 text-lg"
+              >
+                Create Session
+              </button>
+            ) : null}
+          </div>
+          {meals.length === 0 ? (
+            <p className="text-sm text-gray-600 mt-2 text-center">
+              Add meals to create a session from your library, or use Quick Session to start immediately.
+            </p>
+          ) : null}
+        </section>
 
         {/* Sessions Section */}
         <section>

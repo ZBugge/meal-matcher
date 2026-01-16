@@ -14,6 +14,8 @@ export interface Meal {
   type: 'meal' | 'restaurant';
   archived: number; // SQLite boolean (0 or 1)
   pick_count: number;
+  temporary: number; // SQLite boolean (0 or 1)
+  creator_token: string | null;
   created_at: string;
 }
 
@@ -103,4 +105,9 @@ export interface RegisterRequest {
 export interface LoginRequest {
   email: string;
   password: string;
+}
+
+export interface QuickSessionRequest {
+  creatorName: string;
+  meals: { title: string; description?: string }[];
 }

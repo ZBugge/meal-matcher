@@ -171,14 +171,42 @@ router.get('/:id', (req, res) => {
 router.post('/:id/close', (req, res) => {
   try {
     const { id } = req.params;
+    const { creatorToken } = req.body;
 
-    const session = getOne<Session>(
-      'SELECT * FROM sessions WHERE id = ? AND host_id = ?',
-      [id, req.session.hostId]
-    );
+    // Check if user is authenticated OR has a valid creator token
+    let session: Session | undefined;
+
+    if (req.session.hostId) {
+      // Authenticated user
+      session = getOne<Session>(
+        'SELECT * FROM sessions WHERE id = ? AND host_id = ?',
+        [id, req.session.hostId]
+      );
+    } else if (creatorToken) {
+      // Anonymous creator with token
+      session = getOne<Session>(
+        'SELECT * FROM sessions WHERE id = ?',
+        [id]
+      );
+
+      // Verify the creator token matches any meal in this session
+      if (session) {
+        const mealWithToken = getOne<{ id: string }>(
+          `SELECT m.id FROM meals m
+           JOIN session_meals sm ON m.id = sm.meal_id
+           WHERE sm.session_id = ? AND m.creator_token = ?
+           LIMIT 1`,
+          [id, creatorToken]
+        );
+
+        if (!mealWithToken) {
+          session = undefined; // Invalid token
+        }
+      }
+    }
 
     if (!session) {
-      res.status(404).json({ error: 'Session not found' });
+      res.status(404).json({ error: 'Session not found or unauthorized' });
       return;
     }
 

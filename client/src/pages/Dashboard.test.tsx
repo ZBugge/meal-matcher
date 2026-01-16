@@ -694,10 +694,10 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Create New Session')).toBeDefined();
+      expect(screen.getByText('Create Session')).toBeDefined();
     });
 
-    const createSessionButton = screen.getByText('Create New Session');
+    const createSessionButton = screen.getByText('Create Session');
     fireEvent.click(createSessionButton);
 
     expect(screen.getByText('Quick add meal')).toBeDefined();
@@ -725,10 +725,10 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Create New Session')).toBeDefined();
+      expect(screen.getByText('Create Session')).toBeDefined();
     });
 
-    const createSessionButton = screen.getByText('Create New Session');
+    const createSessionButton = screen.getByText('Create Session');
     fireEvent.click(createSessionButton);
 
     const quickAddInput = screen.getByPlaceholderText('e.g., Pizza');
@@ -767,10 +767,10 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Create New Session')).toBeDefined();
+      expect(screen.getByText('Create Session')).toBeDefined();
     });
 
-    const createSessionButton = screen.getByText('Create New Session');
+    const createSessionButton = screen.getByText('Create Session');
     fireEvent.click(createSessionButton);
 
     const quickAddInput = screen.getByPlaceholderText('e.g., Pizza') as HTMLInputElement;
@@ -805,10 +805,10 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Create New Session')).toBeDefined();
+      expect(screen.getByText('Create Session')).toBeDefined();
     });
 
-    const createSessionButton = screen.getByText('Create New Session');
+    const createSessionButton = screen.getByText('Create Session');
     fireEvent.click(createSessionButton);
 
     const quickAddInput = screen.getByPlaceholderText('e.g., Pizza');
@@ -828,10 +828,10 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Create New Session')).toBeDefined();
+      expect(screen.getByText('Create Session')).toBeDefined();
     });
 
-    const createSessionButton = screen.getByText('Create New Session');
+    const createSessionButton = screen.getByText('Create Session');
     fireEvent.click(createSessionButton);
 
     const addButton = screen.getByRole('button', { name: 'Add' });
@@ -859,10 +859,10 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Create New Session')).toBeDefined();
+      expect(screen.getByText('Create Session')).toBeDefined();
     });
 
-    const createSessionButton = screen.getByText('Create New Session');
+    const createSessionButton = screen.getByText('Create Session');
     fireEvent.click(createSessionButton);
 
     const quickAddInput = screen.getByPlaceholderText('e.g., Pizza');
@@ -886,10 +886,10 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Create New Session')).toBeDefined();
+      expect(screen.getByText('Create Session')).toBeDefined();
     });
 
-    const createSessionButton = screen.getByText('Create New Session');
+    const createSessionButton = screen.getByText('Create Session');
     fireEvent.click(createSessionButton);
 
     const quickAddInput = screen.getByPlaceholderText('e.g., Pizza');

@@ -21,6 +21,7 @@ export async function initializeDatabase(): Promise<Database> {
   if (fs.existsSync(DATABASE_PATH)) {
     const buffer = fs.readFileSync(DATABASE_PATH);
     db = new SQL.Database(buffer);
+    runMigrations(db);
   } else {
     db = new SQL.Database();
     createTables(db);
@@ -28,6 +29,23 @@ export async function initializeDatabase(): Promise<Database> {
   }
 
   return db;
+}
+
+function runMigrations(database: Database): void {
+  // Add temporary and creator_token columns to meals table if they don't exist
+  try {
+    database.run('ALTER TABLE meals ADD COLUMN temporary INTEGER DEFAULT 0');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  try {
+    database.run('ALTER TABLE meals ADD COLUMN creator_token TEXT');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  saveDatabase();
 }
 
 function createTables(database: Database): void {
@@ -49,6 +67,8 @@ function createTables(database: Database): void {
       type TEXT DEFAULT 'meal',
       archived INTEGER DEFAULT 0,
       pick_count INTEGER DEFAULT 0,
+      temporary INTEGER DEFAULT 0,
+      creator_token TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 

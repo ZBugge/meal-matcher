@@ -147,9 +147,10 @@ export const sessionsApi = {
 
   get: (id: string) => request<SessionDetails>(`/sessions/${id}`),
 
-  close: (id: string) =>
+  close: (id: string, creatorToken?: string) =>
     request<{ message: string; results: MatchResult[] }>(`/sessions/${id}/close`, {
       method: 'POST',
+      body: JSON.stringify({ creatorToken }),
     }),
 
   selectMeal: (sessionId: string, mealId: string) =>
@@ -212,4 +213,24 @@ export const participantApi = {
     request<{ status: string; selectedMealId: string | null }>(
       `/session-status/${sessionId}`
     ),
+};
+
+// Quick Session API
+export interface QuickSessionResponse {
+  session: {
+    id: string;
+    inviteCode: string;
+    status: string;
+  };
+  participantId: string;
+  creatorToken: string | null;
+  mealIds: string[];
+}
+
+export const quickSessionApi = {
+  create: (creatorName: string, meals: Array<{ title: string; description?: string }>) =>
+    request<QuickSessionResponse>('/quick-session', {
+      method: 'POST',
+      body: JSON.stringify({ creatorName, meals }),
+    }),
 };

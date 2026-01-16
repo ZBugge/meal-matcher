@@ -7,6 +7,7 @@ import authRoutes from './routes/auth';
 import mealsRoutes from './routes/meals';
 import sessionsRoutes from './routes/sessions';
 import swipesRoutes from './routes/swipes';
+import quickSessionRoutes from './routes/quick-session';
 
 declare module 'express-session' {
   interface SessionData {
@@ -58,6 +59,7 @@ app.use(session({
 app.use('/api/auth', authRoutes);
 app.use('/api/meals', mealsRoutes);
 app.use('/api/sessions', sessionsRoutes);
+app.use('/api/quick-session', quickSessionRoutes);
 app.use('/api', swipesRoutes);
 
 // Health check endpoint

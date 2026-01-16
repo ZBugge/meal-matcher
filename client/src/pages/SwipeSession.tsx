@@ -175,13 +175,13 @@ export function SwipeSession() {
   const initialIndex = progress?.currentIndex || 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-lg mx-auto">
+    <div className="min-h-screen bg-gray-50 py-6 px-4">
+      <div className="max-w-md mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-primary-600">MealMatch</h1>
-          <p className="text-gray-600 mt-1">
-            Hey {sessionData.displayName}! Swipe right on meals you'd like to eat.
+        <div className="text-center mb-6">
+          <h1 className="text-lg font-bold text-primary-600">MealMatch</h1>
+          <p className="text-gray-600 text-sm mt-1">
+            Hey {sessionData.displayName}! Swipe right on meals you'd like.
           </p>
         </div>
 

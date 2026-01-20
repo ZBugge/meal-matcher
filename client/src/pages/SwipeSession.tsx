@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { participantApi } from '../api/client';
 import { SwipeDeck } from '../components/SwipeDeck';
 import { useSwipeProgress } from '../hooks/useLocalStorage';
@@ -18,6 +18,8 @@ interface SessionData {
 export function SwipeSession() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const editMode = location.state?.editMode || false;
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -172,7 +174,7 @@ export function SwipeSession() {
 
   // Get initial state from progress if available
   const initialSwipes = progress?.swipes || {};
-  const initialIndex = progress?.currentIndex || 0;
+  const initialIndex = editMode ? sessionData.meals.length : (progress?.currentIndex || 0);
 
   return (
     <div className="min-h-screen bg-gray-50 py-6 px-4">
@@ -181,7 +183,7 @@ export function SwipeSession() {
         <div className="text-center mb-6">
           <h1 className="text-lg font-bold text-primary-600">MealMatch</h1>
           <p className="text-gray-600 text-sm mt-1">
-            Hey {sessionData.displayName}! Swipe right on meals you'd like.
+            {editMode ? `Update your choices, ${sessionData.displayName}!` : `Hey ${sessionData.displayName}! Swipe right on meals you'd like.`}
           </p>
         </div>
 
@@ -198,6 +200,7 @@ export function SwipeSession() {
           initialIndex={initialIndex}
           onSwipe={handleSwipe}
           onComplete={handleComplete}
+          editMode={editMode}
         />
       </div>
     </div>

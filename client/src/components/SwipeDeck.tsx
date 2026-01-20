@@ -14,6 +14,7 @@ interface SwipeDeckProps {
   initialIndex?: number;
   onSwipe: (mealId: string, vote: number, allSwipes: Record<string, number>) => void;
   onComplete: (swipes: Record<string, number>) => void;
+  editMode?: boolean;
 }
 
 export function SwipeDeck({
@@ -22,19 +23,22 @@ export function SwipeDeck({
   initialIndex = 0,
   onSwipe,
   onComplete,
+  editMode = false,
 }: SwipeDeckProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [swipes, setSwipes] = useState<Record<string, number>>(initialSwipes);
-  const [showReview, setShowReview] = useState(false);
+  const [showReview, setShowReview] = useState(editMode || false);
 
   const currentMeal = meals[currentIndex];
   const isComplete = currentIndex >= meals.length;
 
   useEffect(() => {
-    if (isComplete && !showReview) {
+    if (isComplete && !showReview && !editMode) {
       setShowReview(true);
+      // Auto-submit when all swipes are done (not in edit mode)
+      onComplete(swipes);
     }
-  }, [isComplete, showReview]);
+  }, [isComplete, showReview, editMode, swipes, onComplete]);
 
   const handleSwipe = (direction: 'left' | 'right') => {
     if (!currentMeal) return;
@@ -59,6 +63,9 @@ export function SwipeDeck({
   };
 
   const handleReviewChange = (mealId: string) => {
+    // Only allow changes in edit mode
+    if (!editMode) return;
+
     const currentVote = swipes[mealId] ?? 0;
     const newVote = currentVote === 0 ? 1 : currentVote === 1 ? 2 : 0;
     const newSwipes = { ...swipes, [mealId]: newVote };
@@ -86,9 +93,11 @@ export function SwipeDeck({
   if (showReview) {
     return (
       <div className="w-full max-w-md mx-auto px-4">
-        <h2 className="text-2xl font-bold text-center mb-6">Review Your Choices</h2>
+        <h2 className="text-2xl font-bold text-center mb-6">
+          {editMode ? 'Edit Your Choices' : 'Your Choices'}
+        </h2>
         <p className="text-gray-600 text-center mb-6">
-          Tap any meal to change your vote
+          {editMode ? 'Tap any meal to change your vote' : 'Your votes have been submitted'}
         </p>
 
         <div className="space-y-3 mb-8">
@@ -98,7 +107,7 @@ export function SwipeDeck({
             const badgeColor = vote === 1 ? 'bg-green-100 text-green-700' : vote === 2 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
             const label = vote === 1 ? 'YUM' : vote === 2 ? 'MAYBE' : 'NOPE';
 
-            return (
+            return editMode ? (
               <button
                 key={meal.id}
                 onClick={() => handleReviewChange(meal.id)}
@@ -116,18 +125,41 @@ export function SwipeDeck({
                   </span>
                 </div>
               </button>
+            ) : (
+              <div
+                key={meal.id}
+                className={`w-full p-4 rounded-lg border-2 ${borderColor}`}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold">{meal.title}</p>
+                    {meal.description && (
+                      <p className="text-sm text-gray-500 mt-1">{meal.description}</p>
+                    )}
+                  </div>
+                  <span className={`text-sm font-medium px-3 py-1 rounded ${badgeColor}`}>
+                    {label}
+                  </span>
+                </div>
+              </div>
             );
           })}
         </div>
 
-        <div className="flex gap-3">
-          <button onClick={handleBackToSwipe} className="btn btn-secondary flex-1">
-            Back
+        {editMode ? (
+          <div className="flex gap-3">
+            <button onClick={handleBackToSwipe} className="btn btn-secondary flex-1">
+              Back
+            </button>
+            <button onClick={handleSubmit} className="btn btn-success flex-1 py-4 text-lg">
+              Submit Votes
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => window.location.href = `/results/${window.location.pathname.split('/')[2]}`} className="btn btn-primary w-full py-4 text-lg">
+            View Results
           </button>
-          <button onClick={handleSubmit} className="btn btn-success flex-1 py-4 text-lg">
-            Submit Votes
-          </button>
-        </div>
+        )}
       </div>
     );
   }

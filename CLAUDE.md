@@ -63,6 +63,23 @@ SQLite stores booleans as 0/1. Always use ternary when rendering:
 {meal.archived && <Badge>Archived</Badge>}
 ```
 
+### Type Consistency Across Layers
+When changing a core data type (like vote values), ensure ALL related files are updated:
+```typescript
+// Example: Changing vote from boolean to number
+// 1. Update server types (server/src/types.ts)
+vote: number; // 0 = no, 1 = yes, 2 = maybe
+
+// 2. Update client hooks (client/src/hooks/useLocalStorage.ts)
+export interface SwipeProgress {
+  swipes: Record<string, number>; // not boolean!
+}
+
+// 3. Update API client types (client/src/api/client.ts)
+swipes: { mealId: string; vote: number }[];
+```
+Use grep/search to find all usages: `Record<string, boolean>`, `vote: boolean`, etc.
+
 ### Session Configuration
 - Production uses secure cookies with `sameSite: 'lax'`
 - CORS is only enabled in development

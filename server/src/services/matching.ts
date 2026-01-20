@@ -14,7 +14,7 @@ interface MealAggregation {
   mealId: string;
   title: string;
   description: string | null;
-  votes: { name: string; vote: boolean }[];
+  votes: { name: string; vote: number }[];
 }
 
 export function calculateResults(sessionId: string, includeVoters: boolean = false): MatchResult[] {
@@ -51,7 +51,7 @@ export function calculateResults(sessionId: string, includeVoters: boolean = fal
 
     mealMap.get(swipe.meal_id)!.votes.push({
       name: swipe.participant_name,
-      vote: swipe.vote === 1,
+      vote: swipe.vote,
     });
   }
 
@@ -59,15 +59,17 @@ export function calculateResults(sessionId: string, includeVoters: boolean = fal
   const results: MatchResult[] = [];
 
   for (const meal of mealMap.values()) {
-    const yesCount = meal.votes.filter(v => v.vote).length;
+    const yesCount = meal.votes.filter(v => v.vote === 1).length;
+    const maybeCount = meal.votes.filter(v => v.vote === 2).length;
     const totalVotes = meal.votes.length;
-    const percentage = totalVotes > 0 ? Math.round((yesCount / totalVotes) * 100) : 0;
+    const percentage = totalVotes > 0 ? Math.round(((yesCount + maybeCount) / totalVotes) * 100) : 0;
 
     const result: MatchResult = {
       mealId: meal.mealId,
       title: meal.title,
       description: meal.description,
       yesCount,
+      maybeCount,
       totalVotes,
       percentage,
       isUnanimous: totalVotes > 0 && yesCount === totalVotes,
@@ -80,10 +82,13 @@ export function calculateResults(sessionId: string, includeVoters: boolean = fal
     results.push(result);
   }
 
-  // Sort by percentage descending, then by title for ties
+  // Sort by percentage descending, then by maybeCount ascending (fewer maybes = higher rank), then by title for ties
   results.sort((a, b) => {
     if (b.percentage !== a.percentage) {
       return b.percentage - a.percentage;
+    }
+    if (a.maybeCount !== b.maybeCount) {
+      return a.maybeCount - b.maybeCount;
     }
     return a.title.localeCompare(b.title);
   });

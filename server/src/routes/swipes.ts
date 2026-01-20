@@ -154,9 +154,15 @@ router.post('/swipes/:sessionId', (req, res) => {
         return;
       }
 
+      // Validate vote value
+      if (![0, 1, 2].includes(swipe.vote)) {
+        res.status(400).json({ error: `Invalid vote value: ${swipe.vote}. Must be 0 (no), 1 (yes), or 2 (maybe)` });
+        return;
+      }
+
       runQuery(
         'INSERT OR REPLACE INTO swipes (id, participant_id, session_meal_id, vote) VALUES (?, ?, ?, ?)',
-        [uuidv4(), participantId, sessionMealId, swipe.vote ? 1 : 0]
+        [uuidv4(), participantId, sessionMealId, swipe.vote]
       );
     }
 

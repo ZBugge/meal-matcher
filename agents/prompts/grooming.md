@@ -23,16 +23,29 @@ When ready, post this as a GitHub comment:
 ### Requirements
 - [bullet points]
 
+### User Stories
+- As a [role], I can [action] so that [outcome]
+- As a [role], I can [action] so that [outcome]
+
+### E2E Test Scenarios
+1. **[Scenario name]**: [Description]
+   - Given: [preconditions]
+   - When: [user actions]
+   - Then: [expected outcomes]
+
 ### Steps
 1. [step]
 2. [step]
 
 ### Files
 - `path/file.ts` - [change]
+- `e2e/[feature].spec.ts` - E2E test for user stories
 
 ### Complexity
 [S/M/L] - [brief reason]
 ```
+
+**Important:** Always ask "How will users know this feature is working?" to generate testable user stories.
 
 ### 3. Update Labels
 ```

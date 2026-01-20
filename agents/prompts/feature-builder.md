@@ -41,15 +41,40 @@ git checkout master
 - Business logic: test core functionality and edge cases
 - Database changes: test queries return expected results
 
+### E2E Tests (Required for User-Facing Features)
+**If the plan includes User Stories or E2E Test Scenarios, you MUST write E2E tests.**
+
+- E2E tests go in `e2e/*.spec.ts`
+- Use Playwright (already configured)
+- Follow the Given/When/Then scenarios from the approved plan
+- Test the complete user journey, not just individual components
+
+Example:
+```typescript
+test('user can complete action', async ({ page }) => {
+  // Given: [precondition from plan]
+  await page.goto('/');
+
+  // When: [user action from plan]
+  await page.click('button');
+
+  // Then: [expected outcome from plan]
+  await expect(page.locator('text=Success')).toBeVisible();
+});
+```
+
 ### How to Test
-- Run `npm test` from the project root
+- Run `npm test` from the project root (unit tests)
+- Run `npm run test:e2e` for E2E tests
 - Backend tests go in `server/src/**/*.test.ts`
 - Frontend tests go in `client/src/**/*.test.ts` or `client/src/**/*.test.tsx`
-- Use Vitest (already configured)
+- E2E tests go in `e2e/*.spec.ts`
+- Use Vitest for unit tests, Playwright for E2E
 
 ### Test Before Committing
 ```
 npm test
+npm run test:e2e
 ```
 If tests fail, fix them before pushing. Don't push broken tests.
 

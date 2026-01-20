@@ -17,8 +17,10 @@ Review the PR against the approved plan. Focus on **spec compliance** and **test
 ### Review Criteria
 1. **Build Verification**: Does the code compile without errors?
 2. **Spec Compliance**: Does the implementation match the approved plan?
-3. **Test Coverage**: Are there tests for new functionality?
-4. **React Hooks Rules**: Are all hooks at the top of components, before any conditional returns?
+3. **Unit Test Coverage**: Are there unit tests for new functionality?
+4. **E2E Test Coverage**: Are there E2E tests for each User Story in the plan?
+5. **E2E Tests Pass**: Do the E2E tests actually pass when run?
+6. **React Hooks Rules**: Are all hooks at the top of components, before any conditional returns?
 
 ### Steps
 1. Checkout the PR branch: `git checkout {{BRANCH_NAME}}`
@@ -42,26 +44,32 @@ Review the PR against the approved plan. Focus on **spec compliance** and **test
      - Update label to `needs-fixes` and exit
    - After successful rebase: `git push --force-with-lease origin {{BRANCH_NAME}}`
 4. **Run the build first**: `npm run build` - this catches TypeScript errors, import/export mismatches, and syntax issues
-5. Run tests: `npm test`
+5. Run unit tests: `npm test`
 6. **Run linting**: `npm run lint` - this catches React hooks violations and other issues
-7. Review the diff against the approved plan
-8. If issues found:
-   - Attempt to auto-fix
-   - Push fixes to the branch
-   - Re-run build, tests, and lint
-9. If build passes, tests pass, lint passes, and spec is met:
-   - Approve and merge: `"C:\Program Files\GitHub CLI\gh.exe" pr merge {{PR_NUMBER}} --squash --auto`
-10. Update labels appropriately
+7. **Run E2E tests**: `npm run test:e2e` - verifies user stories actually work
+8. Review the diff against the approved plan
+9. **Verify E2E coverage**: Check that each User Story in the plan has a corresponding E2E test
+10. If issues found:
+    - Attempt to auto-fix
+    - Push fixes to the branch
+    - Re-run build, tests, lint, and E2E tests
+11. If build passes, tests pass, lint passes, E2E passes, and spec is met:
+    - Approve and merge: `"C:\Program Files\GitHub CLI\gh.exe" pr merge {{PR_NUMBER}} --squash --auto`
+12. Update labels appropriately
 
 ### Auto-Fix Guidelines
 - Fix build/compile errors (TypeScript errors, missing imports, syntax issues)
 - Fix import/export mismatches (e.g., `export default` vs named exports)
 - Fix lint errors (React hooks violations, unused vars, etc.)
-- Fix missing tests
-- Fix test failures
+- Fix missing unit tests
+- Fix unit test failures
+- Fix missing E2E tests (if User Stories exist in plan but no E2E test)
+- Fix E2E test failures (investigate actual user flow, not just the test)
 - Fix obvious spec compliance issues
 - Don't add features beyond the plan
 - Don't refactor working code
+
+**E2E Test Failures:** When E2E tests fail, investigate the actual user flow - don't just fix the test. The E2E test failing often means the feature doesn't work for real users.
 
 ### Commenting on Auto-Fixes
 **IMPORTANT:** When you make auto-fixes, you MUST document them with PR review comments.
@@ -133,7 +141,9 @@ git checkout master
 **Common Failure Scenarios:**
 - Complex merge conflicts requiring manual resolution
 - Build errors that can't be auto-fixed
-- Test failures requiring spec changes
+- Unit test failures requiring spec changes
+- E2E test failures indicating the feature doesn't work for users
+- Missing E2E tests for User Stories in the plan
 - Spec non-compliance that can't be auto-corrected
 
 ## Rules

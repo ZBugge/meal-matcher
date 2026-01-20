@@ -485,7 +485,7 @@ function ResultCard({ result }: ResultCardProps) {
           </button>
           {showVoters && (
             <div className="mt-2 space-y-1">
-              {result.voters.map((voter, idx) => {
+              {result.voters?.map((voter, idx) => {
                 const voteLabel = voter.vote === 1 ? 'Yes' : voter.vote === 2 ? 'Maybe' : 'No';
                 const voteColor = voter.vote === 1 ? 'text-green-600' : voter.vote === 2 ? 'text-yellow-600' : 'text-red-600';
                 return (

@@ -29,7 +29,7 @@ export interface SwipeProgress {
   sessionId: string;
   participantId: string;
   participantName: string;
-  swipes: Record<string, boolean>; // mealId -> vote
+  swipes: Record<string, number>; // mealId -> vote (0=no, 1=yes, 2=maybe)
   currentIndex: number;
   savedAt: number;
 }
@@ -40,7 +40,7 @@ export function useSwipeProgress(sessionId: string, participantName: string) {
 
   const saveProgress = (
     participantId: string,
-    swipes: Record<string, boolean>,
+    swipes: Record<string, number>,
     currentIndex: number
   ) => {
     setProgress({

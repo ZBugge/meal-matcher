@@ -25,6 +25,7 @@ export function SwipeSession() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [sessionClosed, setSessionClosed] = useState(false);
+  const [hintStyle, setHintStyle] = useState<'bounce' | 'arrows' | 'text'>('bounce');
 
   // Initialize progress hook with placeholder values first
   const displayName = sessionData?.displayName || '';
@@ -174,7 +175,7 @@ export function SwipeSession() {
   const initialIndex = editMode ? sessionData.meals.length : (progress?.currentIndex || 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-200 to-gray-300 py-6 px-4">
       <div className="max-w-md mx-auto">
         {/* Header */}
         <div className="text-center mb-6">
@@ -182,6 +183,20 @@ export function SwipeSession() {
           <p className="text-gray-600 text-sm mt-1">
             {editMode ? `Update your choices, ${sessionData.displayName}!` : `Hey ${sessionData.displayName}! Swipe right on meals you'd like.`}
           </p>
+
+          {/* Dev toggle for swipe hint styles */}
+          <div className="mt-3">
+            <button
+              onClick={() => {
+                setHintStyle(prev =>
+                  prev === 'bounce' ? 'arrows' : prev === 'arrows' ? 'text' : 'bounce'
+                );
+              }}
+              className="text-xs px-3 py-1 bg-white rounded-full shadow-md border border-gray-300 hover:bg-gray-50 transition-colors"
+            >
+              Hint: {hintStyle}
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -198,6 +213,7 @@ export function SwipeSession() {
           onSwipe={handleSwipe}
           onComplete={handleComplete}
           editMode={editMode}
+          hintStyle={hintStyle}
         />
       </div>
     </div>

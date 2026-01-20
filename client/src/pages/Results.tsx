@@ -140,6 +140,8 @@ export function Results() {
     );
   }
 
+  const [copied, setCopied] = useState(false);
+
   if (!results || results.status === 'waiting') {
     const inviteCode = sessionStorage.getItem('inviteCode');
     const shareUrl = inviteCode ? `${window.location.origin}/join/${inviteCode}` : null;
@@ -148,6 +150,8 @@ export function Results() {
       if (!shareUrl) return;
       try {
         await navigator.clipboard.writeText(shareUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
       } catch {
         const input = document.createElement('input');
         input.value = shareUrl;
@@ -155,6 +159,8 @@ export function Results() {
         input.select();
         document.execCommand('copy');
         document.body.removeChild(input);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
       }
     };
 
@@ -228,9 +234,20 @@ export function Results() {
                 />
                 <button
                   onClick={handleCopyLink}
-                  className="text-primary-600 hover:text-primary-700 font-medium text-sm whitespace-nowrap"
+                  className={`font-medium text-sm whitespace-nowrap flex items-center gap-1 ${
+                    copied ? 'text-green-600' : 'text-primary-600 hover:text-primary-700'
+                  }`}
                 >
-                  Copy
+                  {copied ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Copied!
+                    </>
+                  ) : (
+                    'Copy'
+                  )}
                 </button>
               </div>
             </div>

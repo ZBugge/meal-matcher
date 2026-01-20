@@ -46,7 +46,7 @@ Third: Token usage: 10000/200000; 190000 remaining
     const result = parseTokenUsageFromLog(logContent);
     expect(result).not.toBeNull();
     // Should use the last occurrence (10000)
-    expect(result?.inputTokens + result?.outputTokens!).toBeGreaterThan(0);
+    expect(result!.inputTokens + result!.outputTokens).toBeGreaterThan(0);
   });
 
   it('should handle logs with alternative token formats', () => {

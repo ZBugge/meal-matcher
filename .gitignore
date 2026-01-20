@@ -36,3 +36,7 @@ coverage/
 server/data/
 agents/data/
 agents/orchestrator/.env
+
+# PLaywright
+playwright-report/
+test-results/

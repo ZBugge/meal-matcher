@@ -127,10 +127,11 @@ export interface MatchResult {
   title: string;
   description: string | null;
   yesCount: number;
+  maybeCount: number;
   totalVotes: number;
   percentage: number;
   isUnanimous: boolean;
-  voters?: Array<{ name: string; vote: boolean }>;
+  voters?: Array<{ name: string; vote: number }>;
 }
 
 export const sessionsApi = {
@@ -199,7 +200,7 @@ export const participantApi = {
   submitSwipes: (
     sessionId: string,
     participantId: string,
-    swipes: Array<{ mealId: string; vote: boolean }>
+    swipes: Array<{ mealId: string; vote: number }>
   ) =>
     request<{ message: string }>(`/swipes/${sessionId}`, {
       method: 'POST',

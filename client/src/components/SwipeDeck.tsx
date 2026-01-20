@@ -10,10 +10,10 @@ interface Meal {
 
 interface SwipeDeckProps {
   meals: Meal[];
-  initialSwipes?: Record<string, boolean>;
+  initialSwipes?: Record<string, number>;
   initialIndex?: number;
-  onSwipe: (mealId: string, vote: boolean, allSwipes: Record<string, boolean>) => void;
-  onComplete: (swipes: Record<string, boolean>) => void;
+  onSwipe: (mealId: string, vote: number, allSwipes: Record<string, number>) => void;
+  onComplete: (swipes: Record<string, number>) => void;
 }
 
 export function SwipeDeck({
@@ -24,7 +24,7 @@ export function SwipeDeck({
   onComplete,
 }: SwipeDeckProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [swipes, setSwipes] = useState<Record<string, boolean>>(initialSwipes);
+  const [swipes, setSwipes] = useState<Record<string, number>>(initialSwipes);
   const [showReview, setShowReview] = useState(false);
 
   const currentMeal = meals[currentIndex];
@@ -39,7 +39,18 @@ export function SwipeDeck({
   const handleSwipe = (direction: 'left' | 'right') => {
     if (!currentMeal) return;
 
-    const vote = direction === 'right';
+    const vote = direction === 'right' ? 1 : 0;
+    const newSwipes = { ...swipes, [currentMeal.id]: vote };
+
+    setSwipes(newSwipes);
+    onSwipe(currentMeal.id, vote, newSwipes);
+    setCurrentIndex((prev) => prev + 1);
+  };
+
+  const handleMaybe = () => {
+    if (!currentMeal) return;
+
+    const vote = 2;
     const newSwipes = { ...swipes, [currentMeal.id]: vote };
 
     setSwipes(newSwipes);
@@ -48,9 +59,11 @@ export function SwipeDeck({
   };
 
   const handleReviewChange = (mealId: string) => {
-    const newSwipes = { ...swipes, [mealId]: !swipes[mealId] };
+    const currentVote = swipes[mealId] ?? 0;
+    const newVote = currentVote === 0 ? 1 : currentVote === 1 ? 2 : 0;
+    const newSwipes = { ...swipes, [mealId]: newVote };
     setSwipes(newSwipes);
-    onSwipe(mealId, newSwipes[mealId], newSwipes);
+    onSwipe(mealId, newVote, newSwipes);
   };
 
   const handleGoBack = () => {
@@ -79,35 +92,32 @@ export function SwipeDeck({
         </p>
 
         <div className="space-y-3 mb-8">
-          {meals.map((meal) => (
-            <button
-              key={meal.id}
-              onClick={() => handleReviewChange(meal.id)}
-              className={`w-full p-4 rounded-lg border-2 text-left transition-colors ${
-                swipes[meal.id]
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-red-300 bg-red-50'
-              }`}
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-semibold">{meal.title}</p>
-                  {meal.description && (
-                    <p className="text-sm text-gray-500 mt-1">{meal.description}</p>
-                  )}
+          {meals.map((meal) => {
+            const vote = swipes[meal.id] ?? 0;
+            const borderColor = vote === 1 ? 'border-green-500 bg-green-50' : vote === 2 ? 'border-yellow-500 bg-yellow-50' : 'border-red-300 bg-red-50';
+            const badgeColor = vote === 1 ? 'bg-green-100 text-green-700' : vote === 2 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
+            const label = vote === 1 ? 'YUM' : vote === 2 ? 'MAYBE' : 'NOPE';
+
+            return (
+              <button
+                key={meal.id}
+                onClick={() => handleReviewChange(meal.id)}
+                className={`w-full p-4 rounded-lg border-2 text-left transition-colors ${borderColor}`}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold">{meal.title}</p>
+                    {meal.description && (
+                      <p className="text-sm text-gray-500 mt-1">{meal.description}</p>
+                    )}
+                  </div>
+                  <span className={`text-sm font-medium px-3 py-1 rounded ${badgeColor}`}>
+                    {label}
+                  </span>
                 </div>
-                <span
-                  className={`text-sm font-medium px-3 py-1 rounded ${
-                    swipes[meal.id]
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
-                  }`}
-                >
-                  {swipes[meal.id] ? 'YUM' : 'NOPE'}
-                </span>
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex gap-3">
@@ -155,6 +165,14 @@ export function SwipeDeck({
               onSwipe={handleSwipe}
               progress={`${currentIndex + 1} / ${meals.length}`}
             />
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={handleMaybe}
+                className="px-6 py-2 rounded-full bg-white shadow-lg border-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50 active:bg-yellow-100 active:scale-95 transition-all font-medium"
+              >
+                Maybe
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

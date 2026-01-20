@@ -429,11 +429,14 @@ interface ResultCardProps {
 }
 
 function ResultCard({ result }: ResultCardProps) {
+  const [showVoters, setShowVoters] = useState(false);
   const getBarColor = () => {
     if (result.percentage >= 75) return 'bg-green-500';
     if (result.percentage >= 50) return 'bg-yellow-500';
     return 'bg-red-500';
   };
+
+  const hasVoterData = result.voters && result.voters.length > 0;
 
   return (
     <div
@@ -459,7 +462,7 @@ function ResultCard({ result }: ResultCardProps) {
       <div>
         <div className="flex justify-between text-sm mb-1">
           <span className="text-gray-600">
-            {result.yesCount}/{result.totalVotes} said yes
+            {result.yesCount} yes{result.maybeCount > 0 ? `, ${result.maybeCount} maybe` : ''} / {result.totalVotes} total
           </span>
           <span className="font-medium">{result.percentage}%</span>
         </div>
@@ -470,6 +473,32 @@ function ResultCard({ result }: ResultCardProps) {
           />
         </div>
       </div>
+
+      {/* Voter breakdown */}
+      {hasVoterData && (
+        <div className="mt-3">
+          <button
+            onClick={() => setShowVoters(!showVoters)}
+            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+          >
+            {showVoters ? 'Hide' : 'Show'} voter breakdown
+          </button>
+          {showVoters && (
+            <div className="mt-2 space-y-1">
+              {result.voters.map((voter, idx) => {
+                const voteLabel = voter.vote === 1 ? 'Yes' : voter.vote === 2 ? 'Maybe' : 'No';
+                const voteColor = voter.vote === 1 ? 'text-green-600' : voter.vote === 2 ? 'text-yellow-600' : 'text-red-600';
+                return (
+                  <div key={idx} className="flex justify-between text-sm py-1 px-2 bg-gray-50 rounded">
+                    <span>{voter.name}</span>
+                    <span className={`font-medium ${voteColor}`}>{voteLabel}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

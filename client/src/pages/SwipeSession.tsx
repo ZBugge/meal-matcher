@@ -50,8 +50,8 @@ export function SwipeSession() {
 
   const handleSwipe = (
     _mealId: string,
-    _vote: boolean,
-    allSwipes: Record<string, boolean>
+    _vote: number,
+    allSwipes: Record<string, number>
   ) => {
     if (!sessionData || !sessionId) return;
 
@@ -62,7 +62,7 @@ export function SwipeSession() {
     saveProgress(sessionData.participantId, allSwipes, currentIndex);
   };
 
-  const handleComplete = async (swipes: Record<string, boolean>) => {
+  const handleComplete = async (swipes: Record<string, number>) => {
     if (!sessionId || !sessionData) return;
 
     setSubmitting(true);

@@ -49,7 +49,7 @@ export interface Swipe {
   id: string;
   participant_id: string;
   session_meal_id: string;
-  vote: number; // 1 = yes, 0 = no
+  vote: number; // 0 = no, 1 = yes, 2 = maybe
   created_at: string;
 }
 
@@ -66,10 +66,11 @@ export interface MatchResult {
   title: string;
   description: string | null;
   yesCount: number;
+  maybeCount: number;
   totalVotes: number;
   percentage: number;
   isUnanimous: boolean;
-  voters?: { name: string; vote: boolean }[];
+  voters?: { name: string; vote: number }[];
 }
 
 export interface SessionWithDetails extends Session {
@@ -94,7 +95,7 @@ export interface JoinSessionRequest {
 
 export interface SubmitSwipesRequest {
   participantId: string;
-  swipes: { mealId: string; vote: boolean }[];
+  swipes: { mealId: string; vote: number }[];
 }
 
 export interface RegisterRequest {

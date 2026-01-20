@@ -137,7 +137,7 @@ describe('Results - Update Choices', () => {
     fireEvent.click(updateButton);
 
     // Should navigate with editMode state
-    expect(mockNavigate).toHaveBeenCalledWith('/session/session123', { state: { editMode: true } });
+    expect(mockNavigate).toHaveBeenCalledWith('/session/session123/swipe', { state: { editMode: true } });
   });
 
   it('should NOT show "Update Your Choices" button when session is closed', async () => {

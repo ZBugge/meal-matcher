@@ -47,7 +47,10 @@ export function Results() {
         setParticipants(statusData.participants);
         pollTimeoutRef.current = window.setTimeout(loadResults, 3000);
       } else {
-        // Session closed, show save prompt for creator
+        // Session closed - clear participant session data
+        sessionStorage.removeItem(`session_${sessionId}`);
+
+        // Show save prompt for creator
         if (isCreator) {
           setShowSavePrompt(true);
         }
@@ -150,7 +153,7 @@ export function Results() {
 
   const handleUpdateChoices = () => {
     if (!sessionId) return;
-    navigate(`/session/${sessionId}`, { state: { editMode: true } });
+    navigate(`/session/${sessionId}/swipe`, { state: { editMode: true } });
   };
 
   if (!results || results.status === 'waiting') {

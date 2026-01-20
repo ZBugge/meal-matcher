@@ -79,11 +79,8 @@ export function SwipeSession() {
 
       await participantApi.submitSwipes(sessionId, sessionData.participantId, swipeArray);
 
-      // Clear local storage progress
+      // Clear local storage progress (but keep session data for "Update Choices")
       clearProgress();
-
-      // Clear session storage
-      sessionStorage.removeItem(`session_${sessionId}`);
 
       setSubmitted(true);
 

@@ -126,11 +126,6 @@ router.post('/swipes/:sessionId', (req, res) => {
       return;
     }
 
-    if (participant.submitted === 1) {
-      res.status(400).json({ error: 'Swipes already submitted' });
-      return;
-    }
-
     // Verify session is still open
     const session = getOne<Session>('SELECT status FROM sessions WHERE id = ?', [sessionId]);
     if (!session || session.status === 'closed') {
@@ -145,6 +140,11 @@ router.post('/swipes/:sessionId', (req, res) => {
     );
 
     const mealToSessionMeal = new Map(sessionMeals.map(sm => [sm.meal_id, sm.id]));
+
+    // Delete existing swipes if updating choices
+    if (participant.submitted === 1) {
+      runQuery('DELETE FROM swipes WHERE participant_id = ?', [participantId]);
+    }
 
     // Insert swipes
     for (const swipe of swipes) {

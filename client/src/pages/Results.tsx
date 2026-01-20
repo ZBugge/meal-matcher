@@ -141,6 +141,18 @@ export function Results() {
     );
   }
 
+  // Check if current user can update choices (has session data stored)
+  const canUpdateChoices = () => {
+    if (!sessionId) return false;
+    const stored = sessionStorage.getItem(`session_${sessionId}`);
+    return !!stored;
+  };
+
+  const handleUpdateChoices = () => {
+    if (!sessionId) return;
+    navigate(`/session/${sessionId}`, { state: { editMode: true } });
+  };
+
   if (!results || results.status === 'waiting') {
     const inviteCode = sessionStorage.getItem('inviteCode');
     const shareUrl = inviteCode ? `${window.location.origin}/join/${inviteCode}` : null;
@@ -173,6 +185,18 @@ export function Results() {
           <p className="text-gray-600">
             {submittedCount} of {participants.length} people have finished voting
           </p>
+
+          {/* Update Choices button for participants */}
+          {canUpdateChoices() && (
+            <div className="mt-6">
+              <button
+                onClick={handleUpdateChoices}
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 rounded-lg transition-colors"
+              >
+                Update Your Choices
+              </button>
+            </div>
+          )}
 
           {/* Participant list */}
           {participants.length > 0 ? (

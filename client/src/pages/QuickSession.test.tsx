@@ -145,7 +145,7 @@ describe('QuickSession', () => {
       expect(sessionStorage.getItem('sessionId')).toBe('session-123');
       expect(sessionStorage.getItem('participantId')).toBe('participant-123');
       expect(sessionStorage.getItem('creatorToken')).toBe('token-123');
-      expect(mockNavigate).toHaveBeenCalledWith('/session/session-123/swipe');
+      expect(mockNavigate).toHaveBeenCalledWith('/session/session-123/share');
     });
   });
 

@@ -85,10 +85,21 @@ If tests fail, fix them before pushing. Don't push broken tests.
 ## Common Mistakes
 **Learn from past PR reviews.** The PR reviewer agent has identified these recurring patterns. Avoid them.
 
-<!-- PR reviewer agent: Add recurring patterns here using the format below -->
+**Pattern:** React hooks placed after early returns
+**Prevention:** ALL hooks (useState, useEffect, useCallback, useMemo, useRef, etc.) must be declared at the top of the component, BEFORE any conditional returns. React requires hooks to be called in the same order on every render.
+**Example:**
+```tsx
+// WRONG - hooks after early return
+function Component() {
+  if (loading) return <Spinner />;
+  const [value, setValue] = useState(''); // ❌ Violates Rules of Hooks
+  ...
+}
 
-<!-- Example format:
-**Pattern:** [describe the recurring mistake]
-**Prevention:** [how to avoid it in the future]
-**Example:** [code example of correct approach]
--->
+// CORRECT - all hooks at the top
+function Component() {
+  const [value, setValue] = useState(''); // ✅ Before any returns
+  if (loading) return <Spinner />;
+  ...
+}
+```

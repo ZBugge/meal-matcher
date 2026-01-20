@@ -18,6 +18,7 @@ Review the PR against the approved plan. Focus on **spec compliance** and **test
 1. **Build Verification**: Does the code compile without errors?
 2. **Spec Compliance**: Does the implementation match the approved plan?
 3. **Test Coverage**: Are there tests for new functionality?
+4. **React Hooks Rules**: Are all hooks at the top of components, before any conditional returns?
 
 ### Steps
 1. Checkout the PR branch: `git checkout {{BRANCH_NAME}}`
@@ -42,18 +43,20 @@ Review the PR against the approved plan. Focus on **spec compliance** and **test
    - After successful rebase: `git push --force-with-lease origin {{BRANCH_NAME}}`
 4. **Run the build first**: `npm run build` - this catches TypeScript errors, import/export mismatches, and syntax issues
 5. Run tests: `npm test`
-6. Review the diff against the approved plan
-7. If issues found:
+6. **Run linting**: `npm run lint` - this catches React hooks violations and other issues
+7. Review the diff against the approved plan
+8. If issues found:
    - Attempt to auto-fix
    - Push fixes to the branch
-   - Re-run build and tests
-8. If build passes, tests pass, and spec is met:
+   - Re-run build, tests, and lint
+9. If build passes, tests pass, lint passes, and spec is met:
    - Approve and merge: `"C:\Program Files\GitHub CLI\gh.exe" pr merge {{PR_NUMBER}} --squash --auto`
-9. Update labels appropriately
+10. Update labels appropriately
 
 ### Auto-Fix Guidelines
 - Fix build/compile errors (TypeScript errors, missing imports, syntax issues)
 - Fix import/export mismatches (e.g., `export default` vs named exports)
+- Fix lint errors (React hooks violations, unused vars, etc.)
 - Fix missing tests
 - Fix test failures
 - Fix obvious spec compliance issues

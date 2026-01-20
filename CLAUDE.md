@@ -80,6 +80,22 @@ swipes: { mealId: string; vote: number }[];
 ```
 Use grep/search to find all usages: `Record<string, boolean>`, `vote: boolean`, etc.
 
+### React Hooks Rules
+All React hooks must be declared at the TOP of components, BEFORE any conditional returns. This is a runtime error that TypeScript won't catch.
+```tsx
+// WRONG - hooks after early return causes runtime crash
+function Component() {
+  if (loading) return <Spinner />;
+  const [value, setValue] = useState(''); // ❌ Called conditionally
+}
+
+// CORRECT - all hooks before any returns
+function Component() {
+  const [value, setValue] = useState(''); // ✅ Always called
+  if (loading) return <Spinner />;
+}
+```
+
 ### Session Configuration
 - Production uses secure cookies with `sameSite: 'lax'`
 - CORS is only enabled in development

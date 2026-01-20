@@ -22,6 +22,7 @@ export function Results() {
   const [savingMeals, setSavingMeals] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [copied, setCopied] = useState(false);
   const pollTimeoutRef = useRef<number | null>(null);
 
   // Check if user is the creator
@@ -139,8 +140,6 @@ export function Results() {
       </div>
     );
   }
-
-  const [copied, setCopied] = useState(false);
 
   if (!results || results.status === 'waiting') {
     const inviteCode = sessionStorage.getItem('inviteCode');

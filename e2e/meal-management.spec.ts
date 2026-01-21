@@ -76,11 +76,14 @@ test.describe('Meal Management (#17, #12)', () => {
     await expect(page.locator('text=Delete Meal?')).toBeVisible();
     await expect(page.locator('text=/Are you sure you want to delete "Meal To Delete"/')).toBeVisible();
 
-    // When: User confirms deletion
-    await page.locator('button:has-text("Delete"):not(:has-text("Cancel"))').click();
+    // When: User confirms deletion (button says "Confirm")
+    await page.locator('button:has-text("Confirm")').click();
 
-    // Then: Meal is no longer visible
-    await expect(page.locator('text=Meal To Delete')).not.toBeVisible({ timeout: 5000 });
+    // Wait for modal to close
+    await expect(page.locator('text=Delete Meal?')).not.toBeVisible({ timeout: 5000 });
+
+    // Then: Meal is no longer visible (check the card heading specifically)
+    await expect(page.locator('h3:has-text("Meal To Delete")')).not.toBeVisible({ timeout: 5000 });
   });
 
   test('user can cancel meal deletion', async ({ page }) => {
@@ -130,13 +133,16 @@ test.describe('Meal Management (#17, #12)', () => {
     // Then: Confirmation modal shows
     await expect(page.locator('text=/Delete 2 Meals/')).toBeVisible();
 
-    // When: User confirms
-    await page.locator('button:has-text("Delete"):not(:has-text("Cancel"))').click();
+    // When: User confirms (button says "Confirm")
+    await page.locator('button:has-text("Confirm")').click();
 
-    // Then: Only the unselected meal remains
-    await expect(page.locator('text=Keep This One')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=Bulk Delete 1')).not.toBeVisible();
-    await expect(page.locator('text=Bulk Delete 2')).not.toBeVisible();
+    // Wait for modal to close
+    await expect(page.locator('text=/Delete 2 Meals/')).not.toBeVisible({ timeout: 5000 });
+
+    // Then: Only the unselected meal remains (check card headings specifically)
+    await expect(page.locator('h3:has-text("Keep This One")')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('h3:has-text("Bulk Delete 1")')).not.toBeVisible();
+    await expect(page.locator('h3:has-text("Bulk Delete 2")')).not.toBeVisible();
   });
 
   test('edit mode can be toggled on and off', async ({ page }) => {

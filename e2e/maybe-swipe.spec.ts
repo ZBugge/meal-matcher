@@ -33,10 +33,12 @@ test.describe('Maybe Swipe Flow (#28)', () => {
     // Then: User is redirected to results (waiting) page
     await expect(page).toHaveURL(/\/results\//, { timeout: 5000 });
 
-    // When: Creator ends the session to see final results
+    // When: Creator ends the session - click the button then confirm in modal
     await page.click('text=End Session & Show Results');
+    // Handle confirmation modal
+    await page.locator('.fixed.inset-0 button:has-text("End Session")').click();
 
-    // Then: Results page shows with maybe count in the format "X yes, Y maybe / Z total"
+    // Then: Results page shows
     await expect(page.locator('h1:has-text("Results")')).toBeVisible({ timeout: 5000 });
     // The maybe vote should appear in results - check for "maybe" text
     await expect(page.locator('text=/maybe/')).toBeVisible();
@@ -75,8 +77,9 @@ test.describe('Maybe Swipe Flow (#28)', () => {
 
     await expect(participantPage).toHaveURL(/\/results\//, { timeout: 5000 });
 
-    // Host ends the session to see final results
+    // Host ends the session - click button then confirm in modal
     await page.click('text=End Session & Show Results');
+    await page.locator('.fixed.inset-0 button:has-text("End Session")').click();
 
     // Then: Results show with the data
     await expect(page.locator('h1:has-text("Results")')).toBeVisible({ timeout: 5000 });

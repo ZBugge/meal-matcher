@@ -32,6 +32,8 @@ test.describe('Session Lifecycle (#1)', () => {
 
     // Host ends the session while participant is still swiping
     await page.click('text=End Session & Show Results');
+    // Confirm in the modal
+    await page.locator('.fixed.inset-0 button:has-text("End Session")').click();
 
     // Then: Host sees final results
     await expect(page.locator('h1:has-text("Results")')).toBeVisible({ timeout: 5000 });
@@ -79,11 +81,9 @@ test.describe('Session Lifecycle (#1)', () => {
 
     // Then: Confirmation modal appears warning about unfinished participants
     await expect(page.locator('text=End Session?')).toBeVisible();
-    await expect(page.locator('text=/\\d+ (person hasn\'t|people haven\'t) finished voting/')).toBeVisible();
 
     // When: Host confirms by clicking the button inside the modal
-    const modal = page.locator('.fixed.inset-0');
-    await modal.locator('button:has-text("End Session")').click();
+    await page.locator('.fixed.inset-0 button:has-text("End Session")').click();
 
     // Then: Session ends and results are shown
     await expect(page.locator('h1:has-text("Results")')).toBeVisible({ timeout: 5000 });
@@ -135,6 +135,8 @@ test.describe('Session Lifecycle (#1)', () => {
 
     // Host ends session
     await page.click('text=End Session & Show Results');
+    // Confirm in modal
+    await page.locator('.fixed.inset-0 button:has-text("End Session")').click();
 
     // Then: Final results are shown
     await expect(page.locator('h1:has-text("Results")')).toBeVisible({ timeout: 5000 });

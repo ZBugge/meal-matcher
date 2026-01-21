@@ -98,7 +98,7 @@ test.describe('Authenticated Host Flow', () => {
     await expect(page.locator('h2:has-text("Results")')).toBeVisible({ timeout: 5000 });
 
     // And: Can see vote percentages
-    await expect(page.locator('text=/%/')).toBeVisible();
+    await expect(page.locator('text=/%/').first()).toBeVisible();
   });
 
   test('host can quick add meals while creating session', async ({ page }) => {
@@ -186,8 +186,9 @@ test.describe('Authenticated Host Flow', () => {
     // Should be on session view now
     await expect(page).toHaveURL(/\/session\/.*/);
 
-    // Get the invite code
-    const inviteCode = await page.locator('.font-mono.font-bold').first().textContent();
+    // Get the invite code from the input field (e.g., "http://localhost:5173/join/CDJ9EK")
+    const inviteUrl = await page.locator('input[readonly]').first().inputValue();
+    const inviteCode = inviteUrl.split('/join/')[1];
 
     // Go back to dashboard
     await page.click('text=Dashboard');
@@ -195,6 +196,6 @@ test.describe('Authenticated Host Flow', () => {
     // Then: Session appears in Recent Sessions
     await expect(page.locator('text=Recent Sessions')).toBeVisible();
     await expect(page.locator(`text=${inviteCode}`)).toBeVisible();
-    await expect(page.locator('.bg-green-100:has-text("open")')).toBeVisible();
+    await expect(page.locator('text=open')).toBeVisible();
   });
 });

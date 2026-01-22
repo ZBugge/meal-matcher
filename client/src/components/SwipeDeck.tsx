@@ -15,6 +15,7 @@ interface SwipeDeckProps {
   onSwipe: (mealId: string, vote: number, allSwipes: Record<string, number>) => void;
   onComplete: (swipes: Record<string, number>) => void;
   editMode?: boolean;
+  hintStyle?: 'bounce' | 'arrows' | 'text';
 }
 
 export function SwipeDeck({
@@ -24,6 +25,7 @@ export function SwipeDeck({
   onSwipe,
   onComplete,
   editMode = false,
+  hintStyle = 'bounce',
 }: SwipeDeckProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [swipes, setSwipes] = useState<Record<string, number>>(initialSwipes);
@@ -196,6 +198,7 @@ export function SwipeDeck({
               description={currentMeal.description}
               onSwipe={handleSwipe}
               progress={`${currentIndex + 1} / ${meals.length}`}
+              hintStyle={hintStyle}
             />
             <div className="flex justify-center mt-4">
               <button

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { SwipeSession } from './SwipeSession';
 
@@ -12,9 +12,10 @@ vi.mock('../api/client', () => ({
 
 // Mock SwipeDeck component
 vi.mock('../components/SwipeDeck', () => ({
-  SwipeDeck: ({ editMode, onComplete }: any) => (
+  SwipeDeck: ({ editMode, hintStyle, onComplete }: any) => (
     <div data-testid="swipe-deck">
       <div data-testid="edit-mode">{editMode ? 'edit' : 'normal'}</div>
+      <div data-testid="hint-style">{hintStyle}</div>
       <button onClick={() => onComplete({ '1': 1, '2': 0 })}>Complete</button>
     </div>
   ),
@@ -120,5 +121,95 @@ describe('SwipeSession - Edit Mode', () => {
 
     // SwipeDeck should be rendered (component is mocked)
     expect(screen.getByTestId('swipe-deck')).toBeDefined();
+  });
+});
+
+describe('SwipeSession - Visual Improvements', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    // Setup session storage with mock data
+    const mockSessionData = {
+      participantId: 'test-participant',
+      displayName: 'Test User',
+      meals: [
+        {
+          id: 'meal-1',
+          title: 'Pizza',
+          description: 'Delicious pizza',
+          sessionMealId: 'sm-1',
+        },
+      ],
+    };
+    sessionStorage.setItem('session_session123', JSON.stringify(mockSessionData));
+  });
+
+  it('should render with darker gradient background', () => {
+    const { container } = render(
+      <BrowserRouter>
+        <SwipeSession />
+      </BrowserRouter>
+    );
+    const background = container.querySelector('.bg-gradient-to-br.from-gray-200.to-gray-300');
+    expect(background).toBeDefined();
+  });
+
+  it('should render hint style toggle button', () => {
+    render(
+      <BrowserRouter>
+        <SwipeSession />
+      </BrowserRouter>
+    );
+    const toggleButton = screen.getByText(/Hint: bounce/i);
+    expect(toggleButton).toBeDefined();
+  });
+
+  it('should cycle through hint styles when toggle is clicked', () => {
+    render(
+      <BrowserRouter>
+        <SwipeSession />
+      </BrowserRouter>
+    );
+
+    // Initial state should be bounce
+    expect(screen.getByText(/Hint: bounce/i)).toBeDefined();
+
+    // Click once - should become arrows
+    const toggleButton = screen.getByText(/Hint: bounce/i);
+    fireEvent.click(toggleButton);
+    expect(screen.getByText(/Hint: arrows/i)).toBeDefined();
+
+    // Click again - should become text
+    fireEvent.click(screen.getByText(/Hint: arrows/i));
+    expect(screen.getByText(/Hint: text/i)).toBeDefined();
+
+    // Click once more - should cycle back to bounce
+    fireEvent.click(screen.getByText(/Hint: text/i));
+    expect(screen.getByText(/Hint: bounce/i)).toBeDefined();
+  });
+
+  it('should display user greeting', () => {
+    render(
+      <BrowserRouter>
+        <SwipeSession />
+      </BrowserRouter>
+    );
+    expect(screen.getByText(/Hey Test User!/i)).toBeDefined();
+  });
+
+  it('should pass hintStyle prop to SwipeDeck', () => {
+    render(
+      <BrowserRouter>
+        <SwipeSession />
+      </BrowserRouter>
+    );
+
+    // Initial hint style should be bounce
+    expect(screen.getByTestId('hint-style').textContent).toBe('bounce');
+
+    // Toggle to arrows
+    const toggleButton = screen.getByText(/Hint: bounce/i);
+    fireEvent.click(toggleButton);
+    expect(screen.getByTestId('hint-style').textContent).toBe('arrows');
   });
 });

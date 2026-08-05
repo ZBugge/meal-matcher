@@ -10,7 +10,6 @@ No ungroomed ideas right now.
 
 ## Now
 
-- **Whole-card bulk selection** — In bulk-edit mode, clicking anywhere on a meal card should toggle its checkbox without double toggles or accessibility regressions.
 
 ## Next
 

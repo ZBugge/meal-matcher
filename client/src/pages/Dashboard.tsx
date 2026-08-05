@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
-import { mealsApi, sessionsApi, Meal, Session } from '../api/client';
+import { authApi, mealsApi, sessionsApi, Meal, Session, SessionMode } from '../api/client';
 import ConfirmModal from '../components/ConfirmModal';
+import { TAKEOUT_CATEGORY_SUGGESTIONS } from '../constants/takeoutCategories';
 
 export function Dashboard() {
   const { user, logout } = useAuth();
@@ -12,6 +13,7 @@ export function Dashboard() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeMode, setActiveMode] = useState<SessionMode>('home');
 
   // Modal states
   const [showAddMeal, setShowAddMeal] = useState(false);
@@ -20,6 +22,13 @@ export function Dashboard() {
   const [newMealDescription, setNewMealDescription] = useState('');
   const [selectedMealIds, setSelectedMealIds] = useState<string[]>([]);
   const [quickAddTitle, setQuickAddTitle] = useState('');
+  const [sessionMode, setSessionMode] = useState<SessionMode>('home');
+  const [addingSuggestion, setAddingSuggestion] = useState<string | null>(null);
+  const [showTakeoutOnboarding, setShowTakeoutOnboarding] = useState(false);
+  const [selectedStarterCategories, setSelectedStarterCategories] = useState<string[]>([]);
+  const [takeoutOnboardingDismissed, setTakeoutOnboardingDismissed] = useState(
+    Boolean(user?.takeoutOnboardingDismissed)
+  );
 
   // Edit mode states
   const [editMode, setEditMode] = useState(false);
@@ -38,17 +47,30 @@ export function Dashboard() {
   // Animation states
   const [deletingMealIds, setDeletingMealIds] = useState<string[]>([]);
 
+  const activeType = activeMode === 'home' ? 'meal' : 'category';
+  const activeMeals = meals.filter((meal) => meal.type === activeType);
+  const sessionType = sessionMode === 'home' ? 'meal' : 'category';
+  const sessionMeals = meals.filter((meal) => meal.type === sessionType);
+
   useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    setTakeoutOnboardingDismissed(Boolean(user?.takeoutOnboardingDismissed));
+  }, [user?.takeoutOnboardingDismissed]);
+
   const loadData = async () => {
     try {
-      const [mealsData, sessionsData] = await Promise.all([
-        mealsApi.list(),
+      const [homeMealsData, categoriesData, sessionsData] = await Promise.all([
+        mealsApi.list('meal'),
+        mealsApi.list('category'),
         sessionsApi.list(),
       ]);
-      setMeals(mealsData);
+      setMeals([
+        ...homeMealsData.filter((meal) => meal.type === 'meal'),
+        ...categoriesData.filter((meal) => meal.type === 'category'),
+      ]);
       setSessions(sessionsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -57,16 +79,83 @@ export function Dashboard() {
     }
   };
 
+  const markTakeoutOnboardingComplete = async (): Promise<boolean> => {
+    try {
+      await authApi.updatePreferences(true);
+      setTakeoutOnboardingDismissed(true);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save your takeout setup preference');
+      return false;
+    }
+  };
+
   const handleAddMeal = async (e: React.FormEvent) => {
     e.preventDefault();
+
     try {
-      const meal = await mealsApi.create(newMealTitle, newMealDescription || undefined);
-      setMeals([meal, ...meals]);
+      const meal = activeMode === 'home'
+        ? await mealsApi.create(newMealTitle.trim(), newMealDescription || undefined)
+        : await mealsApi.create(newMealTitle.trim(), undefined, 'category');
+      setMeals((current) => [meal, ...current]);
       setNewMealTitle('');
       setNewMealDescription('');
       setShowAddMeal(false);
+      if (activeMode === 'takeout') {
+        setTakeoutOnboardingDismissed(true);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add meal');
+      setError(err instanceof Error ? err.message : `Failed to add ${activeMode === 'home' ? 'meal' : 'category'}`);
+    }
+  };
+
+  const openAddMeal = () => {
+    setNewMealTitle('');
+    setNewMealDescription('');
+    setShowAddMeal(true);
+  };
+
+  const closeAddMeal = () => {
+    setNewMealTitle('');
+    setNewMealDescription('');
+    setShowAddMeal(false);
+  };
+
+  const toggleStarterCategory = (title: string) => {
+    setSelectedStarterCategories((current) =>
+      current.includes(title)
+        ? current.filter((suggestion) => suggestion !== title)
+        : [...current, title]
+    );
+  };
+
+  const openTakeoutOnboarding = () => {
+    setSelectedStarterCategories([]);
+    setShowTakeoutOnboarding(true);
+  };
+
+  const handleAddStarterCategories = async () => {
+    if (selectedStarterCategories.length === 0) {
+      setError('Choose at least one category to add');
+      return;
+    }
+
+    try {
+      const categories = await Promise.all(
+        selectedStarterCategories.map((title) => mealsApi.create(title, undefined, 'category'))
+      );
+      setMeals((current) => [...categories, ...current]);
+      setShowTakeoutOnboarding(false);
+      setSelectedStarterCategories([]);
+      setTakeoutOnboardingDismissed(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add food categories');
+    }
+  };
+
+  const handleAddOwnCategory = async () => {
+    if (await markTakeoutOnboardingComplete()) {
+      openAddMeal();
     }
   };
 
@@ -84,11 +173,17 @@ export function Dashboard() {
     try {
       await mealsApi.update(editingMeal.id, {
         title: editTitle,
-        description: editDescription || undefined,
+        ...(editingMeal.type === 'meal'
+          ? { description: editDescription || undefined }
+          : {}),
       });
       setMeals(meals.map((m) =>
         m.id === editingMeal.id
-          ? { ...m, title: editTitle, description: editDescription || null }
+          ? {
+              ...m,
+              title: editTitle,
+              description: editingMeal.type === 'meal' ? editDescription || null : null,
+            }
           : m
       ));
       setShowEditMeal(false);
@@ -169,12 +264,12 @@ export function Dashboard() {
 
   const handleCreateSession = async () => {
     if (selectedMealIds.length === 0) {
-      setError('Select at least one meal');
+      setError('Select at least one option');
       return;
     }
 
     try {
-      const session = await sessionsApi.create(selectedMealIds);
+      const session = await sessionsApi.create(selectedMealIds, sessionMode);
       navigate(`/session/${session.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session');
@@ -187,8 +282,23 @@ export function Dashboard() {
   };
 
   const openCreateSession = () => {
-    setSelectedMealIds(meals.map((m) => m.id)); // Select all by default
+    setSessionMode(activeMode);
+    setSelectedMealIds(activeMeals.map((meal) => meal.id));
+    setQuickAddTitle('');
     setShowCreateSession(true);
+  };
+
+  const changeSessionMode = (mode: SessionMode) => {
+    setSessionMode(mode);
+    const type = mode === 'home' ? 'meal' : 'category';
+    setSelectedMealIds(meals.filter((meal) => meal.type === type).map((meal) => meal.id));
+    setQuickAddTitle('');
+  };
+
+  const changeActiveMode = (mode: SessionMode) => {
+    setActiveMode(mode);
+    setEditMode(false);
+    setSelectedForDeletion([]);
   };
 
   const toggleMealSelection = (id: string) => {
@@ -202,12 +312,46 @@ export function Dashboard() {
     if (!quickAddTitle.trim()) return;
 
     try {
-      const meal = await mealsApi.create(quickAddTitle.trim(), undefined);
-      setMeals([meal, ...meals]);
-      setSelectedMealIds([...selectedMealIds, meal.id]);
+      const meal = sessionMode === 'home'
+        ? await mealsApi.create(quickAddTitle.trim(), undefined)
+        : await mealsApi.create(quickAddTitle.trim(), undefined, 'category');
+      setMeals((current) => [meal, ...current]);
+      setSelectedMealIds((current) => [...current, meal.id]);
       setQuickAddTitle('');
+      if (sessionMode === 'takeout') {
+        setTakeoutOnboardingDismissed(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add meal');
+    }
+  };
+
+  const handleTakeoutSuggestion = async (title: string, selectForSession: boolean) => {
+    const existing = meals.find(
+      (meal) => meal.type === 'category' && meal.title.toLowerCase() === title.toLowerCase()
+    );
+
+    if (existing) {
+      if (selectForSession) {
+        setSelectedMealIds((current) =>
+          current.includes(existing.id) ? current : [...current, existing.id]
+        );
+      }
+      return;
+    }
+
+    setAddingSuggestion(title);
+    try {
+      const category = await mealsApi.create(title, undefined, 'category');
+      setMeals((current) => [category, ...current]);
+      setTakeoutOnboardingDismissed(true);
+      if (selectForSession) {
+        setSelectedMealIds((current) => [...current, category.id]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add food category');
+    } finally {
+      setAddingSuggestion(null);
     }
   };
 
@@ -244,12 +388,33 @@ export function Dashboard() {
           </div>
         )}
 
-        {/* Meals Section */}
+        {/* Saved options */}
         <section className="mb-12">
+          <div className="inline-flex rounded-lg bg-gray-100 p-1 mb-6" aria-label="Food library">
+            <button
+              onClick={() => changeActiveMode('home')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeMode === 'home' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
+              }`}
+            >
+              Home meals
+            </button>
+            <button
+              onClick={() => changeActiveMode('takeout')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeMode === 'takeout' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
+              }`}
+            >
+              Takeout
+            </button>
+          </div>
+
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold">My Meals</h2>
-              {meals.length > 0 && (
+              <h2 className="text-2xl font-bold">
+                {activeMode === 'home' ? 'My Meals' : 'My Food Categories'}
+              </h2>
+              {activeMeals.length > 0 && (
                 <>
                   <button
                     onClick={toggleEditMode}
@@ -269,23 +434,44 @@ export function Dashboard() {
               )}
             </div>
             {!editMode && (
-              <button onClick={() => setShowAddMeal(true)} className="btn btn-primary">
-                Add Meal
+              <button onClick={openAddMeal} className="btn btn-primary">
+                {activeMode === 'home' ? 'Add Meal' : 'Add Category'}
               </button>
             )}
           </div>
 
-          {meals.length === 0 ? (
-            <div className="card text-center py-12">
-              <p className="text-gray-500 mb-4">No meals yet. Add some to get started!</p>
-              <button onClick={() => setShowAddMeal(true)} className="btn btn-primary">
-                Add Your First Meal
-              </button>
-            </div>
+          {activeMeals.length === 0 ? (
+            activeMode === 'takeout' && !takeoutOnboardingDismissed ? (
+              <div className="card text-center py-12">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Build your takeout list</h3>
+                <p className="text-gray-500 mb-5">
+                  Start with a few popular categories, or add your own from scratch.
+                </p>
+                <div className="flex flex-col sm:flex-row justify-center gap-3">
+                  <button onClick={openTakeoutOnboarding} className="btn btn-primary">
+                    Start with popular categories
+                  </button>
+                  <button onClick={handleAddOwnCategory} className="btn btn-secondary">
+                    I&apos;ll add my own
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="card text-center py-12">
+                <p className="text-gray-500 mb-4">
+                  {activeMode === 'home'
+                    ? 'No meals yet. Add some to get started!'
+                    : 'No takeout categories yet. Add your favorites to get started!'}
+                </p>
+                <button onClick={openAddMeal} className="btn btn-primary">
+                  {activeMode === 'home' ? 'Add Your First Meal' : 'Add Your First Category'}
+                </button>
+              </div>
+            )
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <AnimatePresence mode="popLayout">
-                {meals.map((meal) => {
+                {activeMeals.map((meal) => {
                   const isDeleting = deletingMealIds.includes(meal.id);
                   const isSingleDelete = deletingMealIds.length === 1 && isDeleting;
 
@@ -335,7 +521,7 @@ export function Dashboard() {
                             <button
                               onClick={() => openEditMeal(meal)}
                               className="text-gray-400 hover:text-primary-500"
-                              title="Edit meal"
+                              title={meal.type === 'category' ? 'Edit category' : 'Edit meal'}
                             >
                               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -344,7 +530,7 @@ export function Dashboard() {
                             <button
                               onClick={() => confirmDeleteSingleMeal(meal)}
                               className="text-gray-400 hover:text-red-500"
-                              title="Archive meal"
+                              title={meal.type === 'category' ? 'Archive category' : 'Archive meal'}
                             >
                               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -381,7 +567,7 @@ export function Dashboard() {
           </div>
           {meals.length === 0 ? (
             <p className="text-sm text-gray-600 mt-2 text-center">
-              Add meals to create a session from your library, or use Quick Session to start immediately.
+              Add saved options to create a session from your library, or use Quick Session to start immediately.
             </p>
           ) : null}
         </section>
@@ -406,6 +592,9 @@ export function Dashboard() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-bold text-lg">{session.inviteCode}</span>
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700">
+                          {session.mode === 'takeout' ? 'Order out' : 'Cook at home'}
+                        </span>
                         <span
                           className={`px-2 py-0.5 rounded text-xs font-medium ${
                             session.status === 'open'
@@ -417,7 +606,7 @@ export function Dashboard() {
                         </span>
                       </div>
                       <p className="text-sm text-gray-500 mt-1">
-                        {session.mealCount} meals · {session.participantCount} participants
+                        {session.mealCount} options · {session.participantCount} participants
                       </p>
                     </div>
                     <svg
@@ -436,11 +625,68 @@ export function Dashboard() {
         </section>
       </main>
 
+      {/* Takeout onboarding modal */}
+      {showTakeoutOnboarding && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="card w-full max-w-lg">
+            <h3 className="text-xl font-bold mb-2">Start with popular categories</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              Pick the kinds of food you&apos;d like to consider. You can always add or remove categories later.
+            </p>
+            <fieldset>
+              <legend className="sr-only">Popular categories</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {TAKEOUT_CATEGORY_SUGGESTIONS.map((suggestion) => {
+                  const selected = selectedStarterCategories.includes(suggestion);
+                  return (
+                    <label
+                      key={suggestion}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
+                        selected
+                          ? 'bg-orange-100 border-orange-300 text-orange-800'
+                          : 'bg-white border-gray-300 text-gray-700 hover:border-orange-400'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleStarterCategory(suggestion)}
+                        className="accent-orange-500"
+                      />
+                      {suggestion}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowTakeoutOnboarding(false)}
+                className="btn btn-secondary flex-1"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleAddStarterCategories}
+                disabled={selectedStarterCategories.length === 0}
+                className="btn btn-primary flex-1"
+              >
+                Add selected ({selectedStarterCategories.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add Meal Modal */}
       {showAddMeal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="card w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">Add New Meal</h3>
+            <h3 className="text-xl font-bold mb-4">
+              {activeMode === 'home' ? 'Add New Meal' : 'Add Food Category'}
+            </h3>
             <form onSubmit={handleAddMeal} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -451,12 +697,12 @@ export function Dashboard() {
                   value={newMealTitle}
                   onChange={(e) => setNewMealTitle(e.target.value)}
                   className="input"
-                  placeholder="e.g., Tacos"
+                  placeholder={activeMode === 'home' ? 'e.g., Tacos' : 'e.g., Korean'}
                   required
                   autoFocus
                 />
               </div>
-              <div>
+              {activeMode === 'home' && <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Description (optional)
                 </label>
@@ -467,17 +713,17 @@ export function Dashboard() {
                   rows={3}
                   placeholder="e.g., Beef tacos with all the fixings"
                 />
-              </div>
+              </div>}
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowAddMeal(false)}
+                  onClick={closeAddMeal}
                   className="btn btn-secondary flex-1"
                 >
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary flex-1">
-                  Add Meal
+                  {activeMode === 'home' ? 'Add Meal' : 'Add Category'}
                 </button>
               </div>
             </form>
@@ -489,7 +735,9 @@ export function Dashboard() {
       {showEditMeal && editingMeal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="card w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">Edit Meal</h3>
+            <h3 className="text-xl font-bold mb-4">
+              {editingMeal.type === 'category' ? 'Edit Category' : 'Edit Meal'}
+            </h3>
             <form onSubmit={handleUpdateMeal} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -500,12 +748,12 @@ export function Dashboard() {
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   className="input"
-                  placeholder="e.g., Tacos"
+                  placeholder={editingMeal.type === 'category' ? 'e.g., Korean' : 'e.g., Tacos'}
                   required
                   autoFocus
                 />
               </div>
-              <div>
+              {editingMeal.type === 'meal' && <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Description (optional)
                 </label>
@@ -516,7 +764,7 @@ export function Dashboard() {
                   rows={3}
                   placeholder="e.g., Beef tacos with all the fixings"
                 />
-              </div>
+              </div>}
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -540,10 +788,61 @@ export function Dashboard() {
           <div className="card w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
             <h3 className="text-xl font-bold mb-4">Create Session</h3>
 
+            <div className="grid grid-cols-2 gap-2 bg-gray-100 rounded-lg p-1 mb-4">
+              <button
+                type="button"
+                onClick={() => changeSessionMode('home')}
+                className={`px-3 py-2 rounded-md text-sm font-medium ${
+                  sessionMode === 'home' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600'
+                }`}
+              >
+                Cook at home
+              </button>
+              <button
+                type="button"
+                onClick={() => changeSessionMode('takeout')}
+                className={`px-3 py-2 rounded-md text-sm font-medium ${
+                  sessionMode === 'takeout' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600'
+                }`}
+              >
+                Order out
+              </button>
+            </div>
+
+            {sessionMode === 'takeout' && (
+              <div className="mb-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">Quick picks</p>
+                <div className="flex flex-wrap gap-2">
+                  {TAKEOUT_CATEGORY_SUGGESTIONS.map((suggestion) => {
+                    const existing = meals.find(
+                      (meal) => meal.type === 'category'
+                        && meal.title.toLowerCase() === suggestion.toLowerCase()
+                    );
+                    const selected = existing ? selectedMealIds.includes(existing.id) : false;
+                    return (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        disabled={addingSuggestion === suggestion}
+                        onClick={() => handleTakeoutSuggestion(suggestion, true)}
+                        className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                          selected
+                            ? 'bg-orange-100 border-orange-300 text-orange-800'
+                            : 'bg-white border-gray-300 text-gray-700 hover:border-orange-400'
+                        }`}
+                      >
+                        {selected ? `✓ ${suggestion}` : suggestion}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Quick Add Meal */}
             <form onSubmit={handleQuickAddMeal} className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Quick add meal
+                {sessionMode === 'home' ? 'Quick add meal' : 'Quick add category'}
               </label>
               <div className="flex gap-2">
                 <input
@@ -551,7 +850,7 @@ export function Dashboard() {
                   value={quickAddTitle}
                   onChange={(e) => setQuickAddTitle(e.target.value)}
                   className="input flex-1"
-                  placeholder="e.g., Pizza"
+                  placeholder={sessionMode === 'home' ? 'e.g., Pizza' : 'e.g., Korean'}
                 />
                 <button
                   type="submit"
@@ -564,17 +863,22 @@ export function Dashboard() {
             </form>
 
             <p className="text-gray-600 text-sm mb-4">
-              Select meals to include in this session:
+              Select {sessionMode === 'home' ? 'meals' : 'food categories'} to include:
             </p>
 
-            {meals.length > 30 && (
+            {sessionMeals.length > 30 && (
               <div className="bg-yellow-50 text-yellow-700 px-3 py-2 rounded text-sm mb-4">
-                With {meals.length} meals, sessions may take longer to complete.
+                With {sessionMeals.length} options, sessions may take longer to complete.
               </div>
             )}
 
             <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-              {meals.map((meal) => (
+              {sessionMeals.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  No saved {sessionMode === 'home' ? 'meals' : 'categories'} yet. Add one above.
+                </p>
+              )}
+              {sessionMeals.map((meal) => (
                 <label
                   key={meal.id}
                   className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50"
@@ -602,7 +906,7 @@ export function Dashboard() {
                 disabled={selectedMealIds.length === 0}
                 className="btn btn-success flex-1"
               >
-                Create ({selectedMealIds.length} meals)
+                Create ({selectedMealIds.length} options)
               </button>
             </div>
           </div>
@@ -612,11 +916,17 @@ export function Dashboard() {
       {/* Confirmation Modal */}
       <ConfirmModal
         isOpen={showDeleteConfirm}
-        title={mealToDelete ? 'Delete Meal?' : `Delete ${selectedForDeletion.length} Meal${selectedForDeletion.length !== 1 ? 's' : ''}?`}
+        title={mealToDelete
+          ? `Delete ${mealToDelete.type === 'category' ? 'Category' : 'Meal'}?`
+          : `Delete ${selectedForDeletion.length} ${activeMode === 'takeout' ? 'Categor' : 'Meal'}${
+              activeMode === 'takeout'
+                ? selectedForDeletion.length === 1 ? 'y' : 'ies'
+                : selectedForDeletion.length !== 1 ? 's' : ''
+            }?`}
         message={
           mealToDelete
             ? `Are you sure you want to delete "${mealToDelete.title}"?`
-            : `Are you sure you want to delete the following meals?\n\n${meals
+            : `Are you sure you want to delete the following ${activeMode === 'takeout' ? 'categories' : 'meals'}?\n\n${meals
                 .filter((m) => selectedForDeletion.includes(m.id))
                 .map((m) => `• ${m.title}`)
                 .join('\n')}`

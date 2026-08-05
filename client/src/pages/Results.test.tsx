@@ -6,6 +6,9 @@ import { participantApi } from '../api/client';
 
 // Mock the API
 vi.mock('../api/client', () => ({
+  ApiException: class ApiException extends Error {
+    existingId?: string;
+  },
   participantApi: {
     getResults: vi.fn(),
     getSessionStatus: vi.fn(),
@@ -52,10 +55,12 @@ describe('Results - Update Choices', () => {
     // Mock waiting results
     (participantApi.getResults as any).mockResolvedValue({
       status: 'waiting',
+      mode: 'home',
       results: [],
     });
 
     (participantApi.getSessionStatus as any).mockResolvedValue({
+      mode: 'home',
       participants: [
         { id: 'participant123', displayName: 'John', submitted: true },
       ],
@@ -81,10 +86,12 @@ describe('Results - Update Choices', () => {
     // Mock waiting results
     (participantApi.getResults as any).mockResolvedValue({
       status: 'waiting',
+      mode: 'home',
       results: [],
     });
 
     (participantApi.getSessionStatus as any).mockResolvedValue({
+      mode: 'home',
       participants: [
         { id: 'participant123', displayName: 'John', submitted: true },
       ],
@@ -114,10 +121,12 @@ describe('Results - Update Choices', () => {
     // Mock waiting results
     (participantApi.getResults as any).mockResolvedValue({
       status: 'waiting',
+      mode: 'home',
       results: [],
     });
 
     (participantApi.getSessionStatus as any).mockResolvedValue({
+      mode: 'home',
       participants: [
         { id: 'participant123', displayName: 'John', submitted: true },
       ],
@@ -151,6 +160,7 @@ describe('Results - Update Choices', () => {
     // Mock closed results
     (participantApi.getResults as any).mockResolvedValue({
       status: 'closed',
+      mode: 'home',
       results: [
         {
           mealId: '1',

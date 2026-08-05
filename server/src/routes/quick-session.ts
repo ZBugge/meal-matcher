@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { runQuery } from '../db/schema.js';
 import { QuickSessionRequest } from '../types.js';
+import { hasDuplicateOptionTitles, isSessionMode, mealTypeForMode } from '../services/food-options.js';
 
 const router = Router();
 
@@ -19,10 +20,32 @@ function generateInviteCode(): string {
 // POST /api/quick-session - Create a quick session without authentication
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { creatorName, meals } = req.body as QuickSessionRequest;
+    const { creatorName, meals, mode = 'home' } = req.body as QuickSessionRequest;
 
     if (!creatorName || !meals || meals.length === 0) {
       res.status(400).json({ error: 'Creator name and at least one meal required' });
+      return;
+    }
+
+    if (!isSessionMode(mode)) {
+      res.status(400).json({ error: 'Mode must be home or takeout' });
+      return;
+    }
+
+    const normalizedMeals = meals
+      .map((meal) => ({
+        title: meal.title?.trim(),
+        description: meal.description?.trim(),
+      }))
+      .filter((meal) => meal.title);
+
+    if (normalizedMeals.length === 0) {
+      res.status(400).json({ error: 'At least one option is required' });
+      return;
+    }
+
+    if (hasDuplicateOptionTitles(normalizedMeals.map((meal) => meal.title))) {
+      res.status(400).json({ error: 'Option names must be unique within a session' });
       return;
     }
 
@@ -39,21 +62,23 @@ router.post('/', async (req: Request, res: Response) => {
     const inviteCode = generateInviteCode();
 
     runQuery(
-      `INSERT INTO sessions (id, host_id, invite_code, status, created_at)
-       VALUES (?, ?, ?, 'open', datetime('now'))`,
-      [sessionId, hostId, inviteCode]
+      `INSERT INTO sessions (id, host_id, invite_code, status, mode, created_at)
+       VALUES (?, ?, ?, 'open', ?, datetime('now'))`,
+      [sessionId, hostId, inviteCode, mode]
     );
 
     // Create temporary meals and add to session
-    const sessionMeals: Array<{ id: string; title: string; description: string | null; sessionMealId: string }> = [];
-    for (let i = 0; i < meals.length; i++) {
+    const optionType = mealTypeForMode(mode);
+    const sessionMeals: Array<{ id: string; title: string; description: string | null; type: string; sessionMealId: string }> = [];
+    for (let i = 0; i < normalizedMeals.length; i++) {
       const mealId = uuidv4();
-      const meal = meals[i];
+      const meal = normalizedMeals[i];
+      const description = mode === 'home' ? meal.description || null : null;
 
       runQuery(
         `INSERT INTO meals (id, host_id, title, description, type, temporary, creator_token, created_at)
-         VALUES (?, ?, ?, ?, 'meal', 1, ?, datetime('now'))`,
-        [mealId, hostId, meal.title, meal.description || null, creatorToken]
+         VALUES (?, ?, ?, ?, ?, 1, ?, datetime('now'))`,
+        [mealId, hostId, meal.title, description, optionType, creatorToken]
       );
 
       // Add to session_meals
@@ -67,7 +92,8 @@ router.post('/', async (req: Request, res: Response) => {
       sessionMeals.push({
         id: mealId,
         title: meal.title,
-        description: meal.description || null,
+        description,
+        type: optionType,
         sessionMealId
       });
     }
@@ -84,7 +110,8 @@ router.post('/', async (req: Request, res: Response) => {
       session: {
         id: sessionId,
         inviteCode,
-        status: 'open'
+        status: 'open',
+        mode,
       },
       participantId,
       creatorToken: isAuthenticated ? null : creatorToken,

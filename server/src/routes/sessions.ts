@@ -4,6 +4,7 @@ import { runQuery, getOne, getAll } from '../db/schema';
 import { Session, Meal, Participant, CreateSessionRequest } from '../types';
 import { requireAuth } from '../middleware/auth';
 import { generateInviteCode, calculateResults } from '../services/matching';
+import { isSessionMode, mealTypeForMode } from '../services/food-options';
 
 const router = Router();
 
@@ -28,6 +29,7 @@ router.get('/', (req, res) => {
       id: session.id,
       inviteCode: session.invite_code,
       status: session.status,
+      mode: session.mode,
       selectedMealId: session.selected_meal_id,
       mealCount: session.meal_count,
       participantCount: session.participant_count,
@@ -43,21 +45,35 @@ router.get('/', (req, res) => {
 // POST /api/sessions - Create session with meal IDs
 router.post('/', (req, res) => {
   try {
-    const { mealIds } = req.body as CreateSessionRequest;
+    const { mealIds, mode = 'home' } = req.body as CreateSessionRequest;
 
     if (!mealIds || mealIds.length === 0) {
-      res.status(400).json({ error: 'At least one meal is required' });
+      res.status(400).json({ error: 'At least one option is required' });
       return;
     }
 
+    if (new Set(mealIds).size !== mealIds.length) {
+      res.status(400).json({ error: 'Option IDs must be unique' });
+      return;
+    }
+
+    if (!isSessionMode(mode)) {
+      res.status(400).json({ error: 'Mode must be home or takeout' });
+      return;
+    }
+
+    const expectedType = mealTypeForMode(mode);
+
     // Verify all meals belong to this host and are not archived
     const meals = getAll<Meal>(
-      `SELECT id FROM meals WHERE id IN (${mealIds.map(() => '?').join(',')}) AND host_id = ? AND archived = 0`,
-      [...mealIds, req.session.hostId]
+      `SELECT id FROM meals
+       WHERE id IN (${mealIds.map(() => '?').join(',')})
+         AND host_id = ? AND archived = 0 AND type = ?`,
+      [...mealIds, req.session.hostId, expectedType]
     );
 
     if (meals.length !== mealIds.length) {
-      res.status(400).json({ error: 'Some meals are invalid or not accessible' });
+      res.status(400).json({ error: 'Some options are invalid, inaccessible, or do not match the session mode' });
       return;
     }
 
@@ -76,8 +92,8 @@ router.post('/', (req, res) => {
     // Create session
     const sessionId = uuidv4();
     runQuery(
-      'INSERT INTO sessions (id, host_id, invite_code) VALUES (?, ?, ?)',
-      [sessionId, req.session.hostId, inviteCode]
+      'INSERT INTO sessions (id, host_id, invite_code, mode) VALUES (?, ?, ?, ?)',
+      [sessionId, req.session.hostId, inviteCode, mode]
     );
 
     // Create session_meals entries with randomized order
@@ -93,6 +109,7 @@ router.post('/', (req, res) => {
       id: sessionId,
       inviteCode,
       status: 'open',
+      mode,
       mealCount: mealIds.length,
     });
   } catch (error) {
@@ -145,6 +162,7 @@ router.get('/:id', (req, res) => {
       id: session.id,
       inviteCode: session.invite_code,
       status: session.status,
+      mode: session.mode,
       selectedMealId: session.selected_meal_id,
       createdAt: session.created_at,
       closedAt: session.closed_at,
@@ -152,6 +170,7 @@ router.get('/:id', (req, res) => {
         id: m.id,
         title: m.title,
         description: m.description,
+        type: m.type,
       })),
       participants: participants.map(p => ({
         id: p.id,

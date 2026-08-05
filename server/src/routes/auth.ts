@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { runQuery, getOne } from '../db/schema';
-import { Host, RegisterRequest, LoginRequest } from '../types';
+import { Host, RegisterRequest, LoginRequest, UpdateHostPreferencesRequest } from '../types';
 import { requireAuth } from '../middleware/auth';
 
 const router = Router();
@@ -44,6 +44,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       id,
       email: email.toLowerCase(),
+      takeoutOnboardingDismissed: false,
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -63,7 +64,7 @@ router.post('/login', async (req, res) => {
 
     // Find host by email
     const host = getOne<Host>(
-      'SELECT id, email, password_hash FROM hosts WHERE email = ?',
+      'SELECT id, email, password_hash, takeout_onboarding_dismissed FROM hosts WHERE email = ?',
       [email.toLowerCase()]
     );
 
@@ -85,6 +86,7 @@ router.post('/login', async (req, res) => {
     res.json({
       id: host.id,
       email: host.email,
+      takeoutOnboardingDismissed: Boolean(host.takeout_onboarding_dismissed),
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -108,7 +110,7 @@ router.post('/logout', (req, res) => {
 router.get('/me', requireAuth, (req, res) => {
   try {
     const host = getOne<Host>(
-      'SELECT id, email, created_at FROM hosts WHERE id = ?',
+      'SELECT id, email, created_at, takeout_onboarding_dismissed FROM hosts WHERE id = ?',
       [req.session.hostId]
     );
 
@@ -121,9 +123,47 @@ router.get('/me', requireAuth, (req, res) => {
       id: host.id,
       email: host.email,
       createdAt: host.created_at,
+      takeoutOnboardingDismissed: Boolean(host.takeout_onboarding_dismissed),
     });
   } catch (error) {
     console.error('Get me error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/auth/preferences - Persist host-level UI preferences
+router.patch('/preferences', requireAuth, (req, res) => {
+  try {
+    const { takeoutOnboardingDismissed } = req.body as UpdateHostPreferencesRequest;
+
+    if (typeof takeoutOnboardingDismissed !== 'boolean') {
+      res.status(400).json({ error: 'takeoutOnboardingDismissed must be a boolean' });
+      return;
+    }
+
+    runQuery(
+      'UPDATE hosts SET takeout_onboarding_dismissed = ? WHERE id = ?',
+      [takeoutOnboardingDismissed ? 1 : 0, req.session.hostId]
+    );
+
+    const host = getOne<Host>(
+      'SELECT id, email, created_at, takeout_onboarding_dismissed FROM hosts WHERE id = ?',
+      [req.session.hostId]
+    );
+
+    if (!host) {
+      res.status(404).json({ error: 'Host not found' });
+      return;
+    }
+
+    res.json({
+      id: host.id,
+      email: host.email,
+      createdAt: host.created_at,
+      takeoutOnboardingDismissed: Boolean(host.takeout_onboarding_dismissed),
+    });
+  } catch (error) {
+    console.error('Update preferences error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

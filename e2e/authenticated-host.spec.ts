@@ -48,7 +48,7 @@ test.describe('Authenticated Host Flow', () => {
     await expect(page.locator('text=Select meals to include')).toBeVisible();
 
     // All meals are pre-selected, just create the session
-    await page.click('button:has-text("Create (3 meals)")');
+    await page.click('button:has-text("Create (3 options)")');
 
     // Then: Redirected to session view
     await expect(page).toHaveURL(/\/session\/.*/);
@@ -131,11 +131,11 @@ test.describe('Authenticated Host Flow', () => {
     await expect(sessionModal.locator('label:has-text("Existing Meal") input[type="checkbox"]')).toBeChecked();
 
     // Create the session
-    await page.click('button:has-text("Create (2 meals)")');
+    await page.click('button:has-text("Create (2 options)")');
 
     // Then: Session is created with both meals
     await expect(page).toHaveURL(/\/session\/.*/);
-    await expect(page.locator('text=Meals in Session (2)')).toBeVisible();
+    await expect(page.locator('text=Options in Session (2)')).toBeVisible();
   });
 
   test('host can login and access previous meals', async ({ page }) => {
@@ -181,7 +181,7 @@ test.describe('Authenticated Host Flow', () => {
     await addMeal(page, 'History Test Meal');
 
     await page.click('button:has-text("Create Session")');
-    await page.click('button:has-text("Create (1 meals)")');
+    await page.click('button:has-text("Create (1 options)")');
 
     // Should be on session view now
     await expect(page).toHaveURL(/\/session\/.*/);

@@ -4,6 +4,7 @@ describe('Quick Session API', () => {
   it('should validate quick session request structure', () => {
     const validRequest = {
       creatorName: 'Test User',
+      mode: 'takeout',
       meals: [
         { title: 'Pizza', description: 'Cheese pizza' },
         { title: 'Burgers', description: 'Beef burgers' },
@@ -13,6 +14,7 @@ describe('Quick Session API', () => {
 
     expect(validRequest).toHaveProperty('creatorName');
     expect(validRequest).toHaveProperty('meals');
+    expect(validRequest.mode).toBe('takeout');
     expect(validRequest.creatorName).toBeTruthy();
     expect(validRequest.meals.length).toBeGreaterThan(0);
   });
@@ -22,7 +24,8 @@ describe('Quick Session API', () => {
       session: {
         id: 'session-123',
         inviteCode: 'ABC123',
-        status: 'open'
+        status: 'open',
+        mode: 'takeout'
       },
       participantId: 'participant-123',
       creatorToken: 'token-123',
@@ -34,17 +37,20 @@ describe('Quick Session API', () => {
     expect(mockResponse).toHaveProperty('creatorToken');
     expect(mockResponse).toHaveProperty('mealIds');
     expect(mockResponse.session.status).toBe('open');
+    expect(mockResponse.session.mode).toBe('takeout');
     expect(mockResponse.session.inviteCode).toHaveLength(6);
   });
 
   it('should validate temporary meal structure', () => {
     const temporaryMeal = {
       temporary: 1,
-      creator_token: 'token-123'
+      creator_token: 'token-123',
+      type: 'category'
     };
 
     expect(temporaryMeal.temporary).toBe(1);
     expect(temporaryMeal.creator_token).toBeTruthy();
+    expect(temporaryMeal.type).toBe('category');
   });
 
   it('should validate error response for missing creator name', () => {

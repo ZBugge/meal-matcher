@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { quickSessionApi } from '../api/client';
+import { quickSessionApi, SessionMode } from '../api/client';
+import { TAKEOUT_CATEGORY_SUGGESTIONS } from '../constants/takeoutCategories';
 
 interface MealInput {
   id: string;
@@ -10,16 +11,28 @@ interface MealInput {
 export default function QuickSession() {
   const navigate = useNavigate();
   const [creatorName, setCreatorName] = useState('');
-  const [meals, setMeals] = useState<MealInput[]>([
-    { id: crypto.randomUUID(), title: '' }
-  ]);
+  const [mode, setMode] = useState<SessionMode>('takeout');
+  const [drafts, setDrafts] = useState<Record<SessionMode, MealInput[]>>({
+    home: [{ id: crypto.randomUUID(), title: '' }],
+    takeout: [{ id: crypto.randomUUID(), title: '' }],
+  });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const mealInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const meals = drafts[mode];
+
+  const updateCurrentDraft = (
+    updater: (current: MealInput[]) => MealInput[]
+  ) => {
+    setDrafts((current) => ({
+      ...current,
+      [mode]: updater(current[mode]),
+    }));
+  };
 
   const addMeal = () => {
     const newMeal = { id: crypto.randomUUID(), title: '' };
-    setMeals([...meals, newMeal]);
+    updateCurrentDraft((current) => [...current, newMeal]);
     // Focus the new input after render
     setTimeout(() => {
       mealInputRefs.current.get(newMeal.id)?.focus();
@@ -28,12 +41,31 @@ export default function QuickSession() {
 
   const removeMeal = (id: string) => {
     if (meals.length > 1) {
-      setMeals(meals.filter(m => m.id !== id));
+      updateCurrentDraft((current) => current.filter(m => m.id !== id));
     }
   };
 
   const updateMeal = (id: string, value: string) => {
-    setMeals(meals.map(m => m.id === id ? { ...m, title: value } : m));
+    updateCurrentDraft((current) =>
+      current.map(m => m.id === id ? { ...m, title: value } : m)
+    );
+  };
+
+  const addSuggestedCategory = (title: string) => {
+    if (meals.some((meal) => meal.title.trim().toLowerCase() === title.toLowerCase())) {
+      return;
+    }
+
+    const emptyMeal = meals.find((meal) => !meal.title.trim());
+    if (emptyMeal) {
+      updateMeal(emptyMeal.id, title);
+      return;
+    }
+
+    updateCurrentDraft((current) => [
+      ...current,
+      { id: crypto.randomUUID(), title },
+    ]);
   };
 
   const handleMealKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, mealId: string, index: number) => {
@@ -62,7 +94,15 @@ export default function QuickSession() {
 
     const validMeals = meals.filter(m => m.title.trim());
     if (validMeals.length === 0) {
-      setError('Please add at least one meal option');
+      setError(`Please add at least one ${mode === 'home' ? 'meal' : 'food category'}`);
+      return;
+    }
+
+    const uniqueTitles = new Set(
+      validMeals.map((meal) => meal.title.trim().toLowerCase())
+    );
+    if (uniqueTitles.size !== validMeals.length) {
+      setError('Option names must be unique');
       return;
     }
 
@@ -72,8 +112,10 @@ export default function QuickSession() {
       const response = await quickSessionApi.create(
         creatorName.trim(),
         validMeals.map(m => ({
-          title: m.title.trim()
-        }))
+          title: m.title.trim(),
+          description: undefined,
+        })),
+        mode
       );
 
       // Store session info in the format SwipeSession expects
@@ -82,12 +124,14 @@ export default function QuickSession() {
         JSON.stringify({
           participantId: response.participantId,
           displayName: creatorName.trim(),
-          meals: response.meals
+          mode: response.session.mode,
+          meals: response.meals,
         })
       );
       sessionStorage.setItem('sessionId', response.session.id);
       sessionStorage.setItem('participantId', response.participantId);
       sessionStorage.setItem('inviteCode', response.session.inviteCode);
+      sessionStorage.setItem('sessionMode', response.session.mode);
       if (response.creatorToken) {
         sessionStorage.setItem('creatorToken', response.creatorToken);
       }
@@ -107,7 +151,7 @@ export default function QuickSession() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">MealMatch</h1>
           <p className="text-gray-600">
-            Create a quick session and start swiping on meal ideas with your group
+            Start a quick vote for takeout or a meal at home
           </p>
         </div>
 
@@ -118,6 +162,30 @@ export default function QuickSession() {
         ) : null}
 
         <div className="space-y-6">
+          <div>
+            <span className="block text-sm font-medium text-gray-700 mb-2">What are you deciding?</span>
+            <div className="grid grid-cols-2 gap-2 bg-gray-100 rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => setMode('takeout')}
+                className={`px-4 py-3 rounded-md font-medium ${
+                  mode === 'takeout' ? 'bg-white shadow-sm text-orange-700' : 'text-gray-600'
+                }`}
+              >
+                Order out
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('home')}
+                className={`px-4 py-3 rounded-md font-medium ${
+                  mode === 'home' ? 'bg-white shadow-sm text-orange-700' : 'text-gray-600'
+                }`}
+              >
+                Cook at home
+              </button>
+            </div>
+          </div>
+
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
               Your Name
@@ -140,8 +208,31 @@ export default function QuickSession() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Meal Options
+              {mode === 'home' ? 'Meal Options' : 'Food Categories'}
             </label>
+            {mode === 'takeout' && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {TAKEOUT_CATEGORY_SUGGESTIONS.map((suggestion) => {
+                  const selected = meals.some(
+                    (meal) => meal.title.trim().toLowerCase() === suggestion.toLowerCase()
+                  );
+                  return (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => addSuggestedCategory(suggestion)}
+                      className={`px-3 py-1.5 rounded-full border text-sm transition-colors ${
+                        selected
+                          ? 'bg-orange-100 border-orange-300 text-orange-800'
+                          : 'bg-white border-gray-300 text-gray-700 hover:border-orange-400'
+                      }`}
+                    >
+                      {selected ? `✓ ${suggestion}` : suggestion}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="space-y-3">
               {meals.map((meal, index) => (
                 <div key={meal.id} className="flex gap-2">
@@ -161,7 +252,7 @@ export default function QuickSession() {
                     <button
                       onClick={() => removeMeal(meal.id)}
                       className="px-3 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-xl"
-                      aria-label="Remove meal"
+                      aria-label="Remove option"
                     >
                       ×
                     </button>

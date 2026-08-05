@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { Dashboard } from './Dashboard';
-import { mealsApi, sessionsApi } from '../api/client';
+import { authApi, mealsApi, sessionsApi, Meal } from '../api/client';
 
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => ({
@@ -12,6 +12,9 @@ vi.mock('../hooks/useAuth', () => ({
 }));
 
 vi.mock('../api/client', () => ({
+  authApi: {
+    updatePreferences: vi.fn(),
+  },
   mealsApi: {
     list: vi.fn(),
     create: vi.fn(),
@@ -24,10 +27,9 @@ vi.mock('../api/client', () => ({
   },
 }));
 
-const mockMeals = [
+const mockMeals: Meal[] = [
   {
     id: '1',
-    hostId: 'host1',
     title: 'Pizza',
     description: 'Pepperoni pizza',
     type: 'meal',
@@ -37,7 +39,6 @@ const mockMeals = [
   },
   {
     id: '2',
-    hostId: 'host1',
     title: 'Tacos',
     description: 'Beef tacos',
     type: 'meal',
@@ -47,7 +48,6 @@ const mockMeals = [
   },
   {
     id: '3',
-    hostId: 'host1',
     title: 'Pasta',
     description: 'Spaghetti',
     type: 'meal',
@@ -705,9 +705,8 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
   });
 
   it('should add meal via quick add and auto-select it', async () => {
-    const newMeal = {
+    const newMeal: Meal = {
       id: '4',
-      hostId: 'host1',
       title: 'Burger',
       description: '',
       type: 'meal',
@@ -747,9 +746,8 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
   });
 
   it('should clear input after quick add', async () => {
-    const newMeal = {
+    const newMeal: Meal = {
       id: '4',
-      hostId: 'host1',
       title: 'Burger',
       description: '',
       type: 'meal',
@@ -785,9 +783,8 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
   });
 
   it('should submit quick add on Enter key', async () => {
-    const newMeal = {
+    const newMeal: Meal = {
       id: '4',
-      hostId: 'host1',
       title: 'Burger',
       description: '',
       type: 'meal',
@@ -839,9 +836,8 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
   });
 
   it('should trim whitespace from quick add input', async () => {
-    const newMeal = {
+    const newMeal: Meal = {
       id: '4',
-      hostId: 'host1',
       title: 'Burger',
       description: '',
       type: 'meal',
@@ -901,5 +897,144 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
     await waitFor(() => {
       expect(screen.getByText('Failed to create meal')).toBeDefined();
     });
+  });
+});
+
+describe('Dashboard - Home and takeout modes', () => {
+  const mockCategories: Meal[] = [
+    {
+      id: 'category-1',
+      title: 'Sushi',
+      description: null,
+      type: 'category',
+      archived: false,
+      pickCount: 0,
+      createdAt: '2024-01-05',
+    },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(authApi.updatePreferences).mockResolvedValue({
+      id: '1',
+      email: 'test@example.com',
+      takeoutOnboardingDismissed: true,
+    });
+    vi.mocked(mealsApi.list).mockImplementation(async (type) =>
+      type === 'category' ? mockCategories : mockMeals
+    );
+    vi.mocked(sessionsApi.list).mockResolvedValue([]);
+  });
+
+  it('filters the library by tab and opens the session modal in the active mode', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('My Meals');
+    fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
+
+    expect(screen.getByText('My Food Categories')).toBeInTheDocument();
+    expect(screen.getByText('Sushi')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create Session' }));
+    expect(screen.getByText('Quick add category')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cook at home' }));
+    expect(screen.getByText('Quick add meal')).toBeInTheDocument();
+    expect(screen.getAllByText('Tacos').length).toBeGreaterThan(0);
+  });
+
+  it('saves and selects a missing takeout suggestion in one action', async () => {
+    const mexicanCategory: Meal = {
+      id: 'category-2',
+      title: 'Mexican',
+      description: null,
+      type: 'category',
+      archived: false,
+      pickCount: 0,
+    };
+    vi.mocked(mealsApi.create).mockResolvedValue(mexicanCategory);
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('My Meals');
+    fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create Session' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mexican' }));
+
+    await waitFor(() => {
+      expect(mealsApi.create).toHaveBeenCalledWith('Mexican', undefined, 'category');
+      expect(screen.getByRole('button', { name: /Create \(2 options\)/ })).toBeInTheDocument();
+    });
+  });
+
+  it('only saves checked popular categories when onboarding is submitted', async () => {
+    const barbecueCategory: Meal = {
+      id: 'category-3',
+      title: 'BBQ',
+      description: null,
+      type: 'category',
+      archived: false,
+      pickCount: 0,
+    };
+    vi.mocked(mealsApi.create).mockResolvedValue(barbecueCategory);
+    vi.mocked(mealsApi.list).mockImplementation(async (type) =>
+      type === 'category' ? [] : mockMeals
+    );
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('My Meals');
+    fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start with popular categories' }));
+
+    const barbecue = screen.getByRole('checkbox', { name: 'BBQ' });
+    fireEvent.click(barbecue);
+    expect(barbecue).toBeChecked();
+    expect(mealsApi.create).not.toHaveBeenCalled();
+
+    fireEvent.click(barbecue);
+    expect(barbecue).not.toBeChecked();
+    expect(mealsApi.create).not.toHaveBeenCalled();
+
+    fireEvent.click(barbecue);
+    fireEvent.click(screen.getByRole('button', { name: 'Add selected (1)' }));
+
+    await waitFor(() => {
+      expect(mealsApi.create).toHaveBeenCalledWith('BBQ', undefined, 'category');
+    });
+  });
+
+  it('keeps popular categories out of the normal add-category form after choosing to add its own', async () => {
+    vi.mocked(mealsApi.list).mockImplementation(async (type) =>
+      type === 'category' ? [] : mockMeals
+    );
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('My Meals');
+    fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
+    fireEvent.click(screen.getByRole('button', { name: "I'll add my own" }));
+
+    await waitFor(() => {
+      expect(authApi.updatePreferences).toHaveBeenCalledWith(true);
+      expect(screen.getByText('Add Food Category')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Popular categories')).not.toBeInTheDocument();
   });
 });

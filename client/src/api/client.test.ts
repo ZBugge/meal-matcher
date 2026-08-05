@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { participantApi } from './client';
+import { mealsApi, participantApi } from './client';
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -47,5 +47,20 @@ describe('API Client - Session Closed Handling', () => {
       expect(error.message).toBe('Some other error');
       expect(error.sessionClosed).toBe(false);
     }
+  });
+
+  it('preserves the existing record ID for duplicate library options', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({
+        error: 'A food category with this name already exists',
+        existingId: 'category-123',
+      }),
+    });
+
+    await expect(mealsApi.create('Pizza', undefined, 'category')).rejects.toMatchObject({
+      existingId: 'category-123',
+      sessionClosed: false,
+    });
   });
 });

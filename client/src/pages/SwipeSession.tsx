@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { participantApi } from '../api/client';
+import type { SessionMode } from '../api/client';
 import { SwipeDeck } from '../components/SwipeDeck';
 import { useSwipeProgress } from '../hooks/useLocalStorage';
 
 interface SessionData {
   participantId: string;
   displayName: string;
+  mode?: SessionMode;
   meals: Array<{
     id: string;
     title: string;
@@ -34,11 +36,7 @@ export function SwipeSession() {
     displayName
   );
 
-  useEffect(() => {
-    loadSessionData();
-  }, [sessionId]);
-
-  const loadSessionData = () => {
+  const loadSessionData = useCallback(() => {
     if (!sessionId) return;
 
     // Try to get session data from storage
@@ -49,7 +47,11 @@ export function SwipeSession() {
       // No session data - redirect to join
       setError('Session data not found. Please rejoin the session.');
     }
-  };
+  }, [sessionId]);
+
+  useEffect(() => {
+    loadSessionData();
+  }, [loadSessionData]);
 
   const handleSwipe = (
     _mealId: string,
@@ -181,7 +183,11 @@ export function SwipeSession() {
         <div className="text-center mb-6">
           <h1 className="text-lg font-bold text-primary-600">MealMatch</h1>
           <p className="text-gray-600 text-sm mt-1">
-            {editMode ? `Update your choices, ${sessionData.displayName}!` : `Hey ${sessionData.displayName}! Swipe right on meals you'd like.`}
+            {editMode
+              ? `Update your choices, ${sessionData.displayName}!`
+              : `Hey ${sessionData.displayName}! Swipe right on ${
+                  sessionData.mode === 'takeout' ? 'food categories' : 'meals'
+                } you'd like.`}
           </p>
 
           {/* Dev toggle for swipe hint styles */}

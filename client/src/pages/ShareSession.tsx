@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import type { SessionMode } from '../api/client';
 
 export function ShareSession() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const [inviteCode, setInviteCode] = useState('');
   const [copied, setCopied] = useState(false);
+  const [mode, setMode] = useState<SessionMode>('home');
 
   useEffect(() => {
     const code = sessionStorage.getItem('inviteCode');
     if (code) {
       setInviteCode(code);
+    }
+    const storedMode = sessionStorage.getItem('sessionMode');
+    if (storedMode === 'home' || storedMode === 'takeout') {
+      setMode(storedMode);
     }
   }, []);
 
@@ -65,7 +71,9 @@ export function ShareSession() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Session Created!</h1>
-          <p className="text-gray-600">Share this link with your group</p>
+          <p className="text-gray-600">
+            Share this {mode === 'takeout' ? 'order-out' : 'cook-at-home'} vote with your group
+          </p>
         </div>
 
         <div className="mb-6">

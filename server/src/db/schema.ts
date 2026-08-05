@@ -32,20 +32,46 @@ export async function initializeDatabase(): Promise<Database> {
 }
 
 function runMigrations(database: Database): void {
-  // Add temporary and creator_token columns to meals table if they don't exist
-  try {
+  if (!columnExists(database, 'meals', 'temporary')) {
     database.run('ALTER TABLE meals ADD COLUMN temporary INTEGER DEFAULT 0');
-  } catch (e) {
-    // Column already exists, ignore
   }
 
-  try {
+  if (!columnExists(database, 'meals', 'creator_token')) {
     database.run('ALTER TABLE meals ADD COLUMN creator_token TEXT');
-  } catch (e) {
-    // Column already exists, ignore
   }
+
+  if (!columnExists(database, 'sessions', 'mode')) {
+    database.run("ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'home'");
+  }
+
+  if (!columnExists(database, 'hosts', 'takeout_onboarding_dismissed')) {
+    database.run('ALTER TABLE hosts ADD COLUMN takeout_onboarding_dismissed INTEGER NOT NULL DEFAULT 0');
+  }
+
+  database.run("UPDATE meals SET type = 'meal' WHERE type IS NULL OR TRIM(type) = ''");
+  database.run(`
+    UPDATE hosts
+    SET takeout_onboarding_dismissed = 1
+    WHERE EXISTS (
+      SELECT 1
+      FROM meals
+      WHERE meals.host_id = hosts.id AND meals.type = 'category'
+    )
+  `);
+  database.run(`
+    CREATE INDEX IF NOT EXISTS idx_meals_host_type_archived
+    ON meals(host_id, type, archived)
+  `);
 
   saveDatabase();
+}
+
+function columnExists(database: Database, table: string, column: string): boolean {
+  const result = database.exec(`PRAGMA table_info(${table})`);
+  if (result.length === 0) return false;
+
+  const nameIndex = result[0].columns.indexOf('name');
+  return result[0].values.some((row) => row[nameIndex] === column);
 }
 
 function createTables(database: Database): void {
@@ -55,6 +81,7 @@ function createTables(database: Database): void {
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      takeout_onboarding_dismissed INTEGER NOT NULL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -78,6 +105,7 @@ function createTables(database: Database): void {
       host_id TEXT NOT NULL REFERENCES hosts(id),
       invite_code TEXT UNIQUE NOT NULL,
       status TEXT DEFAULT 'open',
+      mode TEXT NOT NULL DEFAULT 'home',
       selected_meal_id TEXT REFERENCES meals(id),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       closed_at DATETIME
@@ -121,6 +149,7 @@ function createTables(database: Database): void {
 
     -- Create indexes for better query performance
     CREATE INDEX IF NOT EXISTS idx_meals_host_id ON meals(host_id);
+    CREATE INDEX IF NOT EXISTS idx_meals_host_type_archived ON meals(host_id, type, archived);
     CREATE INDEX IF NOT EXISTS idx_sessions_host_id ON sessions(host_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_invite_code ON sessions(invite_code);
     CREATE INDEX IF NOT EXISTS idx_session_meals_session_id ON session_meals(session_id);

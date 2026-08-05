@@ -35,6 +35,7 @@ router.get('/join/:inviteCode', (req, res) => {
     res.json({
       id: session.id,
       status: session.status,
+      mode: session.mode,
       participantCount: participantCount?.count || 0,
     });
   } catch (error) {
@@ -78,7 +79,7 @@ router.post('/join/:inviteCode', (req, res) => {
 
     // Get meals for this session (randomized order for this participant)
     const meals = getAll<Meal & { session_meal_id: string }>(
-      `SELECT m.id, m.title, m.description, sm.id as session_meal_id
+      `SELECT m.id, m.title, m.description, m.type, sm.id as session_meal_id
        FROM meals m
        JOIN session_meals sm ON m.id = sm.meal_id
        WHERE sm.session_id = ?`,
@@ -91,10 +92,12 @@ router.post('/join/:inviteCode', (req, res) => {
     res.status(201).json({
       participantId,
       sessionId: session.id,
+      mode: session.mode,
       meals: shuffledMeals.map(m => ({
         id: m.id,
         title: m.title,
         description: m.description,
+        type: m.type,
         sessionMealId: m.session_meal_id,
       })),
     });
@@ -195,6 +198,7 @@ router.get('/results/:sessionId', (req, res) => {
     if (session.status !== 'closed') {
       res.json({
         status: 'waiting',
+        mode: session.mode,
         message: 'Session is still open. Results will be available after the host closes it.',
       });
       return;
@@ -206,18 +210,20 @@ router.get('/results/:sessionId', (req, res) => {
     // Get selected meal info if any
     let selectedMeal = null;
     if (session.selected_meal_id) {
-      const meal = getOne<Meal>('SELECT id, title, description FROM meals WHERE id = ?', [session.selected_meal_id]);
+      const meal = getOne<Meal>('SELECT id, title, description, type FROM meals WHERE id = ?', [session.selected_meal_id]);
       if (meal) {
         selectedMeal = {
           id: meal.id,
           title: meal.title,
           description: meal.description,
+          type: meal.type,
         };
       }
     }
 
     res.json({
       status: 'closed',
+      mode: session.mode,
       results,
       selectedMeal,
       isHost: requestorIsHost,
@@ -292,7 +298,7 @@ router.get('/session-status/:sessionId', (req, res) => {
   try {
     const { sessionId } = req.params;
 
-    const session = getOne<Session>('SELECT status, selected_meal_id FROM sessions WHERE id = ?', [sessionId]);
+    const session = getOne<Session>('SELECT status, mode, selected_meal_id FROM sessions WHERE id = ?', [sessionId]);
 
     if (!session) {
       res.status(404).json({ error: 'Session not found' });
@@ -310,6 +316,7 @@ router.get('/session-status/:sessionId', (req, res) => {
 
     res.json({
       status: session.status,
+      mode: session.mode,
       selectedMealId: session.selected_meal_id,
       participants: participants.map(p => ({
         id: p.id,

@@ -36,6 +36,7 @@ const mockMeals: Meal[] = [
     archived: false,
     pickCount: 5,
     createdAt: '2024-01-01',
+    lastSelectedAt: '2024-01-04 12:00:00',
   },
   {
     id: '2',
@@ -45,6 +46,7 @@ const mockMeals: Meal[] = [
     archived: false,
     pickCount: 3,
     createdAt: '2024-01-02',
+    lastSelectedAt: '2024-01-05 12:00:00',
   },
   {
     id: '3',
@@ -54,6 +56,7 @@ const mockMeals: Meal[] = [
     archived: false,
     pickCount: 0,
     createdAt: '2024-01-03',
+    lastSelectedAt: null,
   },
 ];
 
@@ -88,6 +91,17 @@ describe('Dashboard - Edit Mode and Delete', () => {
     await waitFor(() => {
       expect(screen.queryByText('Edit')).toBeNull();
     });
+  });
+
+  it('shows each meal\'s last selection date or that it has never been selected', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    expect(await screen.findByText(/Last selected Jan 4, 2024/)).toBeDefined();
+    expect(screen.getByText('Never selected')).toBeDefined();
   });
 
   it('should toggle edit mode when Edit button is clicked', async () => {

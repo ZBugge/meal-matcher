@@ -31,7 +31,8 @@ router.get('/', (req, res) => {
       ? [req.session.hostId, requestedType]
       : [req.session.hostId];
     const meals = getAll<Meal>(
-      `SELECT id, title, description, type, archived, pick_count, created_at
+      `SELECT id, title, description, type, archived, pick_count, created_at,
+        (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
        FROM meals
        WHERE host_id = ? AND archived = 0${typeFilter}
        ORDER BY created_at DESC`,
@@ -45,6 +46,7 @@ router.get('/', (req, res) => {
       type: meal.type,
       pickCount: meal.pick_count,
       createdAt: meal.created_at,
+      lastSelectedAt: meal.last_selected_at ?? null,
     })));
   } catch (error) {
     console.error('Get meals error:', error);
@@ -66,7 +68,8 @@ router.get('/all', (req, res) => {
       ? [req.session.hostId, requestedType]
       : [req.session.hostId];
     const meals = getAll<Meal>(
-      `SELECT id, title, description, type, archived, pick_count, created_at
+      `SELECT id, title, description, type, archived, pick_count, created_at,
+        (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
        FROM meals
        WHERE host_id = ?${typeFilter}
        ORDER BY created_at DESC`,
@@ -81,6 +84,7 @@ router.get('/all', (req, res) => {
       archived: meal.archived === 1,
       pickCount: meal.pick_count,
       createdAt: meal.created_at,
+      lastSelectedAt: meal.last_selected_at ?? null,
     })));
   } catch (error) {
     console.error('Get all meals error:', error);

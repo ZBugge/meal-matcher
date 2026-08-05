@@ -6,6 +6,18 @@ import { authApi, mealsApi, sessionsApi, Meal, Session, SessionMode } from '../a
 import ConfirmModal from '../components/ConfirmModal';
 import { TAKEOUT_CATEGORY_SUGGESTIONS } from '../constants/takeoutCategories';
 
+function formatLastSelectedAt(timestamp: string | null | undefined): string {
+  if (!timestamp) return 'Never selected';
+
+  const date = new Date(`${timestamp.replace(' ', 'T')}Z`);
+  return `Last selected ${new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date)}`;
+}
+
 export function Dashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -510,11 +522,12 @@ export function Dashboard() {
                           {meal.description && (
                             <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
                           )}
-                          {meal.pickCount > 0 && (
-                            <p className="text-xs text-gray-400 mt-2">
-                              Selected {meal.pickCount} time{meal.pickCount !== 1 ? 's' : ''}
-                            </p>
-                          )}
+                          <p className="text-xs text-gray-400 mt-2">
+                            {meal.pickCount > 0 && (
+                              <>Selected {meal.pickCount} time{meal.pickCount !== 1 ? 's' : ''} · </>
+                            )}
+                            {formatLastSelectedAt(meal.lastSelectedAt)}
+                          </p>
                         </div>
                         {!editMode && (
                           <div className="flex gap-2">

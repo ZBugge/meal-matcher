@@ -89,6 +89,7 @@ export interface Meal {
   type: MealType;
   pickCount: number;
   createdAt?: string;
+  lastSelectedAt?: string | null;
   archived?: boolean;
 }
 

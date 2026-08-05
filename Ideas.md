@@ -11,7 +11,6 @@ No ungroomed ideas right now.
 ## Now
 
 - **Selection recency** — Count only the host's explicit final choice. Make selection idempotent, expose the last-selected time, and show `Never selected` or the date in the meal library. Whether to add recency sorting remains open.
-- **Whole-card bulk selection** — In bulk-edit mode, clicking anywhere on a meal card should toggle its checkbox without double toggles or accessibility regressions.
 
 ## Next
 

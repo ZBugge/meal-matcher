@@ -1,8 +1,13 @@
+// Shared domain types
+export type SessionMode = 'home' | 'takeout';
+export type MealType = 'meal' | 'category' | 'restaurant';
+
 // Database entity types
 export interface Host {
   id: string;
   email: string;
   password_hash: string;
+  takeout_onboarding_dismissed: number;
   created_at: string;
 }
 
@@ -11,7 +16,7 @@ export interface Meal {
   host_id: string;
   title: string;
   description: string | null;
-  type: 'meal' | 'restaurant';
+  type: MealType;
   archived: number; // SQLite boolean (0 or 1)
   pick_count: number;
   temporary: number; // SQLite boolean (0 or 1)
@@ -24,6 +29,7 @@ export interface Session {
   host_id: string;
   invite_code: string;
   status: 'open' | 'closed';
+  mode: SessionMode;
   selected_meal_id: string | null;
   created_at: string;
   closed_at: string | null;
@@ -83,10 +89,12 @@ export interface SessionWithDetails extends Session {
 export interface CreateMealRequest {
   title: string;
   description?: string;
+  type?: MealType;
 }
 
 export interface CreateSessionRequest {
   mealIds: string[];
+  mode?: SessionMode;
 }
 
 export interface JoinSessionRequest {
@@ -108,7 +116,12 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface UpdateHostPreferencesRequest {
+  takeoutOnboardingDismissed: boolean;
+}
+
 export interface QuickSessionRequest {
   creatorName: string;
   meals: { title: string; description?: string }[];
+  mode?: SessionMode;
 }

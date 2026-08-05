@@ -40,7 +40,8 @@ describe('QuickSession', () => {
 
     expect(screen.getByText('MealMatch')).toBeInTheDocument();
     expect(screen.getByLabelText('Your Name')).toBeInTheDocument();
-    expect(screen.getByText('Meal Options')).toBeInTheDocument();
+    expect(screen.getByText('Food Categories')).toBeInTheDocument();
+    expect(screen.getByText('Order out')).toBeInTheDocument();
     expect(screen.getByText('Create Session')).toBeInTheDocument();
   });
 
@@ -69,7 +70,7 @@ describe('QuickSession', () => {
     fireEvent.click(addButton);
 
     // Remove it
-    const removeButtons = screen.getAllByLabelText('Remove meal');
+    const removeButtons = screen.getAllByLabelText('Remove option');
     fireEvent.click(removeButtons[0]);
 
     const inputs = screen.getAllByPlaceholderText(/Option \d+/);
@@ -79,7 +80,7 @@ describe('QuickSession', () => {
   it('should not allow removing the last meal input', () => {
     renderQuickSession();
 
-    const removeButtons = screen.queryAllByLabelText('Remove meal');
+    const removeButtons = screen.queryAllByLabelText('Remove option');
     expect(removeButtons).toHaveLength(0);
   });
 
@@ -104,7 +105,7 @@ describe('QuickSession', () => {
     fireEvent.click(createButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Please add at least one meal option')).toBeInTheDocument();
+      expect(screen.getByText('Please add at least one food category')).toBeInTheDocument();
     });
   });
 
@@ -113,13 +114,14 @@ describe('QuickSession', () => {
       session: {
         id: 'session-123',
         inviteCode: 'ABC123',
-        status: 'open'
+        status: 'open',
+        mode: 'takeout' as const,
       },
       participantId: 'participant-123',
       creatorToken: 'token-123',
       meals: [
-        { id: 'meal-1', title: 'Pizza', description: null, sessionMealId: 'sm-1' },
-        { id: 'meal-2', title: 'Tacos', description: null, sessionMealId: 'sm-2' }
+        { id: 'meal-1', title: 'Pizza', description: null, type: 'category' as const, sessionMealId: 'sm-1' },
+        { id: 'meal-2', title: 'Tacos', description: null, type: 'category' as const, sessionMealId: 'sm-2' }
       ]
     };
 
@@ -140,11 +142,13 @@ describe('QuickSession', () => {
     await waitFor(() => {
       expect(client.quickSessionApi.create).toHaveBeenCalledWith(
         'Test User',
-        [{ title: 'Pizza', description: undefined }]
+        [{ title: 'Pizza', description: undefined }],
+        'takeout'
       );
       expect(sessionStorage.getItem('sessionId')).toBe('session-123');
       expect(sessionStorage.getItem('participantId')).toBe('participant-123');
       expect(sessionStorage.getItem('creatorToken')).toBe('token-123');
+      expect(sessionStorage.getItem('sessionMode')).toBe('takeout');
       expect(mockNavigate).toHaveBeenCalledWith('/session/session-123/share');
     });
   });
@@ -168,5 +172,30 @@ describe('QuickSession', () => {
     await waitFor(() => {
       expect(screen.getByText('Network error')).toBeInTheDocument();
     });
+  });
+
+  it('adds takeout suggestions without creating duplicate option names', () => {
+    renderQuickSession();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pizza' }));
+    expect(screen.getByPlaceholderText('Option 1')).toHaveValue('Pizza');
+
+    fireEvent.click(screen.getByRole('button', { name: /Pizza/ }));
+    expect(screen.getAllByPlaceholderText(/Option \d+/)).toHaveLength(1);
+  });
+
+  it('preserves separate drafts when switching between takeout and home', () => {
+    renderQuickSession();
+
+    fireEvent.change(screen.getByPlaceholderText('Option 1'), {
+      target: { value: 'Sushi' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Cook at home' }));
+    fireEvent.change(screen.getByPlaceholderText('Option 1'), {
+      target: { value: 'Lasagna' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Order out' }));
+
+    expect(screen.getByPlaceholderText('Option 1')).toHaveValue('Sushi');
   });
 });

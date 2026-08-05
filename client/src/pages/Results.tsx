@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { participantApi, ResultsResponse, MatchResult, mealsApi } from '../api/client';
+import { participantApi, ResultsResponse, MatchResult, mealsApi, ApiException } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 
 interface Participant {
@@ -99,9 +99,20 @@ export function Results() {
 
     setSavingMeals(true);
     try {
-      // Save all meals to the user's library
+      const isTakeout = results.mode === 'takeout';
+      // Save all quick-session options to the matching library.
       for (const result of results.results) {
-        await mealsApi.create(result.title, result.description || undefined);
+        try {
+          if (isTakeout) {
+            await mealsApi.create(result.title, undefined, 'category');
+          } else {
+            await mealsApi.create(result.title, result.description || undefined);
+          }
+        } catch (err) {
+          if (!(err instanceof ApiException && err.existingId)) {
+            throw err;
+          }
+        }
       }
 
       // Clear creator token
@@ -112,7 +123,7 @@ export function Results() {
       // Navigate to dashboard
       navigate('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save meals');
+      setError(err instanceof Error ? err.message : 'Failed to save options');
     } finally {
       setSavingMeals(false);
     }
@@ -369,13 +380,15 @@ export function Results() {
           </section>
         )}
 
-        {/* Save meals prompt for anonymous creators */}
+        {/* Save options prompt for anonymous creators */}
         {isCreator && showSavePrompt && !user ? (
           <div className="card bg-orange-50 border-2 border-orange-500 mt-8">
             <div className="text-center">
-              <h3 className="font-bold text-lg">Save these meals?</h3>
+              <h3 className="font-bold text-lg">
+                Save these {results.mode === 'takeout' ? 'food categories' : 'meals'}?
+              </h3>
               <p className="text-gray-600 mt-1 mb-4">
-                Create an account to save these meals to your library and host more sessions!
+                Create an account to build a reusable library and host more sessions!
               </p>
               <div className="flex gap-3 justify-center">
                 <button
@@ -395,13 +408,15 @@ export function Results() {
           </div>
         ) : null}
 
-        {/* Save meals for logged-in creators */}
+        {/* Save options for logged-in creators */}
         {isCreator && showSavePrompt && user ? (
           <div className="card bg-green-50 border-2 border-green-500 mt-8">
             <div className="text-center">
-              <h3 className="font-bold text-lg">Save these meals to your library?</h3>
+              <h3 className="font-bold text-lg">
+                Save these {results.mode === 'takeout' ? 'food categories' : 'meals'} to your library?
+              </h3>
               <p className="text-gray-600 mt-1 mb-4">
-                Add all meals from this session to your permanent collection.
+                Add all options from this session to your permanent collection.
               </p>
               <div className="flex gap-3 justify-center">
                 <button
@@ -415,7 +430,9 @@ export function Results() {
                   disabled={savingMeals}
                   className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
                 >
-                  {savingMeals ? 'Saving...' : 'Save Meals'}
+                  {savingMeals
+                    ? 'Saving...'
+                    : results.mode === 'takeout' ? 'Save Categories' : 'Save Meals'}
                 </button>
               </div>
             </div>
@@ -428,7 +445,7 @@ export function Results() {
             <div className="text-center">
               <h3 className="font-bold text-lg">Want to host your own sessions?</h3>
               <p className="text-gray-600 mt-1 mb-4">
-                Create an account to build your meal collection and invite friends.
+                Create an account to build your food library and invite friends.
               </p>
               <Link to="/register" className="btn btn-primary">
                 Create Account

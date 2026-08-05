@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { sessionsApi, SessionDetails, MatchResult } from '../api/client';
 import ConfirmModal from '../components/ConfirmModal';
@@ -11,11 +11,7 @@ export function SessionView() {
   const [copied, setCopied] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  useEffect(() => {
-    loadSession();
-  }, [sessionId]);
-
-  const loadSession = async () => {
+  const loadSession = useCallback(async () => {
     if (!sessionId) return;
 
     try {
@@ -26,7 +22,11 @@ export function SessionView() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionId]);
+
+  useEffect(() => {
+    loadSession();
+  }, [loadSession]);
 
   const handleCopyLink = async () => {
     if (!session) return;
@@ -118,6 +118,9 @@ export function SessionView() {
           >
             {session.status}
           </span>
+          <span className="px-3 py-1 rounded text-sm font-medium bg-orange-50 text-orange-700">
+            {session.mode === 'takeout' ? 'Order out' : 'Cook at home'}
+          </span>
         </div>
       </header>
 
@@ -145,7 +148,7 @@ export function SessionView() {
             </a>
           </div>
           <p className="text-sm text-gray-500 mt-2">
-            Share this link with your group to let them vote on meals
+            Share this link with your group to let them vote on options
           </p>
         </section>
 
@@ -223,9 +226,9 @@ export function SessionView() {
           </section>
         )}
 
-        {/* Meals in Session */}
+        {/* Options in Session */}
         <section className="card">
-          <h2 className="text-xl font-bold mb-4">Meals in Session ({session.meals.length})</h2>
+          <h2 className="text-xl font-bold mb-4">Options in Session ({session.meals.length})</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {session.meals.map((meal) => (
               <div key={meal.id} className="border rounded-lg p-3">

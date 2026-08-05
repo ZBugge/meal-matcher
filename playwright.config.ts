@@ -1,4 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
+
+const e2eDatabasePath = path.resolve('test-results', `e2e-database-${process.pid}.db`);
 
 export default defineConfig({
   testDir: './e2e',
@@ -21,7 +24,11 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === '1',
     timeout: 120 * 1000,
+    env: {
+      DATABASE_PATH: e2eDatabasePath,
+      SESSION_SECRET: 'mealmatch-e2e-session-secret',
+    },
   },
 });

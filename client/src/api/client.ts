@@ -3,15 +3,18 @@ const API_BASE = '/api';
 interface ApiError {
   error: string;
   sessionClosed?: boolean;
+  existingId?: string;
 }
 
-class ApiException extends Error {
+export class ApiException extends Error {
   sessionClosed: boolean;
+  existingId?: string;
 
-  constructor(message: string, sessionClosed: boolean = false) {
+  constructor(message: string, sessionClosed: boolean = false, existingId?: string) {
     super(message);
     this.name = 'ApiException';
     this.sessionClosed = sessionClosed;
+    this.existingId = existingId;
   }
 }
 
@@ -32,7 +35,11 @@ async function request<T>(
 
   if (!response.ok) {
     const error = data as ApiError;
-    throw new ApiException(error.error || 'An error occurred', error.sessionClosed || false);
+    throw new ApiException(
+      error.error || 'An error occurred',
+      error.sessionClosed || false,
+      error.existingId
+    );
   }
 
   return data as T;
@@ -43,6 +50,7 @@ export interface User {
   id: string;
   email: string;
   createdAt?: string;
+  takeoutOnboardingDismissed?: boolean;
 }
 
 export const authApi = {
@@ -62,28 +70,39 @@ export const authApi = {
     request<{ message: string }>('/auth/logout', { method: 'POST' }),
 
   getMe: () => request<User>('/auth/me'),
+
+  updatePreferences: (takeoutOnboardingDismissed: boolean) =>
+    request<User>('/auth/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify({ takeoutOnboardingDismissed }),
+    }),
 };
 
 // Meals API
+export type SessionMode = 'home' | 'takeout';
+export type MealType = 'meal' | 'category' | 'restaurant';
+
 export interface Meal {
   id: string;
   title: string;
   description: string | null;
-  type: string;
+  type: MealType;
   pickCount: number;
   createdAt?: string;
   archived?: boolean;
 }
 
 export const mealsApi = {
-  list: () => request<Meal[]>('/meals'),
+  list: (type?: MealType) =>
+    request<Meal[]>(`/meals${type ? `?type=${type}` : ''}`),
 
-  listAll: () => request<Meal[]>('/meals/all'),
+  listAll: (type?: MealType) =>
+    request<Meal[]>(`/meals/all${type ? `?type=${type}` : ''}`),
 
-  create: (title: string, description?: string) =>
+  create: (title: string, description?: string, type: MealType = 'meal') =>
     request<Meal>('/meals', {
       method: 'POST',
-      body: JSON.stringify({ title, description }),
+      body: JSON.stringify({ title, description, type }),
     }),
 
   update: (id: string, data: { title?: string; description?: string }) =>
@@ -104,6 +123,7 @@ export interface Session {
   id: string;
   inviteCode: string;
   status: 'open' | 'closed';
+  mode: SessionMode;
   selectedMealId: string | null;
   mealCount: number;
   participantCount: number;
@@ -112,7 +132,7 @@ export interface Session {
 }
 
 export interface SessionDetails extends Session {
-  meals: Array<{ id: string; title: string; description: string | null }>;
+  meals: Array<{ id: string; title: string; description: string | null; type: MealType }>;
   participants: Array<{
     id: string;
     displayName: string;
@@ -137,12 +157,12 @@ export interface MatchResult {
 export const sessionsApi = {
   list: () => request<Session[]>('/sessions'),
 
-  create: (mealIds: string[]) =>
-    request<{ id: string; inviteCode: string; status: string; mealCount: number }>(
+  create: (mealIds: string[], mode: SessionMode = 'home') =>
+    request<{ id: string; inviteCode: string; status: string; mode: SessionMode; mealCount: number }>(
       '/sessions',
       {
         method: 'POST',
-        body: JSON.stringify({ mealIds }),
+        body: JSON.stringify({ mealIds, mode }),
       }
     ),
 
@@ -165,29 +185,33 @@ export const sessionsApi = {
 export interface JoinSessionResponse {
   participantId: string;
   sessionId: string;
+  mode: SessionMode;
   meals: Array<{
     id: string;
     title: string;
     description: string | null;
+    type: MealType;
     sessionMealId: string;
   }>;
 }
 
 export interface ResultsResponse {
   status: 'waiting' | 'closed';
+  mode: SessionMode;
   message?: string;
   results?: MatchResult[];
   selectedMeal?: {
     id: string;
     title: string;
     description: string | null;
+    type: MealType;
   } | null;
   isHost?: boolean;
 }
 
 export const participantApi = {
   getSession: (inviteCode: string) =>
-    request<{ id: string; status: string; participantCount: number }>(
+    request<{ id: string; status: string; mode: SessionMode; participantCount: number }>(
       `/join/${inviteCode}`
     ),
 
@@ -213,6 +237,7 @@ export const participantApi = {
   getSessionStatus: (sessionId: string) =>
     request<{
       status: string;
+      mode: SessionMode;
       selectedMealId: string | null;
       participants: Array<{
         id: string;
@@ -234,6 +259,7 @@ export interface QuickSessionResponse {
     id: string;
     inviteCode: string;
     status: string;
+    mode: SessionMode;
   };
   participantId: string;
   creatorToken: string | null;
@@ -241,14 +267,19 @@ export interface QuickSessionResponse {
     id: string;
     title: string;
     description: string | null;
+    type: MealType;
     sessionMealId: string;
   }>;
 }
 
 export const quickSessionApi = {
-  create: (creatorName: string, meals: Array<{ title: string; description?: string }>) =>
+  create: (
+    creatorName: string,
+    meals: Array<{ title: string; description?: string }>,
+    mode: SessionMode = 'home'
+  ) =>
     request<QuickSessionResponse>('/quick-session', {
       method: 'POST',
-      body: JSON.stringify({ creatorName, meals }),
+      body: JSON.stringify({ creatorName, meals, mode }),
     }),
 };

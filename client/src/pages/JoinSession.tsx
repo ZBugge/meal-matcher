@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { participantApi } from '../api/client';
+import { participantApi, SessionMode } from '../api/client';
 
 export function JoinSession() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
@@ -11,17 +11,15 @@ export function JoinSession() {
   const [error, setError] = useState('');
   const [sessionClosed, setSessionClosed] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
+  const [mode, setMode] = useState<SessionMode>('home');
 
-  useEffect(() => {
-    checkSession();
-  }, [inviteCode]);
-
-  const checkSession = async () => {
+  const checkSession = useCallback(async () => {
     if (!inviteCode) return;
 
     try {
       const session = await participantApi.getSession(inviteCode);
       setParticipantCount(session.participantCount);
+      setMode(session.mode);
     } catch (err) {
       if (err instanceof Error) {
         if (err.message.includes('ended')) {
@@ -33,7 +31,11 @@ export function JoinSession() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [inviteCode]);
+
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +53,7 @@ export function JoinSession() {
         JSON.stringify({
           participantId: response.participantId,
           displayName: displayName.trim(),
+          mode: response.mode,
           meals: response.meals,
         })
       );
@@ -102,7 +105,9 @@ export function JoinSession() {
         <div className="card">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-primary-600">MealMatch</h1>
-            <p className="text-gray-600 mt-2">Join the meal voting session</p>
+            <p className="text-gray-600 mt-2">
+              Join the {mode === 'takeout' ? 'order-out' : 'home-meal'} voting session
+            </p>
             <div className="flex items-center justify-center gap-2 mt-4">
               <span className="bg-primary-100 text-primary-700 font-mono font-bold px-4 py-2 rounded-lg text-xl">
                 {inviteCode}

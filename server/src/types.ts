@@ -22,6 +22,7 @@ export interface Meal {
   temporary: number; // SQLite boolean (0 or 1)
   creator_token: string | null;
   created_at: string;
+  last_selected_at?: string | null;
 }
 
 export interface Session {

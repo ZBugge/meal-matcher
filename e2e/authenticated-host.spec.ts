@@ -99,6 +99,31 @@ test.describe('Authenticated Host Flow', () => {
 
     // And: Can see vote percentages
     await expect(page.locator('text=/%/').first()).toBeVisible();
+
+    // Selecting the final option is safe to retry: it must not increment its count twice.
+    await page.getByRole('button', { name: 'Select' }).first().click();
+    await expect(page.getByText(/^Selected:/)).toBeVisible();
+
+    const sessionId = new URL(page.url()).pathname.split('/').pop();
+    const selectedMealId = await page.evaluate(async (id) => {
+      const response = await fetch(`/api/sessions/${id}`);
+      const session = await response.json();
+      return session.selectedMealId as string;
+    }, sessionId);
+
+    const retryResponse = await page.evaluate(async ({ id, mealId }) => {
+      const response = await fetch(`/api/sessions/${id}/select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mealId }),
+      });
+      return { ok: response.ok, body: await response.json() };
+    }, { id: sessionId, mealId: selectedMealId });
+
+    expect(retryResponse.ok).toBe(true);
+    await page.goto('/dashboard');
+    await expect(page.getByText('Selected 1 time')).toBeVisible();
+    await expect(page.getByText(/Last selected/)).toBeVisible();
   });
 
   test('host can quick add meals while creating session', async ({ page }) => {

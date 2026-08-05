@@ -278,6 +278,16 @@ router.post('/:id/select', (req, res) => {
       return;
     }
 
+    if (session.selected_meal_id) {
+      if (session.selected_meal_id === mealId) {
+        res.json({ message: 'Meal selected successfully' });
+        return;
+      }
+
+      res.status(409).json({ error: 'A final meal has already been selected for this session' });
+      return;
+    }
+
     // Verify meal is part of this session
     const sessionMeal = getOne(
       'SELECT id FROM session_meals WHERE session_id = ? AND meal_id = ?',

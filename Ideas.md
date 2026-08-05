@@ -10,7 +10,6 @@ No ungroomed ideas right now.
 
 ## Now
 
-- **Selection recency** — Count only the host's explicit final choice. Make selection idempotent, expose the last-selected time, and show `Never selected` or the date in the meal library. Whether to add recency sorting remains open.
 
 ## Next
 

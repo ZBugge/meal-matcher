@@ -486,11 +486,13 @@ export function Dashboard() {
                 {activeMeals.map((meal) => {
                   const isDeleting = deletingMealIds.includes(meal.id);
                   const isSingleDelete = deletingMealIds.length === 1 && isDeleting;
+                  const isSelectedForDeletion = selectedForDeletion.includes(meal.id);
 
                   return (
                     <motion.div
                       key={meal.id}
                       layout
+                      onClick={editMode ? () => toggleMealForDeletion(meal.id) : undefined}
                       initial={{ opacity: 1 }}
                       exit={
                         isSingleDelete
@@ -505,15 +507,17 @@ export function Dashboard() {
                             }
                       }
                       className={`card transition-colors duration-150 ${
-                        isDeleting ? 'bg-red-50' : ''
-                      }`}
+                        editMode ? 'cursor-pointer' : ''
+                      } ${isDeleting ? 'bg-red-50' : ''}`}
                     >
                       <div className="flex justify-between items-start gap-3">
                         {editMode && (
                           <input
                             type="checkbox"
-                            checked={selectedForDeletion.includes(meal.id)}
+                            checked={isSelectedForDeletion}
+                            onClick={(event) => event.stopPropagation()}
                             onChange={() => toggleMealForDeletion(meal.id)}
+                            aria-label={`Select ${meal.title} for deletion`}
                             className="w-5 h-5 mt-1 text-primary-600 cursor-pointer"
                           />
                         )}

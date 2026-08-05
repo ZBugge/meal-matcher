@@ -183,6 +183,27 @@ describe('Dashboard - Edit Mode and Delete', () => {
     expect(screen.getByText('Delete Selected (2)')).toBeDefined();
   });
 
+  it('should toggle a meal once when its card or checkbox is clicked in edit mode', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit')).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByText('Edit'));
+    fireEvent.click(screen.getByText('Pizza'));
+
+    expect(screen.getByText('Delete Selected (1)')).toBeDefined();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Pizza for deletion' }));
+
+    expect(screen.queryByText('Delete Selected (1)')).toBeNull();
+  });
+
   it('should show confirmation modal for single delete', async () => {
     render(
       <BrowserRouter>

@@ -105,6 +105,70 @@ Simmer until tender.`);
     expect(joinPayload.meals[0]).toMatchObject({ title: 'Garlic Soup' });
     expect(joinPayload.meals[0]).not.toHaveProperty('instructions');
     expect(joinPayload.meals[0]).not.toHaveProperty('ingredients');
+
+    const sessionId = joinPayload.sessionId as string;
+    const mealId = joinPayload.meals[0].id as string;
+    const privateRecipe = await page.evaluate(async (id) => {
+      const response = await fetch(`/api/meals/${id}`);
+      return { status: response.status, body: await response.json() };
+    }, mealId);
+    expect(privateRecipe.status).toBe(200);
+    expect(privateRecipe.body).toMatchObject({
+      instructions: 'Simmer until tender.',
+      ingredients: [
+        { amount: '2 bulbs', ingredient: 'garlic' },
+        { amount: '4oz', ingredient: 'milk' },
+      ],
+    });
+
+    const unauthenticatedRecipe = await request.get(`/api/meals/${mealId}`);
+    expect(unauthenticatedRecipe.status()).toBe(401);
+
+    const swipeResponse = await request.post(`/api/swipes/${sessionId}`, {
+      data: {
+        participantId: joinPayload.participantId,
+        swipes: [{ mealId, vote: 1 }],
+      },
+    });
+    expect(swipeResponse.ok(), await swipeResponse.text()).toBe(true);
+
+    const closeResponse = await page.evaluate(async (id) => {
+      const response = await fetch(`/api/sessions/${id}/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      return response.status;
+    }, sessionId);
+    expect(closeResponse).toBe(200);
+
+    const selectResponse = await page.evaluate(async ({ id, selectedMealId }) => {
+      const response = await fetch(`/api/sessions/${id}/select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mealId: selectedMealId }),
+      });
+      return response.status;
+    }, { id: sessionId, selectedMealId: mealId });
+    expect(selectResponse).toBe(200);
+
+    const publicResults = await request.get(`/api/results/${sessionId}`);
+    expect(publicResults.ok()).toBe(true);
+    const publicResultsPayload = await publicResults.json();
+    expect(publicResultsPayload.results[0]).not.toHaveProperty('instructions');
+    expect(publicResultsPayload.results[0]).not.toHaveProperty('ingredients');
+
+    await page.goto(`/results/${sessionId}`);
+    await page.getByRole('button', { name: 'Garlic Soup' }).first().click();
+    const resultsRecipe = page.getByRole('dialog', { name: 'Garlic Soup' });
+    await expect(resultsRecipe.getByText('2 bulbs')).toBeVisible();
+    await expect(resultsRecipe.getByText('Simmer until tender.')).toBeVisible();
+    await resultsRecipe.getByRole('button', { name: 'Close recipe' }).click();
+
+    await page.goto('/dashboard');
+    const recentSessions = page.locator('section').filter({ hasText: 'Recent Sessions' });
+    await recentSessions.getByRole('button', { name: 'Garlic Soup' }).click();
+    await expect(page.getByRole('dialog', { name: 'Garlic Soup' })).toBeVisible();
   });
 
   test('user can delete single meal with confirmation (#12)', async ({ page }) => {

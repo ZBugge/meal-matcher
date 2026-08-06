@@ -14,6 +14,7 @@ import {
 import ConfirmModal from '../components/ConfirmModal';
 import RecipeFields from '../components/RecipeFields';
 import RecipePasteImport from '../components/RecipePasteImport';
+import RecipeViewer from '../components/RecipeViewer';
 import { TAKEOUT_CATEGORY_SUGGESTIONS } from '../constants/takeoutCategories';
 
 function formatLastSelectedAt(timestamp: string | null | undefined): string {
@@ -69,6 +70,8 @@ export function Dashboard() {
   const [editDescription, setEditDescription] = useState('');
   const [editInstructions, setEditInstructions] = useState('');
   const [editIngredients, setEditIngredients] = useState<RecipeIngredient[]>([]);
+  const [viewingRecipe, setViewingRecipe] = useState<Meal | null>(null);
+  const [loadingRecipeId, setLoadingRecipeId] = useState<string | null>(null);
 
   // Animation states
   const [deletingMealIds, setDeletingMealIds] = useState<string[]>([]);
@@ -206,6 +209,23 @@ export function Dashboard() {
     setEditInstructions(meal.instructions || '');
     setEditIngredients(meal.ingredients?.map((row) => ({ ...row })) || []);
     setShowEditMeal(true);
+  };
+
+  const openRecipe = async (mealId: string, loadedMeal?: Meal) => {
+    if (loadedMeal?.type === 'meal') {
+      setViewingRecipe(loadedMeal);
+      return;
+    }
+
+    setLoadingRecipeId(mealId);
+    try {
+      const meal = await mealsApi.get(mealId);
+      if (meal.type === 'meal') setViewingRecipe(meal);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load recipe');
+    } finally {
+      setLoadingRecipeId(null);
+    }
   };
 
   const handleUpdateMeal = async (e: React.FormEvent) => {
@@ -563,7 +583,17 @@ export function Dashboard() {
                           />
                         )}
                         <div className="flex-1">
-                          <h3 className="font-semibold text-lg">{meal.title}</h3>
+                          {meal.type === 'meal' && !editMode ? (
+                            <button
+                              type="button"
+                              onClick={() => openRecipe(meal.id, meal)}
+                              className="text-left text-lg font-semibold text-primary-700 hover:underline"
+                            >
+                              {meal.title}
+                            </button>
+                          ) : (
+                            <h3 className="font-semibold text-lg">{meal.title}</h3>
+                          )}
                           {meal.description && (
                             <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
                           )}
@@ -674,6 +704,28 @@ export function Dashboard() {
                       <p className="text-sm text-gray-500 mt-1">
                         {session.mealCount} options · {session.participantCount} participants
                       </p>
+                      {session.selectedMeal && (
+                        <p className="mt-1 text-sm text-gray-600">
+                          Selected:{' '}
+                          {session.selectedMeal.type === 'meal' ? (
+                            <button
+                              type="button"
+                              disabled={loadingRecipeId === session.selectedMeal.id}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openRecipe(session.selectedMeal!.id);
+                              }}
+                              className="font-medium text-primary-700 hover:underline disabled:text-gray-400"
+                            >
+                              {loadingRecipeId === session.selectedMeal.id
+                                ? 'Loading recipe...'
+                                : session.selectedMeal.title}
+                            </button>
+                          ) : (
+                            <span className="font-medium">{session.selectedMeal.title}</span>
+                          )}
+                        </p>
+                      )}
                     </div>
                     <svg
                       className="w-5 h-5 text-gray-400"
@@ -690,6 +742,10 @@ export function Dashboard() {
           )}
         </section>
       </main>
+
+      {viewingRecipe && (
+        <RecipeViewer meal={viewingRecipe} onClose={() => setViewingRecipe(null)} />
+      )}
 
       {/* Takeout onboarding modal */}
       {showTakeoutOnboarding && (

@@ -125,6 +125,8 @@ export const mealsApi = {
   listAll: (type?: MealType) =>
     request<Meal[]>(`/meals/all${type ? `?type=${type}` : ''}`),
 
+  get: (id: string) => request<Meal>(`/meals/${id}`),
+
   create: (
     title: string,
     description?: string,
@@ -159,6 +161,7 @@ export interface Session {
   status: 'open' | 'closed';
   mode: SessionMode;
   selectedMealId: string | null;
+  selectedMeal: { id: string; title: string; type: MealType } | null;
   mealCount: number;
   participantCount: number;
   createdAt: string;

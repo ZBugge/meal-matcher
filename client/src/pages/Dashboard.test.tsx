@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { Dashboard } from './Dashboard';
 import { authApi, mealsApi, sessionsApi, Meal } from '../api/client';
@@ -18,6 +18,7 @@ vi.mock('../api/client', () => ({
   mealsApi: {
     parseRecipe: vi.fn(),
     list: vi.fn(),
+    get: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -1220,6 +1221,51 @@ Blend and simmer.`;
       expect(screen.getByLabelText('Ingredient 1 amount')).toHaveValue('2 bulbs');
       expect(screen.getByLabelText('Ingredient 2 name')).toHaveValue('milk');
     });
+  });
+
+  it('opens a readable recipe by clicking its library name', async () => {
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('My Meals');
+    fireEvent.click(screen.getByRole('button', { name: 'Garlic soup' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Garlic soup' });
+    expect(within(dialog).getByText('2 bulbs')).toBeInTheDocument();
+    expect(within(dialog).getByText('garlic')).toBeInTheDocument();
+    expect(within(dialog).getByText('Simmer until tender.')).toBeInTheDocument();
+  });
+
+  it('opens the selected meal recipe from Recent Sessions', async () => {
+    vi.mocked(mealsApi.get).mockResolvedValue(recipeMeal);
+    vi.mocked(sessionsApi.list).mockResolvedValue([{
+      id: 'session-1',
+      inviteCode: 'ABC123',
+      status: 'closed',
+      mode: 'home',
+      selectedMealId: 'recipe-1',
+      selectedMeal: { id: 'recipe-1', title: 'Garlic soup', type: 'meal' },
+      mealCount: 1,
+      participantCount: 2,
+      createdAt: '2024-01-01',
+      closedAt: '2024-01-01',
+    }]);
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    const recentSessions = (await screen.findByText('Recent Sessions')).closest('section');
+    expect(recentSessions).not.toBeNull();
+    fireEvent.click(within(recentSessions!).getByRole('button', { name: 'Garlic soup' }));
+
+    await waitFor(() => expect(mealsApi.get).toHaveBeenCalledWith('recipe-1'));
+    expect(screen.getByRole('dialog', { name: 'Garlic soup' })).toBeInTheDocument();
   });
 
   it('does not show recipe fields for takeout categories', async () => {

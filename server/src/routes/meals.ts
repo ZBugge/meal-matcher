@@ -154,6 +154,29 @@ router.get('/all', (req, res) => {
   }
 });
 
+// GET /api/meals/:id - Get one host-owned meal, including private recipe data
+router.get('/:id', (req, res) => {
+  try {
+    const meal = getOne<Meal>(
+      `SELECT id, title, description, instructions, type, archived, pick_count, created_at,
+        (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
+       FROM meals
+       WHERE id = ? AND host_id = ?`,
+      [req.params.id, req.session.hostId]
+    );
+
+    if (!meal) {
+      res.status(404).json({ error: 'Meal not found' });
+      return;
+    }
+
+    res.json(toLibraryMealResponse(meal, true));
+  } catch (error) {
+    console.error('Get meal error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/meals - Create meal
 router.post('/', (req, res) => {
   try {

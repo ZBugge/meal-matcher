@@ -109,4 +109,23 @@ describe('API Client - Session Closed Handling', () => {
       body: JSON.stringify({ text: 'Title: Garlic Soup' }),
     }));
   });
+
+  it('loads one host-owned meal for the read-only recipe viewer', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        id: 'meal-123',
+        title: 'Garlic Soup',
+        description: null,
+        type: 'meal',
+        pickCount: 1,
+        instructions: 'Simmer.',
+        ingredients: [{ amount: '2 bulbs', ingredient: 'garlic' }],
+      }),
+    });
+
+    await mealsApi.get('meal-123');
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/meals/meal-123', expect.any(Object));
+  });
 });

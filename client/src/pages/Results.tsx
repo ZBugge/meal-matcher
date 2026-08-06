@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { participantApi, ResultsResponse, MatchResult, mealsApi, ApiException } from '../api/client';
+import { participantApi, ResultsResponse, MatchResult, mealsApi, ApiException, Meal } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import RecipeViewer from '../components/RecipeViewer';
 
 interface Participant {
   id: string;
@@ -23,6 +24,8 @@ export function Results() {
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closing, setClosing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [viewingRecipe, setViewingRecipe] = useState<Meal | null>(null);
+  const [loadingRecipeId, setLoadingRecipeId] = useState<string | null>(null);
   const pollTimeoutRef = useRef<number | null>(null);
 
   // Check if user is the creator
@@ -133,6 +136,18 @@ export function Results() {
     sessionStorage.removeItem('creatorToken');
     sessionStorage.removeItem('sessionId');
     setShowSavePrompt(false);
+  };
+
+  const handleViewRecipe = async (mealId: string) => {
+    setLoadingRecipeId(mealId);
+    try {
+      const meal = await mealsApi.get(mealId);
+      if (meal.type === 'meal') setViewingRecipe(meal);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load recipe');
+    } finally {
+      setLoadingRecipeId(null);
+    }
   };
 
   if (loading) {
@@ -329,6 +344,7 @@ export function Results() {
 
   const unanimousResults = results.results?.filter((r) => r.isUnanimous) || [];
   const otherResults = results.results?.filter((r) => !r.isUnanimous) || [];
+  const canViewRecipes = Boolean(user && results.isHost && results.mode === 'home');
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -345,7 +361,20 @@ export function Results() {
             <div className="text-center">
               <span className="text-4xl">🎉</span>
               <h2 className="text-xl font-bold mt-2 text-green-700">Tonight's Pick:</h2>
-              <p className="text-2xl font-bold mt-1">{results.selectedMeal.title}</p>
+              {canViewRecipes ? (
+                <button
+                  type="button"
+                  disabled={loadingRecipeId === results.selectedMeal.id}
+                  onClick={() => handleViewRecipe(results.selectedMeal!.id)}
+                  className="mt-1 text-2xl font-bold text-primary-700 hover:underline disabled:text-gray-400"
+                >
+                  {loadingRecipeId === results.selectedMeal.id
+                    ? 'Loading recipe...'
+                    : results.selectedMeal.title}
+                </button>
+              ) : (
+                <p className="text-2xl font-bold mt-1">{results.selectedMeal.title}</p>
+              )}
               {results.selectedMeal.description && (
                 <p className="text-gray-600 mt-1">{results.selectedMeal.description}</p>
               )}
@@ -362,7 +391,12 @@ export function Results() {
             </h2>
             <div className="space-y-3">
               {unanimousResults.map((result) => (
-                <ResultCard key={result.mealId} result={result} />
+                <ResultCard
+                  key={result.mealId}
+                  result={result}
+                  onViewRecipe={canViewRecipes ? handleViewRecipe : undefined}
+                  recipeLoading={loadingRecipeId === result.mealId}
+                />
               ))}
             </div>
           </section>
@@ -374,7 +408,12 @@ export function Results() {
             <h2 className="text-xl font-bold mb-4">All Results</h2>
             <div className="space-y-3">
               {otherResults.map((result) => (
-                <ResultCard key={result.mealId} result={result} />
+                <ResultCard
+                  key={result.mealId}
+                  result={result}
+                  onViewRecipe={canViewRecipes ? handleViewRecipe : undefined}
+                  recipeLoading={loadingRecipeId === result.mealId}
+                />
               ))}
             </div>
           </section>
@@ -463,15 +502,20 @@ export function Results() {
           </div>
         )}
       </div>
+      {viewingRecipe && (
+        <RecipeViewer meal={viewingRecipe} onClose={() => setViewingRecipe(null)} />
+      )}
     </div>
   );
 }
 
 interface ResultCardProps {
   result: MatchResult;
+  onViewRecipe?: (mealId: string) => void;
+  recipeLoading?: boolean;
 }
 
-function ResultCard({ result }: ResultCardProps) {
+function ResultCard({ result, onViewRecipe, recipeLoading }: ResultCardProps) {
   const [showVoters, setShowVoters] = useState(false);
   const getBarColor = () => {
     if (result.percentage >= 75) return 'bg-green-500';
@@ -489,7 +533,18 @@ function ResultCard({ result }: ResultCardProps) {
     >
       <div className="flex justify-between items-start mb-3">
         <div>
-          <h3 className="font-semibold text-lg">{result.title}</h3>
+          {onViewRecipe ? (
+            <button
+              type="button"
+              disabled={recipeLoading}
+              onClick={() => onViewRecipe(result.mealId)}
+              className="text-left text-lg font-semibold text-primary-700 hover:underline disabled:text-gray-400"
+            >
+              {recipeLoading ? 'Loading recipe...' : result.title}
+            </button>
+          ) : (
+            <h3 className="font-semibold text-lg">{result.title}</h3>
+          )}
           {result.description && (
             <p className="text-gray-600 text-sm mt-1">{result.description}</p>
           )}

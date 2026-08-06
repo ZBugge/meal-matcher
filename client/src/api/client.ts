@@ -82,10 +82,29 @@ export const authApi = {
 export type SessionMode = 'home' | 'takeout';
 export type MealType = 'meal' | 'category' | 'restaurant';
 
+export interface RecipeIngredient {
+  amount: string;
+  ingredient: string;
+}
+
+export interface RecipeInput {
+  instructions?: string | null;
+  ingredients?: RecipeIngredient[];
+}
+
+export interface ParsedRecipe {
+  title: string;
+  description: string | null;
+  instructions: string | null;
+  ingredients: RecipeIngredient[];
+}
+
 export interface Meal {
   id: string;
   title: string;
   description: string | null;
+  instructions?: string | null;
+  ingredients?: RecipeIngredient[];
   type: MealType;
   pickCount: number;
   createdAt?: string;
@@ -94,19 +113,33 @@ export interface Meal {
 }
 
 export const mealsApi = {
+  parseRecipe: (text: string) =>
+    request<ParsedRecipe>('/meals/parse-recipe', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+
   list: (type?: MealType) =>
     request<Meal[]>(`/meals${type ? `?type=${type}` : ''}`),
 
   listAll: (type?: MealType) =>
     request<Meal[]>(`/meals/all${type ? `?type=${type}` : ''}`),
 
-  create: (title: string, description?: string, type: MealType = 'meal') =>
+  create: (
+    title: string,
+    description?: string,
+    type: MealType = 'meal',
+    recipe?: RecipeInput
+  ) =>
     request<Meal>('/meals', {
       method: 'POST',
-      body: JSON.stringify({ title, description, type }),
+      body: JSON.stringify({ title, description, type, ...recipe }),
     }),
 
-  update: (id: string, data: { title?: string; description?: string }) =>
+  update: (
+    id: string,
+    data: { title?: string; description?: string; instructions?: string | null; ingredients?: RecipeIngredient[] }
+  ) =>
     request<Meal>(`/meals/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

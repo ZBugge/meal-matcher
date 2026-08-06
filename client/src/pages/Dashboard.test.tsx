@@ -16,6 +16,7 @@ vi.mock('../api/client', () => ({
     updatePreferences: vi.fn(),
   },
   mealsApi: {
+    parseRecipe: vi.fn(),
     list: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -1071,5 +1072,179 @@ describe('Dashboard - Home and takeout modes', () => {
       expect(screen.getByText('Add Food Category')).toBeInTheDocument();
     });
     expect(screen.queryByText('Popular categories')).not.toBeInTheDocument();
+  });
+});
+
+describe('Dashboard - Private Recipes', () => {
+  const recipeMeal: Meal = {
+    id: 'recipe-1',
+    title: 'Garlic soup',
+    description: 'Creamy soup',
+    instructions: 'Simmer until tender.',
+    ingredients: [{ amount: '2 bulbs', ingredient: 'garlic' }],
+    type: 'meal',
+    archived: false,
+    pickCount: 0,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(mealsApi.list).mockImplementation(async (type) =>
+      type === 'meal' ? [recipeMeal] : []
+    );
+    vi.mocked(sessionsApi.list).mockResolvedValue([]);
+  });
+
+  it('edits instructions and ordered two-field ingredient rows', async () => {
+    vi.mocked(mealsApi.update).mockResolvedValue({
+      ...recipeMeal,
+      ingredients: [
+        { amount: '2 bulbs', ingredient: 'garlic' },
+        { amount: '4oz', ingredient: 'milk' },
+      ],
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('Garlic soup');
+    fireEvent.click(screen.getByTitle('Edit meal'));
+    expect(screen.getByDisplayValue('Simmer until tender.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Ingredient 1 amount')).toHaveValue('2 bulbs');
+    expect(screen.getByLabelText('Ingredient 1 name')).toHaveValue('garlic');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add ingredient' }));
+    fireEvent.change(screen.getByLabelText('Ingredient 2 amount'), {
+      target: { value: '4oz' },
+    });
+    fireEvent.change(screen.getByLabelText('Ingredient 2 name'), {
+      target: { value: 'milk' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(mealsApi.update).toHaveBeenCalledWith('recipe-1', {
+        title: 'Garlic soup',
+        description: 'Creamy soup',
+        instructions: 'Simmer until tender.',
+        ingredients: [
+          { amount: '2 bulbs', ingredient: 'garlic' },
+          { amount: '4oz', ingredient: 'milk' },
+        ],
+      });
+    });
+  });
+
+  it('creates a home meal with an optional private recipe', async () => {
+    vi.mocked(mealsApi.create).mockResolvedValue({ ...recipeMeal, id: 'recipe-2' });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('My Meals');
+    fireEvent.click(screen.getByRole('button', { name: 'Add Meal' }));
+    fireEvent.change(screen.getByPlaceholderText('e.g., Tacos'), {
+      target: { value: 'Garlic soup' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Describe how to make this meal'), {
+      target: { value: 'Simmer until tender.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add ingredient' }));
+    fireEvent.change(screen.getByLabelText('Ingredient 1 amount'), {
+      target: { value: '2 bulbs' },
+    });
+    fireEvent.change(screen.getByLabelText('Ingredient 1 name'), {
+      target: { value: 'garlic' },
+    });
+    const addMealButtons = screen.getAllByRole('button', { name: 'Add Meal' });
+    fireEvent.click(addMealButtons[addMealButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(mealsApi.create).toHaveBeenCalledWith(
+        'Garlic soup',
+        undefined,
+        'meal',
+        {
+          instructions: 'Simmer until tender.',
+          ingredients: [{ amount: '2 bulbs', ingredient: 'garlic' }],
+        }
+      );
+    });
+  });
+
+  it('fills the editable meal form from backend-parsed recipe text', async () => {
+    vi.mocked(mealsApi.parseRecipe).mockResolvedValue({
+      title: 'Garlic Soup',
+      description: 'Creamy roasted garlic soup',
+      instructions: 'Roast the garlic.\nBlend and simmer.',
+      ingredients: [
+        { amount: '2 bulbs', ingredient: 'garlic' },
+        { amount: '4oz', ingredient: 'milk' },
+      ],
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('My Meals');
+    fireEvent.click(screen.getByRole('button', { name: 'Add Meal' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Paste a full recipe' }));
+    const recipeText = `Title: Garlic Soup
+Description: Creamy roasted garlic soup
+Ingredients:
+2 bulbs | garlic
+4oz | milk
+Instructions:
+Roast the garlic.
+Blend and simmer.`;
+    fireEvent.change(screen.getByLabelText('Recipe text to parse'), {
+      target: { value: recipeText },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Fill recipe form' }));
+
+    await waitFor(() => {
+      expect(mealsApi.parseRecipe).toHaveBeenCalledWith(recipeText);
+      expect(screen.getByDisplayValue('Garlic Soup')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Creamy roasted garlic soup')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Describe how to make this meal'))
+        .toHaveValue('Roast the garlic.\nBlend and simmer.');
+      expect(screen.getByLabelText('Ingredient 1 amount')).toHaveValue('2 bulbs');
+      expect(screen.getByLabelText('Ingredient 2 name')).toHaveValue('milk');
+    });
+  });
+
+  it('does not show recipe fields for takeout categories', async () => {
+    vi.mocked(mealsApi.list).mockImplementation(async (type) =>
+      type === 'category'
+        ? [{
+            ...recipeMeal,
+            id: 'category-1',
+            title: 'Italian',
+            type: 'category',
+            instructions: undefined,
+            ingredients: undefined,
+          }]
+        : []
+    );
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('My Meals');
+    fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
+    fireEvent.click(screen.getByTitle('Edit category'));
+    expect(screen.queryByText('Recipe (optional)')).not.toBeInTheDocument();
   });
 });

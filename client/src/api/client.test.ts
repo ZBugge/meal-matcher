@@ -63,4 +63,50 @@ describe('API Client - Session Closed Handling', () => {
       sessionClosed: false,
     });
   });
+
+  it('sends recipe instructions and two-field ingredient rows for home meals', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        id: 'meal-123',
+        title: 'Garlic soup',
+        description: null,
+        type: 'meal',
+        pickCount: 0,
+        instructions: 'Simmer.',
+        ingredients: [{ amount: '2 bulbs', ingredient: 'garlic' }],
+      }),
+    });
+
+    await mealsApi.create('Garlic soup', undefined, 'meal', {
+      instructions: 'Simmer.',
+      ingredients: [{ amount: '2 bulbs', ingredient: 'garlic' }],
+    });
+
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({
+      title: 'Garlic soup',
+      type: 'meal',
+      instructions: 'Simmer.',
+      ingredients: [{ amount: '2 bulbs', ingredient: 'garlic' }],
+    });
+  });
+
+  it('sends full recipe text to the authenticated parser', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        title: 'Garlic Soup',
+        description: null,
+        instructions: 'Simmer.',
+        ingredients: [{ amount: '2 bulbs', ingredient: 'garlic' }],
+      }),
+    });
+
+    await mealsApi.parseRecipe('Title: Garlic Soup');
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/meals/parse-recipe', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ text: 'Title: Garlic Soup' }),
+    }));
+  });
 });

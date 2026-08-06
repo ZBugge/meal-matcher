@@ -2,8 +2,18 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
-import { authApi, mealsApi, sessionsApi, Meal, Session, SessionMode } from '../api/client';
+import {
+  authApi,
+  mealsApi,
+  sessionsApi,
+  Meal,
+  RecipeIngredient,
+  Session,
+  SessionMode,
+} from '../api/client';
 import ConfirmModal from '../components/ConfirmModal';
+import RecipeFields from '../components/RecipeFields';
+import RecipePasteImport from '../components/RecipePasteImport';
 import { TAKEOUT_CATEGORY_SUGGESTIONS } from '../constants/takeoutCategories';
 
 function formatLastSelectedAt(timestamp: string | null | undefined): string {
@@ -32,6 +42,8 @@ export function Dashboard() {
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [newMealTitle, setNewMealTitle] = useState('');
   const [newMealDescription, setNewMealDescription] = useState('');
+  const [newMealInstructions, setNewMealInstructions] = useState('');
+  const [newMealIngredients, setNewMealIngredients] = useState<RecipeIngredient[]>([]);
   const [selectedMealIds, setSelectedMealIds] = useState<string[]>([]);
   const [quickAddTitle, setQuickAddTitle] = useState('');
   const [sessionMode, setSessionMode] = useState<SessionMode>('home');
@@ -55,6 +67,8 @@ export function Dashboard() {
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editInstructions, setEditInstructions] = useState('');
+  const [editIngredients, setEditIngredients] = useState<RecipeIngredient[]>([]);
 
   // Animation states
   const [deletingMealIds, setDeletingMealIds] = useState<string[]>([]);
@@ -106,12 +120,22 @@ export function Dashboard() {
     e.preventDefault();
 
     try {
+      const hasRecipe = Boolean(newMealInstructions.trim()) || newMealIngredients.length > 0;
       const meal = activeMode === 'home'
-        ? await mealsApi.create(newMealTitle.trim(), newMealDescription || undefined)
+        ? hasRecipe
+          ? await mealsApi.create(
+              newMealTitle.trim(),
+              newMealDescription || undefined,
+              'meal',
+              { instructions: newMealInstructions, ingredients: newMealIngredients }
+            )
+          : await mealsApi.create(newMealTitle.trim(), newMealDescription || undefined)
         : await mealsApi.create(newMealTitle.trim(), undefined, 'category');
       setMeals((current) => [meal, ...current]);
       setNewMealTitle('');
       setNewMealDescription('');
+      setNewMealInstructions('');
+      setNewMealIngredients([]);
       setShowAddMeal(false);
       if (activeMode === 'takeout') {
         setTakeoutOnboardingDismissed(true);
@@ -124,12 +148,16 @@ export function Dashboard() {
   const openAddMeal = () => {
     setNewMealTitle('');
     setNewMealDescription('');
+    setNewMealInstructions('');
+    setNewMealIngredients([]);
     setShowAddMeal(true);
   };
 
   const closeAddMeal = () => {
     setNewMealTitle('');
     setNewMealDescription('');
+    setNewMealInstructions('');
+    setNewMealIngredients([]);
     setShowAddMeal(false);
   };
 
@@ -175,6 +203,8 @@ export function Dashboard() {
     setEditingMeal(meal);
     setEditTitle(meal.title);
     setEditDescription(meal.description || '');
+    setEditInstructions(meal.instructions || '');
+    setEditIngredients(meal.ingredients?.map((row) => ({ ...row })) || []);
     setShowEditMeal(true);
   };
 
@@ -183,18 +213,27 @@ export function Dashboard() {
     if (!editingMeal) return;
 
     try {
-      await mealsApi.update(editingMeal.id, {
+      const hasLoadedRecipe = editingMeal.instructions !== undefined
+        || editingMeal.ingredients !== undefined;
+      const hasRecipeDraft = Boolean(editInstructions.trim()) || editIngredients.length > 0;
+      const updatedMeal = await mealsApi.update(editingMeal.id, {
         title: editTitle,
         ...(editingMeal.type === 'meal'
           ? { description: editDescription || undefined }
           : {}),
+        ...(editingMeal.type === 'meal' && (hasLoadedRecipe || hasRecipeDraft)
+          ? {
+              instructions: editInstructions || null,
+              ingredients: editIngredients,
+            }
+          : {}),
       });
-      setMeals(meals.map((m) =>
+      setMeals((current) => current.map((m) =>
         m.id === editingMeal.id
           ? {
               ...m,
-              title: editTitle,
-              description: editingMeal.type === 'meal' ? editDescription || null : null,
+              ...updatedMeal,
+              lastSelectedAt: m.lastSelectedAt,
             }
           : m
       ));
@@ -202,6 +241,8 @@ export function Dashboard() {
       setEditingMeal(null);
       setEditTitle('');
       setEditDescription('');
+      setEditInstructions('');
+      setEditIngredients([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update meal');
     }
@@ -526,6 +567,14 @@ export function Dashboard() {
                           {meal.description && (
                             <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
                           )}
+                          {meal.type === 'meal'
+                            && (meal.instructions || (meal.ingredients?.length ?? 0) > 0) && (
+                            <p className="text-xs text-primary-600 mt-2">
+                              Recipe · {meal.ingredients?.length ?? 0} ingredient{
+                                (meal.ingredients?.length ?? 0) === 1 ? '' : 's'
+                              }
+                            </p>
+                          )}
                           <p className="text-xs text-gray-400 mt-2">
                             {meal.pickCount > 0 && (
                               <>Selected {meal.pickCount} time{meal.pickCount !== 1 ? 's' : ''} · </>
@@ -700,11 +749,21 @@ export function Dashboard() {
       {/* Add Meal Modal */}
       {showAddMeal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="card w-full max-w-md">
+          <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">
               {activeMode === 'home' ? 'Add New Meal' : 'Add Food Category'}
             </h3>
             <form onSubmit={handleAddMeal} className="space-y-4">
+              {activeMode === 'home' && (
+                <RecipePasteImport
+                  onParsed={(recipe) => {
+                    setNewMealTitle(recipe.title);
+                    setNewMealDescription(recipe.description || '');
+                    setNewMealInstructions(recipe.instructions || '');
+                    setNewMealIngredients(recipe.ingredients);
+                  }}
+                />
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Title *
@@ -731,6 +790,14 @@ export function Dashboard() {
                   placeholder="e.g., Beef tacos with all the fixings"
                 />
               </div>}
+              {activeMode === 'home' && (
+                <RecipeFields
+                  instructions={newMealInstructions}
+                  ingredients={newMealIngredients}
+                  onInstructionsChange={setNewMealInstructions}
+                  onIngredientsChange={setNewMealIngredients}
+                />
+              )}
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -751,11 +818,21 @@ export function Dashboard() {
       {/* Edit Meal Modal */}
       {showEditMeal && editingMeal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="card w-full max-w-md">
+          <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">
               {editingMeal.type === 'category' ? 'Edit Category' : 'Edit Meal'}
             </h3>
             <form onSubmit={handleUpdateMeal} className="space-y-4">
+              {editingMeal.type === 'meal' && (
+                <RecipePasteImport
+                  onParsed={(recipe) => {
+                    setEditTitle(recipe.title);
+                    setEditDescription(recipe.description || '');
+                    setEditInstructions(recipe.instructions || '');
+                    setEditIngredients(recipe.ingredients);
+                  }}
+                />
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Title *
@@ -782,6 +859,14 @@ export function Dashboard() {
                   placeholder="e.g., Beef tacos with all the fixings"
                 />
               </div>}
+              {editingMeal.type === 'meal' && (
+                <RecipeFields
+                  instructions={editInstructions}
+                  ingredients={editIngredients}
+                  onInstructionsChange={setEditInstructions}
+                  onIngredientsChange={setEditIngredients}
+                />
+              )}
               <div className="flex gap-3">
                 <button
                   type="button"

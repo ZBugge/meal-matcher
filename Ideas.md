@@ -10,13 +10,12 @@ No ungroomed ideas right now.
 
 ## Now
 
+- **Library export and import** — Transfer active home meals and takeout categories with versioned JSON, validation, preview, and duplicate reporting. Do not transfer IDs, ownership, tokens, counts, or history.
 
 ## Next
 
-- **Library export and import** — Transfer active home meals and takeout categories with versioned JSON, validation, preview, and duplicate reporting. Do not transfer IDs, ownership, tokens, counts, or history.
-- **Recipe and ingredient foundation** — Add recipe instructions and structured ingredient rows to home meals. Recipe visibility to session participants remains open.
+- **Weekly planning and shopping lists** — Choose three to five home meals in a separate planning flow and generate a checkable list grouped by meal, preserving ingredients as entered without unit consolidation.
 
 ## Later
 
-- **Weekly planning and shopping lists** — Choose three to five home meals in a separate planning flow and generate a checkable list grouped by meal, preserving ingredients as entered without unit consolidation.
 - **Pictures** — Support one image per home meal after choosing durable storage and deciding whether images appear on public session screens. Restaurant-specific images wait for a real restaurant model.

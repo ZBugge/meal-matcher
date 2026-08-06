@@ -12,6 +12,7 @@ MealMatch is a collaborative meal-decision app. A group creates a session, votes
 
 - The public home page (`/`) creates an account-free quick session. It defaults to takeout categories, still supports home meals, auto-joins the creator, stores participant/session data in browser storage, and gives an anonymous creator a secret token that can close the session.
 - Authenticated hosts can register or log in, manage separate home-meal and takeout-category libraries, create sessions, monitor participants, close sessions, view voter details, and select the final option.
+- Authenticated hosts can keep private recipe instructions and ordered free-text amount/ingredient rows on home meals. They can fill the editable meal form through a validated full-recipe paste format, and recipe data stays out of session participant payloads.
 - A new authenticated takeout library starts with a one-time onboarding choice: select popular categories or add a custom category. The dismissal is stored on the host record, and creating any takeout category also dismisses it, so onboarding does not return when the library later becomes empty.
 - Other participants join through a six-character invite code. The meal pool is fixed when a session is created, but a participant can update submitted choices while the session remains open.
 - Votes are numeric across every layer: `0 = no`, `1 = yes`, and `2 = maybe`. Results treat yes and maybe as acceptable, treat only all-yes as unanimous, and rank tied acceptance percentages by fewer maybes.
@@ -82,6 +83,7 @@ Playwright starts its server with a per-run database under `test-results/` and d
 - Protect authenticated host routes with both authentication and resource ownership checks. Anonymous close operations must validate the creator token without returning or logging it.
 - Express session storage currently uses the package default memory store. Do not assume login sessions are durable across server restarts or multiple production instances.
 - Public result responses must not expose voter identities. Host voter detail is allowed only after server-side host verification; a query-string flag alone is not authorization.
+- Recipe instructions and ingredients are private host-library data. Reject them for takeout categories, preserve ingredient order and free-text amounts, and never add recipe fields to public join, swipe, session, or result payloads.
 - Browser recovery uses both `sessionStorage` for join/session context and `localStorage` for in-progress swipes. Preserve the storage contracts when changing join, share, swipe, edit, or result flows.
 - Declare React hooks before conditional returns and keep effect dependencies accurate. Add regression coverage for async navigation, polling, and storage behavior.
 

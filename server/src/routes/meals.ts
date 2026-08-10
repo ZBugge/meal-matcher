@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runQuery, getOne, getAll, getDatabase, saveDatabase } from '../db/schema';
-import { Meal, MealIngredient, MealType, CreateMealRequest } from '../types';
+import {
+  Meal,
+  MealIngredient,
+  MealType,
+  CreateMealRequest,
+  LibraryExportData,
+  LibraryExportOption,
+} from '../types';
 import { requireAuth } from '../middleware/auth';
 import {
   normalizeIngredients,
@@ -9,6 +16,10 @@ import {
   parseRecipeText,
   RecipeValidationError,
 } from '../services/recipe';
+import {
+  LibraryTransferValidationError,
+  parseLibraryExport,
+} from '../services/library-transfer';
 
 const router = Router();
 
@@ -35,6 +46,7 @@ function toLibraryMealResponse(meal: Meal, includeArchived = false) {
     id: meal.id,
     title: meal.title,
     description: meal.description,
+    notes: meal.notes ?? null,
     type: meal.type,
     ...(includeArchived ? { archived: meal.archived === 1 } : {}),
     pickCount: meal.pick_count,
@@ -110,7 +122,7 @@ router.get('/', (req, res) => {
       ? [req.session.hostId, requestedType]
       : [req.session.hostId];
     const meals = getAll<Meal>(
-      `SELECT id, title, description, instructions, type, archived, pick_count, created_at,
+      `SELECT id, title, description, instructions, notes, type, archived, pick_count, created_at,
         (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
        FROM meals
        WHERE host_id = ? AND archived = 0${typeFilter}
@@ -139,7 +151,7 @@ router.get('/all', (req, res) => {
       ? [req.session.hostId, requestedType]
       : [req.session.hostId];
     const meals = getAll<Meal>(
-      `SELECT id, title, description, instructions, type, archived, pick_count, created_at,
+      `SELECT id, title, description, instructions, notes, type, archived, pick_count, created_at,
         (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
        FROM meals
        WHERE host_id = ?${typeFilter}
@@ -154,11 +166,120 @@ router.get('/all', (req, res) => {
   }
 });
 
+// GET /api/meals/export - Export active host library data without internal metadata
+router.get('/export', (req, res) => {
+  try {
+    const meals = getAll<Meal>(
+      `SELECT id, title, description, instructions, notes, type
+       FROM meals
+       WHERE host_id = ? AND archived = 0 AND type IN ('meal', 'category')
+       ORDER BY type, title`,
+      [req.session.hostId]
+    );
+    const options: LibraryExportOption[] = meals.map((meal) => meal.type === 'meal'
+      ? {
+          title: meal.title,
+          type: 'meal',
+          description: meal.description,
+          notes: meal.notes ?? null,
+          instructions: meal.instructions ?? null,
+          ingredients: getMealIngredients(meal.id),
+        }
+      : {
+          title: meal.title,
+          type: 'category',
+          notes: meal.notes ?? null,
+        });
+    const data: LibraryExportData = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      options,
+    };
+    res.json(data);
+  } catch (error) {
+    console.error('Export library error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/meals/import - Preview or import active library data
+router.post('/import', (req, res) => {
+  try {
+    const { data, dryRun } = req.body ?? {};
+    if (typeof dryRun !== 'boolean') {
+      res.status(400).json({ error: 'dryRun must be a boolean' });
+      return;
+    }
+
+    const { valid, invalid } = parseLibraryExport(data);
+    const existing = getAll<Pick<Meal, 'title' | 'type'>>(
+      `SELECT title, type FROM meals
+       WHERE host_id = ? AND archived = 0 AND type IN ('meal', 'category')`,
+      [req.session.hostId]
+    );
+    const seen = new Set(existing.map((meal) => `${meal.type}:${meal.title.toLowerCase()}`));
+    const duplicates: string[] = [];
+    const ready: LibraryExportOption[] = [];
+
+    valid.forEach((option) => {
+      const key = `${option.type}:${option.title.toLowerCase()}`;
+      if (seen.has(key)) {
+        duplicates.push(`${option.title} (${option.type})`);
+        return;
+      }
+      seen.add(key);
+      ready.push(option);
+    });
+
+    if (!dryRun && ready.length > 0) {
+      runTransaction((database) => {
+        ready.forEach((option) => {
+          const id = uuidv4();
+          database.run(
+            `INSERT INTO meals (id, host_id, title, description, instructions, notes, type)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+              id,
+              req.session.hostId,
+              option.title,
+              option.type === 'meal' ? option.description ?? null : null,
+              option.type === 'meal' ? option.instructions ?? null : null,
+              option.notes ?? null,
+              option.type,
+            ]
+          );
+          if (option.type === 'meal') addIngredients(database, id, option.ingredients ?? []);
+        });
+        if (ready.some((option) => option.type === 'category')) {
+          database.run(
+            'UPDATE hosts SET takeout_onboarding_dismissed = 1 WHERE id = ?',
+            [req.session.hostId]
+          );
+        }
+      });
+    }
+
+    res.json({
+      ready: ready.length,
+      imported: dryRun ? 0 : ready.length,
+      duplicates,
+      invalid,
+    });
+  } catch (error) {
+    if (error instanceof LibraryTransferValidationError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    console.error('Import library error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/meals/:id - Get one host-owned meal, including private recipe data
 router.get('/:id', (req, res) => {
   try {
     const meal = getOne<Meal>(
-      `SELECT id, title, description, instructions, type, archived, pick_count, created_at,
+      `SELECT id, title, description, instructions, notes, type, archived, pick_count, created_at,
         (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
        FROM meals
        WHERE id = ? AND host_id = ?`,
@@ -274,7 +395,7 @@ router.post('/', (req, res) => {
 router.patch('/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, instructions, ingredients } = req.body;
+    const { title, description, instructions, ingredients, notes } = req.body;
 
     // Verify ownership
     const meal = getOne<Meal>(
@@ -326,6 +447,15 @@ router.patch('/:id', (req, res) => {
       }
       updates.push('description = ?');
       params.push(description?.trim() || null);
+    }
+
+    if (notes !== undefined) {
+      if (notes !== null && typeof notes !== 'string') {
+        res.status(400).json({ error: 'Notes must be text' });
+        return;
+      }
+      updates.push('notes = ?');
+      params.push(notes?.trim() || null);
     }
 
     let normalizedIngredients: MealIngredient[] | undefined;

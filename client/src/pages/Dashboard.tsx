@@ -7,6 +7,8 @@ import {
   mealsApi,
   sessionsApi,
   Meal,
+  LibraryExportData,
+  LibraryImportPreview,
   RecipeIngredient,
   Session,
   SessionMode,
@@ -72,6 +74,12 @@ export function Dashboard() {
   const [editIngredients, setEditIngredients] = useState<RecipeIngredient[]>([]);
   const [viewingRecipe, setViewingRecipe] = useState<Meal | null>(null);
   const [loadingRecipeId, setLoadingRecipeId] = useState<string | null>(null);
+  const [notingMeal, setNotingMeal] = useState<Meal | null>(null);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [showLibraryImport, setShowLibraryImport] = useState(false);
+  const [libraryImportData, setLibraryImportData] = useState<LibraryExportData | null>(null);
+  const [libraryImportPreview, setLibraryImportPreview] = useState<LibraryImportPreview | null>(null);
+  const [libraryTransferLoading, setLibraryTransferLoading] = useState(false);
 
   // Animation states
   const [deletingMealIds, setDeletingMealIds] = useState<string[]>([]);
@@ -211,6 +219,16 @@ export function Dashboard() {
     setShowEditMeal(true);
   };
 
+  const openNotes = (meal: Meal) => {
+    setNotingMeal(meal);
+    setNotesDraft(meal.notes || '');
+  };
+
+  const closeNotes = () => {
+    setNotingMeal(null);
+    setNotesDraft('');
+  };
+
   const openRecipe = async (mealId: string, loadedMeal?: Meal) => {
     if (loadedMeal?.type === 'meal') {
       setViewingRecipe(loadedMeal);
@@ -266,6 +284,86 @@ export function Dashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update meal');
     }
+  };
+
+  const handleSaveNotes = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notingMeal) return;
+
+    try {
+      const updatedMeal = await mealsApi.update(notingMeal.id, { notes: notesDraft });
+      setMeals((current) => current.map((meal) =>
+        meal.id === notingMeal.id
+          ? {
+              ...meal,
+              ...updatedMeal,
+              lastSelectedAt: meal.lastSelectedAt,
+            }
+          : meal
+      ));
+      closeNotes();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save notes');
+    }
+  };
+
+  const handleExportLibrary = async () => {
+    setLibraryTransferLoading(true);
+    try {
+      const data = await mealsApi.exportLibrary();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json',
+      }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `mealmatch-library-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export library');
+    } finally {
+      setLibraryTransferLoading(false);
+    }
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setLibraryTransferLoading(true);
+    try {
+      const data = JSON.parse(await file.text()) as LibraryExportData;
+      const preview = await mealsApi.previewImport(data);
+      setLibraryImportData(data);
+      setLibraryImportPreview(preview);
+    } catch (err) {
+      setLibraryImportData(null);
+      setLibraryImportPreview(null);
+      setError(err instanceof Error ? err.message : 'Failed to read import file');
+    } finally {
+      setLibraryTransferLoading(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!libraryImportData) return;
+    setLibraryTransferLoading(true);
+    try {
+      const result = await mealsApi.importLibrary(libraryImportData);
+      setLibraryImportPreview(result);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import library');
+    } finally {
+      setLibraryTransferLoading(false);
+    }
+  };
+
+  const closeLibraryImport = () => {
+    setShowLibraryImport(false);
+    setLibraryImportData(null);
+    setLibraryImportPreview(null);
   };
 
   const handleDeleteMeal = async (id: string) => {
@@ -507,9 +605,26 @@ export function Dashboard() {
               )}
             </div>
             {!editMode && (
-              <button onClick={openAddMeal} className="btn btn-primary">
-                {activeMode === 'home' ? 'Add Meal' : 'Add Category'}
-              </button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportLibrary}
+                  disabled={libraryTransferLoading}
+                  className="btn btn-secondary"
+                >
+                  Export
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLibraryImport(true)}
+                  className="btn btn-secondary"
+                >
+                  Import
+                </button>
+                <button onClick={openAddMeal} className="btn btn-primary">
+                  {activeMode === 'home' ? 'Add Meal' : 'Add Category'}
+                </button>
+              </div>
             )}
           </div>
 
@@ -614,6 +729,14 @@ export function Dashboard() {
                         </div>
                         {!editMode && (
                           <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openNotes(meal)}
+                              className="text-sm text-gray-500 hover:text-primary-500"
+                              title={`View notes for ${meal.title}`}
+                            >
+                              Notes
+                            </button>
                             <button
                               onClick={() => openEditMeal(meal)}
                               className="text-gray-400 hover:text-primary-500"
@@ -821,6 +944,91 @@ export function Dashboard() {
         </div>
       )}
 
+      {/* Library Import Modal */}
+      {showLibraryImport && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div
+            className="card w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="library-import-title"
+          >
+            <h3 id="library-import-title" className="text-xl font-bold mb-2">Import library</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Choose a MealMatch JSON export to preview new options and duplicates before saving.
+            </p>
+            <label className="btn btn-secondary inline-block cursor-pointer">
+              Choose JSON file
+              <input
+                type="file"
+                accept="application/json,.json"
+                onChange={handleImportFile}
+                className="sr-only"
+                aria-label="Library JSON file"
+              />
+            </label>
+
+            {libraryTransferLoading && <p className="mt-4 text-sm text-gray-500">Checking file...</p>}
+
+            {libraryImportPreview && (
+              <div className="mt-5 space-y-3" aria-live="polite">
+                {libraryImportPreview.imported > 0 ? (
+                  <p className="rounded-lg bg-green-50 px-3 py-2 text-green-700">
+                    Imported {libraryImportPreview.imported} option{
+                      libraryImportPreview.imported === 1 ? '' : 's'
+                    }.
+                  </p>
+                ) : (
+                  <p className="font-medium">
+                    {libraryImportPreview.ready} option{
+                      libraryImportPreview.ready === 1 ? '' : 's'
+                    } ready to import
+                  </p>
+                )}
+                {libraryImportPreview.duplicates.length > 0 && (
+                  <div>
+                    <h4 className="font-medium">Duplicates skipped</h4>
+                    <ul className="list-disc pl-5 text-sm text-gray-600">
+                      {libraryImportPreview.duplicates.map((duplicate) => (
+                        <li key={duplicate}>{duplicate}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {libraryImportPreview.invalid.length > 0 && (
+                  <div>
+                    <h4 className="font-medium">Invalid entries skipped</h4>
+                    <ul className="list-disc pl-5 text-sm text-red-600">
+                      {libraryImportPreview.invalid.map((entry) => (
+                        <li key={`${entry.index}-${entry.error}`}>
+                          Option {entry.index + 1}: {entry.error}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-6">
+              <button type="button" onClick={closeLibraryImport} className="btn btn-secondary flex-1">
+                {libraryImportPreview?.imported ? 'Done' : 'Cancel'}
+              </button>
+              {libraryImportPreview && libraryImportPreview.imported === 0 && (
+                <button
+                  type="button"
+                  onClick={handleConfirmImport}
+                  disabled={libraryTransferLoading || libraryImportPreview.ready === 0}
+                  className="btn btn-primary flex-1"
+                >
+                  Import {libraryImportPreview.ready}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add Meal Modal */}
       {showAddMeal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -952,6 +1160,49 @@ export function Dashboard() {
                 </button>
                 <button type="submit" className="btn btn-primary flex-1">
                   Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Private Notes Modal */}
+      {notingMeal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div
+            className="card w-full max-w-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="private-notes-title"
+          >
+            <h3 id="private-notes-title" className="text-xl font-bold mb-2">
+              Notes for {notingMeal.title}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              These notes are private to your library and are not shared with session participants.
+            </p>
+            <form onSubmit={handleSaveNotes} className="space-y-4">
+              <div>
+                <label htmlFor="private-notes" className="block text-sm font-medium text-gray-700 mb-1">
+                  Private notes
+                </label>
+                <textarea
+                  id="private-notes"
+                  value={notesDraft}
+                  onChange={(event) => setNotesDraft(event.target.value)}
+                  className="input"
+                  rows={6}
+                  placeholder="e.g., Ask for the spicy sauce on the side"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={closeNotes} className="btn btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary flex-1">
+                  Save notes
                 </button>
               </div>
             </form>

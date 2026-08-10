@@ -84,6 +84,8 @@ Playwright starts its server with a per-run database under `test-results/` and d
 - Express session storage currently uses the package default memory store. Do not assume login sessions are durable across server restarts or multiple production instances.
 - Public result responses must not expose voter identities. Host voter detail is allowed only after server-side host verification; a query-string flag alone is not authorization.
 - Recipe instructions and ingredients are private host-library data. Reject them for takeout categories, preserve ingredient order and free-text amounts, never add recipe fields to public join, swipe, session, or result payloads, and load host recipe views through an authenticated ownership-checked meal route.
+- Private library notes are host-only data for both meals and categories. Keep them out of public join, swipe, session, and result payloads, and expose them only through authenticated ownership-checked meal routes.
+- Library transfers are authenticated, versioned JSON for active meals and categories. Preserve private recipe data, ingredient order, and notes, assign fresh IDs on import, and never transfer ownership, tokens, counts, history, archived records, or internal IDs.
 - Browser recovery uses both `sessionStorage` for join/session context and `localStorage` for in-progress swipes. Preserve the storage contracts when changing join, share, swipe, edit, or result flows.
 - Declare React hooks before conditional returns and keep effect dependencies accurate. Add regression coverage for async navigation, polling, and storage behavior.
 

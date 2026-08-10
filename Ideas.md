@@ -6,7 +6,9 @@ Keep this file lean. Add rough thoughts under `## Ungroomed ideas`; keep active 
 
 <!-- Add new, unreviewed ideas here. Rambling is welcome. -->
 
-No ungroomed ideas right now.
+for recent sessions it should show the winner not the random ID code
+
+there should be a notes section for every possible entry, like for restaurants you can leave notes about certain dishes, how you liked it etc. should not be immediately visible a user would have to want to go see the notes with an action.
 
 ## Now
 

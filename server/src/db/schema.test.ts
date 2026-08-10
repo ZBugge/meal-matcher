@@ -4,14 +4,17 @@ import initSqlJs from 'sql.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const testDatabasePath = path.join(__dirname, '../../data/schema-migration-test.db');
+const freshDatabasePath = path.join(__dirname, '../../data/schema-fresh-test.db');
 
 describe('database schema migrations', () => {
   afterEach(() => {
     delete process.env.DATABASE_PATH;
     vi.resetModules();
-    if (fs.existsSync(testDatabasePath)) {
-      fs.rmSync(testDatabasePath);
-    }
+    [testDatabasePath, freshDatabasePath].forEach((databasePath) => {
+      if (fs.existsSync(databasePath)) {
+        fs.rmSync(databasePath);
+      }
+    });
   });
 
   it('migrates existing meals and sessions to the mode-aware schema', async () => {
@@ -68,7 +71,39 @@ describe('database schema migrations', () => {
     expect(getOne<{ type: string }>('SELECT type FROM meals WHERE id = ?', ['meal-1'])?.type)
       .toBe('meal');
 
+    const mealColumns = migratedDatabase.exec('PRAGMA table_info(meals)')[0].values;
+    expect(mealColumns.some((column) => column[1] === 'instructions')).toBe(true);
+    const ingredientColumns = migratedDatabase.exec('PRAGMA table_info(meal_ingredients)')[0].values;
+    expect(ingredientColumns.map((column) => column[1])).toEqual([
+      'id',
+      'meal_id',
+      'amount',
+      'ingredient',
+      'display_order',
+    ]);
+
     const indexes = migratedDatabase.exec('PRAGMA index_list(meals)')[0].values;
     expect(indexes.some((index) => index[1] === 'idx_meals_host_type_archived')).toBe(true);
+    const ingredientIndexes = migratedDatabase.exec('PRAGMA index_list(meal_ingredients)')[0].values;
+    expect(ingredientIndexes.some((index) => index[1] === 'idx_meal_ingredients_meal_order'))
+      .toBe(true);
+  });
+
+  it('creates recipe storage in a fresh database', async () => {
+    process.env.DATABASE_PATH = freshDatabasePath;
+    vi.resetModules();
+    const { initializeDatabase } = await import('./schema');
+    const freshDatabase = await initializeDatabase();
+
+    const mealColumns = freshDatabase.exec('PRAGMA table_info(meals)')[0].values;
+    expect(mealColumns.some((column) => column[1] === 'instructions')).toBe(true);
+    const ingredientColumns = freshDatabase.exec('PRAGMA table_info(meal_ingredients)')[0].values;
+    expect(ingredientColumns.map((column) => column[1])).toEqual([
+      'id',
+      'meal_id',
+      'amount',
+      'ingredient',
+      'display_order',
+    ]);
   });
 });

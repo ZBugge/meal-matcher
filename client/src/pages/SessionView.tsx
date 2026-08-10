@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { sessionsApi, SessionDetails, MatchResult } from '../api/client';
+import { sessionsApi, SessionDetails, MatchResult, mealsApi, Meal } from '../api/client';
 import ConfirmModal from '../components/ConfirmModal';
+import RecipeViewer from '../components/RecipeViewer';
 
 export function SessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -10,6 +11,8 @@ export function SessionView() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [viewingRecipe, setViewingRecipe] = useState<Meal | null>(null);
+  const [loadingRecipeId, setLoadingRecipeId] = useState<string | null>(null);
 
   const loadSession = useCallback(async () => {
     if (!sessionId) return;
@@ -72,6 +75,18 @@ export function SessionView() {
       loadSession();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to select meal');
+    }
+  };
+
+  const handleViewRecipe = async (mealId: string) => {
+    setLoadingRecipeId(mealId);
+    try {
+      const meal = await mealsApi.get(mealId);
+      if (meal.type === 'meal') setViewingRecipe(meal);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load recipe');
+    } finally {
+      setLoadingRecipeId(null);
     }
   };
 
@@ -206,7 +221,20 @@ export function SessionView() {
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
                 <p className="text-green-700 font-medium">
                   Selected:{' '}
-                  {session.results.find((r) => r.mealId === session.selectedMealId)?.title}
+                  {session.mode === 'home' ? (
+                    <button
+                      type="button"
+                      disabled={loadingRecipeId === session.selectedMealId}
+                      onClick={() => handleViewRecipe(session.selectedMealId!)}
+                      className="font-semibold text-primary-700 hover:underline disabled:text-gray-400"
+                    >
+                      {loadingRecipeId === session.selectedMealId
+                        ? 'Loading recipe...'
+                        : session.results.find((r) => r.mealId === session.selectedMealId)?.title}
+                    </button>
+                  ) : (
+                    session.results.find((r) => r.mealId === session.selectedMealId)?.title
+                  )}
                 </p>
               </div>
             )}
@@ -220,6 +248,8 @@ export function SessionView() {
                   onSelect={() => handleSelectMeal(result.mealId)}
                   showVoters
                   canSelect={!session.selectedMealId}
+                  onViewRecipe={session.mode === 'home' ? handleViewRecipe : undefined}
+                  recipeLoading={loadingRecipeId === result.mealId}
                 />
               ))}
             </div>
@@ -232,7 +262,18 @@ export function SessionView() {
           <div className="grid gap-3 sm:grid-cols-2">
             {session.meals.map((meal) => (
               <div key={meal.id} className="border rounded-lg p-3">
-                <p className="font-medium">{meal.title}</p>
+                {session.mode === 'home' ? (
+                  <button
+                    type="button"
+                    disabled={loadingRecipeId === meal.id}
+                    onClick={() => handleViewRecipe(meal.id)}
+                    className="font-medium text-primary-700 hover:underline disabled:text-gray-400"
+                  >
+                    {loadingRecipeId === meal.id ? 'Loading recipe...' : meal.title}
+                  </button>
+                ) : (
+                  <p className="font-medium">{meal.title}</p>
+                )}
                 {meal.description && (
                   <p className="text-sm text-gray-500 mt-1">{meal.description}</p>
                 )}
@@ -252,6 +293,9 @@ export function SessionView() {
         onConfirm={closeSession}
         onCancel={() => setShowConfirmModal(false)}
       />
+      {viewingRecipe && (
+        <RecipeViewer meal={viewingRecipe} onClose={() => setViewingRecipe(null)} />
+      )}
     </div>
   );
 }
@@ -262,9 +306,19 @@ interface ResultCardProps {
   onSelect: () => void;
   showVoters?: boolean;
   canSelect?: boolean;
+  onViewRecipe?: (mealId: string) => void;
+  recipeLoading?: boolean;
 }
 
-function ResultCard({ result, isSelected, onSelect, showVoters, canSelect }: ResultCardProps) {
+function ResultCard({
+  result,
+  isSelected,
+  onSelect,
+  showVoters,
+  canSelect,
+  onViewRecipe,
+  recipeLoading,
+}: ResultCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -276,7 +330,18 @@ function ResultCard({ result, isSelected, onSelect, showVoters, canSelect }: Res
       <div className="flex justify-between items-start">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-lg">{result.title}</h3>
+            {onViewRecipe ? (
+              <button
+                type="button"
+                disabled={recipeLoading}
+                onClick={() => onViewRecipe(result.mealId)}
+                className="text-left text-lg font-semibold text-primary-700 hover:underline disabled:text-gray-400"
+              >
+                {recipeLoading ? 'Loading recipe...' : result.title}
+              </button>
+            ) : (
+              <h3 className="font-semibold text-lg">{result.title}</h3>
+            )}
             {result.isUnanimous && (
               <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded">
                 Unanimous!

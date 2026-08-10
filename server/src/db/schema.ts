@@ -48,6 +48,20 @@ function runMigrations(database: Database): void {
     database.run('ALTER TABLE hosts ADD COLUMN takeout_onboarding_dismissed INTEGER NOT NULL DEFAULT 0');
   }
 
+  if (!columnExists(database, 'meals', 'instructions')) {
+    database.run('ALTER TABLE meals ADD COLUMN instructions TEXT');
+  }
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS meal_ingredients (
+      id TEXT PRIMARY KEY,
+      meal_id TEXT NOT NULL REFERENCES meals(id),
+      amount TEXT NOT NULL DEFAULT '',
+      ingredient TEXT NOT NULL,
+      display_order INTEGER NOT NULL
+    )
+  `);
+
   database.run("UPDATE meals SET type = 'meal' WHERE type IS NULL OR TRIM(type) = ''");
   database.run(`
     UPDATE hosts
@@ -61,6 +75,10 @@ function runMigrations(database: Database): void {
   database.run(`
     CREATE INDEX IF NOT EXISTS idx_meals_host_type_archived
     ON meals(host_id, type, archived)
+  `);
+  database.run(`
+    CREATE INDEX IF NOT EXISTS idx_meal_ingredients_meal_order
+    ON meal_ingredients(meal_id, display_order)
   `);
 
   saveDatabase();
@@ -91,12 +109,22 @@ function createTables(database: Database): void {
       host_id TEXT NOT NULL REFERENCES hosts(id),
       title TEXT NOT NULL,
       description TEXT,
+      instructions TEXT,
       type TEXT DEFAULT 'meal',
       archived INTEGER DEFAULT 0,
       pick_count INTEGER DEFAULT 0,
       temporary INTEGER DEFAULT 0,
       creator_token TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Private recipe ingredients for home meals
+    CREATE TABLE IF NOT EXISTS meal_ingredients (
+      id TEXT PRIMARY KEY,
+      meal_id TEXT NOT NULL REFERENCES meals(id),
+      amount TEXT NOT NULL DEFAULT '',
+      ingredient TEXT NOT NULL,
+      display_order INTEGER NOT NULL
     );
 
     -- Swipe sessions
@@ -150,6 +178,7 @@ function createTables(database: Database): void {
     -- Create indexes for better query performance
     CREATE INDEX IF NOT EXISTS idx_meals_host_id ON meals(host_id);
     CREATE INDEX IF NOT EXISTS idx_meals_host_type_archived ON meals(host_id, type, archived);
+    CREATE INDEX IF NOT EXISTS idx_meal_ingredients_meal_order ON meal_ingredients(meal_id, display_order);
     CREATE INDEX IF NOT EXISTS idx_sessions_host_id ON sessions(host_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_invite_code ON sessions(invite_code);
     CREATE INDEX IF NOT EXISTS idx_session_meals_session_id ON session_meals(session_id);

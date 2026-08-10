@@ -16,6 +16,7 @@ export interface Meal {
   host_id: string;
   title: string;
   description: string | null;
+  instructions: string | null;
   type: MealType;
   archived: number; // SQLite boolean (0 or 1)
   pick_count: number;
@@ -23,6 +24,18 @@ export interface Meal {
   creator_token: string | null;
   created_at: string;
   last_selected_at?: string | null;
+}
+
+export interface MealIngredient {
+  amount: string;
+  ingredient: string;
+}
+
+export interface ParsedRecipe {
+  title: string;
+  description: string | null;
+  instructions: string | null;
+  ingredients: MealIngredient[];
 }
 
 export interface Session {
@@ -91,6 +104,8 @@ export interface CreateMealRequest {
   title: string;
   description?: string;
   type?: MealType;
+  instructions?: string | null;
+  ingredients?: MealIngredient[];
 }
 
 export interface CreateSessionRequest {

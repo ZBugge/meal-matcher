@@ -14,12 +14,20 @@ router.use(requireAuth);
 // GET /api/sessions - List host's sessions
 router.get('/', (req, res) => {
   try {
-    const sessions = getAll<Session & { meal_count: number; participant_count: number }>(
+    const sessions = getAll<Session & {
+      meal_count: number;
+      participant_count: number;
+      selected_meal_title: string | null;
+      selected_meal_type: Meal['type'] | null;
+    }>(
       `SELECT
         s.*,
+        selected_meal.title as selected_meal_title,
+        selected_meal.type as selected_meal_type,
         (SELECT COUNT(*) FROM session_meals WHERE session_id = s.id) as meal_count,
         (SELECT COUNT(*) FROM participants WHERE session_id = s.id) as participant_count
       FROM sessions s
+      LEFT JOIN meals selected_meal ON selected_meal.id = s.selected_meal_id
       WHERE s.host_id = ?
       ORDER BY s.created_at DESC`,
       [req.session.hostId]
@@ -31,6 +39,13 @@ router.get('/', (req, res) => {
       status: session.status,
       mode: session.mode,
       selectedMealId: session.selected_meal_id,
+      selectedMeal: session.selected_meal_id && session.selected_meal_title && session.selected_meal_type
+        ? {
+            id: session.selected_meal_id,
+            title: session.selected_meal_title,
+            type: session.selected_meal_type,
+          }
+        : null,
       mealCount: session.meal_count,
       participantCount: session.participant_count,
       createdAt: session.created_at,

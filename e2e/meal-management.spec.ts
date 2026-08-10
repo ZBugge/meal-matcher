@@ -61,6 +61,116 @@ test.describe('Meal Management (#17, #12)', () => {
     await expect(page.locator('text=Original Title')).not.toBeVisible();
   });
 
+  test('host can save a private recipe without exposing it to session participants', async ({ page, request }) => {
+    const uniqueEmail = `test-recipe-${Date.now()}@example.com`;
+    await registerAndGoToDashboard(page, uniqueEmail);
+
+    await page.getByRole('button', { name: 'Add Meal' }).click();
+    const addModal = page.locator('.card:has(h3:has-text("Add New Meal"))');
+    await addModal.getByRole('button', { name: 'Paste a full recipe' }).click();
+    await addModal.getByLabel('Recipe text to parse').fill(`Title: Garlic Soup
+Description: Creamy roasted garlic soup
+Ingredients:
+2 bulbs | garlic
+4oz | milk
+Instructions:
+Simmer until tender.`);
+    await addModal.getByRole('button', { name: 'Fill recipe form' }).click();
+    await expect(addModal.locator('input[placeholder="e.g., Tacos"]')).toHaveValue('Garlic Soup');
+    await expect(addModal.getByLabel('Ingredient 2 name')).toHaveValue('milk');
+    await addModal.getByRole('button', { name: 'Add Meal' }).click();
+
+    await expect(page.getByText('Recipe · 2 ingredients')).toBeVisible();
+    await page.reload();
+    await page.getByTitle('Edit meal').click();
+    const editModal = page.locator('.card:has(h3:has-text("Edit Meal"))');
+    await expect(editModal.locator('textarea[placeholder="Describe how to make this meal"]'))
+      .toHaveValue('Simmer until tender.');
+    await expect(editModal.getByLabel('Ingredient 1 amount')).toHaveValue('2 bulbs');
+    await expect(editModal.getByLabel('Ingredient 1 name')).toHaveValue('garlic');
+    await expect(editModal.getByLabel('Ingredient 2 amount')).toHaveValue('4oz');
+    await expect(editModal.getByLabel('Ingredient 2 name')).toHaveValue('milk');
+    await editModal.getByRole('button', { name: 'Cancel' }).click();
+
+    await page.getByRole('button', { name: 'Create Session' }).click();
+    await page.getByRole('button', { name: 'Create (1 options)' }).click();
+    const inviteUrl = await page.locator('input[readonly]').first().inputValue();
+    const inviteCode = inviteUrl.split('/join/')[1];
+
+    const joinResponse = await request.post(`/api/join/${inviteCode}`, {
+      data: { displayName: 'Recipe privacy check' },
+    });
+    expect(joinResponse.ok()).toBe(true);
+    const joinPayload = await joinResponse.json();
+    expect(joinPayload.meals[0]).toMatchObject({ title: 'Garlic Soup' });
+    expect(joinPayload.meals[0]).not.toHaveProperty('instructions');
+    expect(joinPayload.meals[0]).not.toHaveProperty('ingredients');
+
+    const sessionId = joinPayload.sessionId as string;
+    const mealId = joinPayload.meals[0].id as string;
+    const privateRecipe = await page.evaluate(async (id) => {
+      const response = await fetch(`/api/meals/${id}`);
+      return { status: response.status, body: await response.json() };
+    }, mealId);
+    expect(privateRecipe.status).toBe(200);
+    expect(privateRecipe.body).toMatchObject({
+      instructions: 'Simmer until tender.',
+      ingredients: [
+        { amount: '2 bulbs', ingredient: 'garlic' },
+        { amount: '4oz', ingredient: 'milk' },
+      ],
+    });
+
+    const unauthenticatedRecipe = await request.get(`/api/meals/${mealId}`);
+    expect(unauthenticatedRecipe.status()).toBe(401);
+
+    const swipeResponse = await request.post(`/api/swipes/${sessionId}`, {
+      data: {
+        participantId: joinPayload.participantId,
+        swipes: [{ mealId, vote: 1 }],
+      },
+    });
+    expect(swipeResponse.ok(), await swipeResponse.text()).toBe(true);
+
+    const closeResponse = await page.evaluate(async (id) => {
+      const response = await fetch(`/api/sessions/${id}/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      return response.status;
+    }, sessionId);
+    expect(closeResponse).toBe(200);
+
+    const selectResponse = await page.evaluate(async ({ id, selectedMealId }) => {
+      const response = await fetch(`/api/sessions/${id}/select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mealId: selectedMealId }),
+      });
+      return response.status;
+    }, { id: sessionId, selectedMealId: mealId });
+    expect(selectResponse).toBe(200);
+
+    const publicResults = await request.get(`/api/results/${sessionId}`);
+    expect(publicResults.ok()).toBe(true);
+    const publicResultsPayload = await publicResults.json();
+    expect(publicResultsPayload.results[0]).not.toHaveProperty('instructions');
+    expect(publicResultsPayload.results[0]).not.toHaveProperty('ingredients');
+
+    await page.goto(`/results/${sessionId}`);
+    await page.getByRole('button', { name: 'Garlic Soup' }).first().click();
+    const resultsRecipe = page.getByRole('dialog', { name: 'Garlic Soup' });
+    await expect(resultsRecipe.getByText('2 bulbs')).toBeVisible();
+    await expect(resultsRecipe.getByText('Simmer until tender.')).toBeVisible();
+    await resultsRecipe.getByRole('button', { name: 'Close recipe' }).click();
+
+    await page.goto('/dashboard');
+    const recentSessions = page.locator('section').filter({ hasText: 'Recent Sessions' });
+    await recentSessions.getByRole('button', { name: 'Garlic Soup' }).click();
+    await expect(page.getByRole('dialog', { name: 'Garlic Soup' })).toBeVisible();
+  });
+
   test('user can delete single meal with confirmation (#12)', async ({ page }) => {
     const uniqueEmail = `test-delete-${Date.now()}@example.com`;
     await registerAndGoToDashboard(page, uniqueEmail);

@@ -61,6 +61,89 @@ test.describe('Meal Management (#17, #12)', () => {
     await expect(page.locator('text=Original Title')).not.toBeVisible();
   });
 
+  test('host can export, preview, and import active library data', async ({ page }) => {
+    const uniqueEmail = `test-transfer-${Date.now()}@example.com`;
+    await registerAndGoToDashboard(page, uniqueEmail);
+    await addMeal(page, 'Backup Soup', 'Warm and filling');
+
+    await page.getByRole('button', { name: 'Notes' }).click();
+    const notesDialog = page.getByRole('dialog', { name: 'Notes for Backup Soup' });
+    await notesDialog.getByLabel('Private notes').fill('Serve with bread.');
+    await notesDialog.getByRole('button', { name: 'Save notes' }).click();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^mealmatch-library-\d{4}-\d{2}-\d{2}\.json$/);
+
+    const exported = await page.evaluate(async () => {
+      const response = await fetch('/api/meals/export');
+      return { status: response.status, body: await response.json() };
+    });
+    expect(exported.status).toBe(200);
+    expect(exported.body).toMatchObject({
+      version: 1,
+      options: [{
+        title: 'Backup Soup',
+        type: 'meal',
+        description: 'Warm and filling',
+        notes: 'Serve with bread.',
+        instructions: null,
+        ingredients: [],
+      }],
+    });
+    expect(exported.body.options[0]).not.toHaveProperty('id');
+    expect(exported.body.options[0]).not.toHaveProperty('pickCount');
+    expect(exported.body.options[0]).not.toHaveProperty('hostId');
+
+    await page.getByTitle('Archive meal').click();
+    await page.getByRole('button', { name: 'Confirm' }).click();
+    await expect(page.getByText('Backup Soup', { exact: true })).not.toBeVisible();
+
+    const preview = await page.evaluate(async (data) => {
+      const response = await fetch('/api/meals/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, dryRun: true }),
+      });
+      return { status: response.status, body: await response.json() };
+    }, exported.body);
+    expect(preview).toMatchObject({
+      status: 200,
+      body: { ready: 1, imported: 0, duplicates: [], invalid: [] },
+    });
+
+    const imported = await page.evaluate(async (data) => {
+      const response = await fetch('/api/meals/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, dryRun: false }),
+      });
+      return { status: response.status, body: await response.json() };
+    }, exported.body);
+    expect(imported).toMatchObject({ status: 200, body: { ready: 1, imported: 1 } });
+
+    await page.reload();
+    await expect(page.getByText('Backup Soup', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Notes' }).click();
+    await expect(page.getByLabel('Private notes')).toHaveValue('Serve with bread.');
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    const duplicatePreview = await page.evaluate(async (data) => {
+      const response = await fetch('/api/meals/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, dryRun: true }),
+      });
+      return response.json();
+    }, exported.body);
+    expect(duplicatePreview).toMatchObject({
+      ready: 0,
+      imported: 0,
+      duplicates: ['Backup Soup (meal)'],
+    });
+  });
+
   test('host can save private recipe details and notes without exposing them to session participants', async ({ page, request }) => {
     const uniqueEmail = `test-recipe-${Date.now()}@example.com`;
     await registerAndGoToDashboard(page, uniqueEmail);

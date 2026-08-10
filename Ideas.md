@@ -6,6 +6,8 @@ Keep this file lean. Add rough thoughts under `## Ungroomed ideas`; keep active 
 
 <!-- Add new, unreviewed ideas here. Rambling is welcome. -->
 
+some way to incorporate sides into the process. deciding on a main is one thing but sometimes for a big group youll want to make more. interview me more deeply on this idea.
+
 ## Now
 
 - **Make selected winners prominent in recent sessions** — On closed sessions with a final selection, lead with the winning meal/category name and retain the invite code as secondary session metadata. Do not invent a winner for sessions without a final selection.

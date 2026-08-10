@@ -109,6 +109,21 @@ export interface CreateMealRequest {
   ingredients?: MealIngredient[];
 }
 
+export interface LibraryExportOption {
+  title: string;
+  type: 'meal' | 'category';
+  description?: string | null;
+  notes?: string | null;
+  instructions?: string | null;
+  ingredients?: MealIngredient[];
+}
+
+export interface LibraryExportData {
+  version: 1;
+  exportedAt: string;
+  options: LibraryExportOption[];
+}
+
 export interface CreateSessionRequest {
   mealIds: string[];
   mode?: SessionMode;

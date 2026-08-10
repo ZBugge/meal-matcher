@@ -10,10 +10,6 @@ Keep this file lean. Add rough thoughts under `## Ungroomed ideas`; keep active 
 
 - **Make selected winners prominent in recent sessions** — On closed sessions with a final selection, lead with the winning meal/category name and retain the invite code as secondary session metadata. Do not invent a winner for sessions without a final selection.
 
-- **Private library notes** — Let hosts add one private free-text note to each home meal or takeout category, opened deliberately from the library rather than shown on cards. Keep notes out of session, swipe, and public-result payloads; defer restaurant/dish-specific notes until a real restaurant model exists.
-
-- **Library export and import** — Transfer active home meals and takeout categories with versioned JSON, validation, preview, and duplicate reporting. Do not transfer IDs, ownership, tokens, counts, or history.
-
 ## Next
 
 - **Weekly planning and shopping lists** — Choose three to five home meals in a separate planning flow and generate a checkable list grouped by meal, preserving ingredients as entered without unit consolidation.

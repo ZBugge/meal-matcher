@@ -8,6 +8,10 @@ Keep this file lean. Add rough thoughts under `## Ungroomed ideas`; keep active 
 
 some way to incorporate sides into the process. deciding on a main is one thing but sometimes for a big group youll want to make more. interview me more deeply on this idea.
 
+Move the Create Session to the top above the Recipes, and have the Recipe section be collapsible. When there are a lot of recipes, you just have to scroll forever. Make the History collapsible as well. Searchable, too. 
+
+Mid-session, someone might have an idea that wasn't originally put in there. We should think about a way to have a user input an option while voting, and that would show up in other people's options. 
+
 ## Now
 
 - **Private library notes** — Let hosts add one private free-text note to each home meal or takeout category, opened deliberately from the library rather than shown on cards. Keep notes out of session, swipe, and public-result payloads; defer restaurant/dish-specific notes until a real restaurant model exists.

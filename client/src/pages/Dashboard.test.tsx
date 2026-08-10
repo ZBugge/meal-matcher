@@ -1262,6 +1262,10 @@ Blend and simmer.`;
 
     const recentSessions = (await screen.findByText('Recent Sessions')).closest('section');
     expect(recentSessions).not.toBeNull();
+    expect(within(recentSessions!).getByRole('heading', { name: /Winner:\s*Garlic soup/ }))
+      .toBeInTheDocument();
+    expect(within(recentSessions!).getByText('Invite code:', { exact: false })).toBeInTheDocument();
+    expect(within(recentSessions!).getByText('ABC123')).toBeInTheDocument();
     fireEvent.click(within(recentSessions!).getByRole('button', { name: 'Garlic soup' }));
 
     await waitFor(() => expect(mealsApi.get).toHaveBeenCalledWith('recipe-1'));
@@ -1321,6 +1325,32 @@ Blend and simmer.`;
     fireEvent.click(screen.getByRole('button', { name: 'Notes' }));
 
     expect(screen.getByRole('dialog', { name: 'Notes for Thai food' })).toBeInTheDocument();
+  });
+
+  it('does not show a winner heading when a closed session has no final selection', async () => {
+    vi.mocked(sessionsApi.list).mockResolvedValue([{
+      id: 'session-1',
+      inviteCode: 'ABC123',
+      status: 'closed',
+      mode: 'home',
+      selectedMealId: null,
+      selectedMeal: null,
+      mealCount: 1,
+      participantCount: 2,
+      createdAt: '2024-01-01',
+      closedAt: '2024-01-01',
+    }]);
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    const recentSessions = (await screen.findByText('Recent Sessions')).closest('section');
+    expect(recentSessions).not.toBeNull();
+    expect(within(recentSessions!).queryByRole('heading', { name: /Winner:/ })).not.toBeInTheDocument();
+    expect(within(recentSessions!).getByText('ABC123')).toBeInTheDocument();
   });
 
   it('does not show recipe fields for takeout categories', async () => {

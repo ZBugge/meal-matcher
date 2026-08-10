@@ -39,6 +39,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Body parsers
+app.use('/api/meals/import', express.json({ limit: '5mb' }));
 app.use(express.json());
 
 // Session middleware

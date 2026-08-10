@@ -52,6 +52,10 @@ function runMigrations(database: Database): void {
     database.run('ALTER TABLE meals ADD COLUMN instructions TEXT');
   }
 
+  if (!columnExists(database, 'meals', 'notes')) {
+    database.run('ALTER TABLE meals ADD COLUMN notes TEXT');
+  }
+
   database.run(`
     CREATE TABLE IF NOT EXISTS meal_ingredients (
       id TEXT PRIMARY KEY,
@@ -110,6 +114,7 @@ function createTables(database: Database): void {
       title TEXT NOT NULL,
       description TEXT,
       instructions TEXT,
+      notes TEXT,
       type TEXT DEFAULT 'meal',
       archived INTEGER DEFAULT 0,
       pick_count INTEGER DEFAULT 0,

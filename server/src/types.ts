@@ -17,6 +17,7 @@ export interface Meal {
   title: string;
   description: string | null;
   instructions: string | null;
+  notes: string | null;
   type: MealType;
   archived: number; // SQLite boolean (0 or 1)
   pick_count: number;
@@ -106,6 +107,21 @@ export interface CreateMealRequest {
   type?: MealType;
   instructions?: string | null;
   ingredients?: MealIngredient[];
+}
+
+export interface LibraryExportOption {
+  title: string;
+  type: 'meal' | 'category';
+  description?: string | null;
+  notes?: string | null;
+  instructions?: string | null;
+  ingredients?: MealIngredient[];
+}
+
+export interface LibraryExportData {
+  version: 1;
+  exportedAt: string;
+  options: LibraryExportOption[];
 }
 
 export interface CreateSessionRequest {

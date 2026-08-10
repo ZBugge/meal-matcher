@@ -73,6 +73,7 @@ describe('database schema migrations', () => {
 
     const mealColumns = migratedDatabase.exec('PRAGMA table_info(meals)')[0].values;
     expect(mealColumns.some((column) => column[1] === 'instructions')).toBe(true);
+    expect(mealColumns.some((column) => column[1] === 'notes')).toBe(true);
     const ingredientColumns = migratedDatabase.exec('PRAGMA table_info(meal_ingredients)')[0].values;
     expect(ingredientColumns.map((column) => column[1])).toEqual([
       'id',
@@ -97,6 +98,7 @@ describe('database schema migrations', () => {
 
     const mealColumns = freshDatabase.exec('PRAGMA table_info(meals)')[0].values;
     expect(mealColumns.some((column) => column[1] === 'instructions')).toBe(true);
+    expect(mealColumns.some((column) => column[1] === 'notes')).toBe(true);
     const ingredientColumns = freshDatabase.exec('PRAGMA table_info(meal_ingredients)')[0].values;
     expect(ingredientColumns.map((column) => column[1])).toEqual([
       'id',

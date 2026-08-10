@@ -103,6 +103,7 @@ export interface Meal {
   id: string;
   title: string;
   description: string | null;
+  notes?: string | null;
   instructions?: string | null;
   ingredients?: RecipeIngredient[];
   type: MealType;
@@ -112,7 +113,43 @@ export interface Meal {
   archived?: boolean;
 }
 
+export interface LibraryExportOption {
+  title: string;
+  type: 'meal' | 'category';
+  description?: string | null;
+  notes?: string | null;
+  instructions?: string | null;
+  ingredients?: RecipeIngredient[];
+}
+
+export interface LibraryExportData {
+  version: 1;
+  exportedAt: string;
+  options: LibraryExportOption[];
+}
+
+export interface LibraryImportPreview {
+  ready: number;
+  imported: number;
+  duplicates: string[];
+  invalid: Array<{ index: number; error: string }>;
+}
+
 export const mealsApi = {
+  exportLibrary: () => request<LibraryExportData>('/meals/export'),
+
+  previewImport: (data: unknown) =>
+    request<LibraryImportPreview>('/meals/import', {
+      method: 'POST',
+      body: JSON.stringify({ data, dryRun: true }),
+    }),
+
+  importLibrary: (data: unknown) =>
+    request<LibraryImportPreview>('/meals/import', {
+      method: 'POST',
+      body: JSON.stringify({ data, dryRun: false }),
+    }),
+
   parseRecipe: (text: string) =>
     request<ParsedRecipe>('/meals/parse-recipe', {
       method: 'POST',
@@ -140,7 +177,13 @@ export const mealsApi = {
 
   update: (
     id: string,
-    data: { title?: string; description?: string; instructions?: string | null; ingredients?: RecipeIngredient[] }
+    data: {
+      title?: string;
+      description?: string;
+      notes?: string | null;
+      instructions?: string | null;
+      ingredients?: RecipeIngredient[];
+    }
   ) =>
     request<Meal>(`/meals/${id}`, {
       method: 'PATCH',

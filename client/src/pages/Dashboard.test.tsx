@@ -16,6 +16,9 @@ vi.mock('../api/client', () => ({
     updatePreferences: vi.fn(),
   },
   mealsApi: {
+    exportLibrary: vi.fn(),
+    previewImport: vi.fn(),
+    importLibrary: vi.fn(),
     parseRecipe: vi.fn(),
     list: vi.fn(),
     get: vi.fn(),
@@ -1272,6 +1275,61 @@ Blend and simmer.`;
     expect(screen.getByRole('dialog', { name: 'Garlic soup' })).toBeInTheDocument();
   });
 
+  it('saves notes through a deliberate action without displaying them on the library card', async () => {
+    vi.mocked(mealsApi.update).mockResolvedValue({
+      ...recipeMeal,
+      notes: 'Ask for extra basil.',
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('Garlic soup');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Notes' })[0]);
+
+    const dialog = screen.getByRole('dialog', { name: 'Notes for Garlic soup' });
+    expect(within(dialog).getByText(/not shared with session participants/)).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText('Private notes'), {
+      target: { value: 'Ask for extra basil.' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save notes' }));
+
+    await waitFor(() => {
+      expect(mealsApi.update).toHaveBeenCalledWith('recipe-1', { notes: 'Ask for extra basil.' });
+    });
+    expect(screen.queryByRole('dialog', { name: 'Notes for Garlic soup' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Ask for extra basil.')).not.toBeInTheDocument();
+  });
+
+  it('opens the notes action for takeout categories', async () => {
+    vi.mocked(mealsApi.list).mockImplementation(async (type) =>
+      type === 'category'
+        ? [{
+            ...mockMeals[0],
+            id: 'category-1',
+            title: 'Thai food',
+            description: null,
+            type: 'category',
+          }]
+        : []
+    );
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('My Meals');
+    fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Notes' }));
+
+    expect(screen.getByRole('dialog', { name: 'Notes for Thai food' })).toBeInTheDocument();
+  });
+
   it('does not show a winner heading when a closed session has no final selection', async () => {
     vi.mocked(sessionsApi.list).mockResolvedValue([{
       id: 'session-1',
@@ -1296,6 +1354,45 @@ Blend and simmer.`;
     expect(recentSessions).not.toBeNull();
     expect(within(recentSessions!).queryByRole('heading', { name: /Winner:/ })).not.toBeInTheDocument();
     expect(within(recentSessions!).getByText('ABC123')).toBeInTheDocument();
+  });
+
+  it('previews duplicates before importing a library file', async () => {
+    const data = {
+      version: 1 as const,
+      exportedAt: '2026-08-10T12:00:00.000Z',
+      options: [{ title: 'Soup', type: 'meal' as const }],
+    };
+    vi.mocked(mealsApi.previewImport).mockResolvedValue({
+      ready: 1,
+      imported: 0,
+      duplicates: ['Pizza (meal)'],
+      invalid: [],
+    });
+    vi.mocked(mealsApi.importLibrary).mockResolvedValue({
+      ready: 1,
+      imported: 1,
+      duplicates: ['Pizza (meal)'],
+      invalid: [],
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('My Meals');
+    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+    fireEvent.change(screen.getByLabelText('Library JSON file'), {
+      target: { files: [{ text: async () => JSON.stringify(data) }] },
+    });
+
+    expect(await screen.findByText('1 option ready to import')).toBeInTheDocument();
+    expect(screen.getByText('Pizza (meal)')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Import 1' }));
+
+    await waitFor(() => expect(mealsApi.importLibrary).toHaveBeenCalledWith(data));
+    expect(await screen.findByText('Imported 1 option.')).toBeInTheDocument();
   });
 
   it('does not show recipe fields for takeout categories', async () => {

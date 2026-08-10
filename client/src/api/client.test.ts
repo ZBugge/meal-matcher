@@ -128,4 +128,39 @@ describe('API Client - Session Closed Handling', () => {
 
     expect(mockFetch).toHaveBeenCalledWith('/api/meals/meal-123', expect.any(Object));
   });
+
+  it('sends private library notes only to the authenticated meal endpoint', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        id: 'meal-123',
+        title: 'Thai food',
+        description: null,
+        notes: 'Ask for mild spice.',
+        type: 'category',
+        pickCount: 1,
+      }),
+    });
+
+    await mealsApi.update('meal-123', { notes: 'Ask for mild spice.' });
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/meals/meal-123', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({ notes: 'Ask for mild spice.' }),
+    }));
+  });
+
+  it('previews and confirms versioned library imports', async () => {
+    const data = { version: 1 as const, exportedAt: '2026-08-10T00:00:00Z', options: [] };
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ ready: 0, imported: 0, duplicates: [], invalid: [] }),
+    });
+
+    await mealsApi.previewImport(data);
+    await mealsApi.importLibrary(data);
+
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({ data, dryRun: true });
+    expect(JSON.parse(mockFetch.mock.calls[1][1].body)).toEqual({ data, dryRun: false });
+  });
 });

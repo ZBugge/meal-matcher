@@ -686,45 +686,64 @@ export function Dashboard() {
                 >
                   <div className="flex justify-between items-center">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-lg">{session.inviteCode}</span>
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700">
-                          {session.mode === 'takeout' ? 'Order out' : 'Cook at home'}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            session.status === 'open'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          {session.status}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {session.mealCount} options · {session.participantCount} participants
-                      </p>
-                      {session.selectedMeal && (
-                        <p className="mt-1 text-sm text-gray-600">
-                          Selected:{' '}
-                          {session.selectedMeal.type === 'meal' ? (
-                            <button
-                              type="button"
-                              disabled={loadingRecipeId === session.selectedMeal.id}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openRecipe(session.selectedMeal!.id);
-                              }}
-                              className="font-medium text-primary-700 hover:underline disabled:text-gray-400"
+                      {session.status === 'closed' && session.selectedMeal ? (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-bold text-gray-900">
+                              Winner:{' '}
+                              {session.selectedMeal.type === 'meal' ? (
+                                <button
+                                  type="button"
+                                  disabled={loadingRecipeId === session.selectedMeal.id}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openRecipe(session.selectedMeal!.id);
+                                  }}
+                                  className="text-primary-700 hover:underline disabled:text-gray-400"
+                                >
+                                  {loadingRecipeId === session.selectedMeal.id
+                                    ? 'Loading recipe...'
+                                    : session.selectedMeal.title}
+                                </button>
+                              ) : (
+                                session.selectedMeal.title
+                              )}
+                            </h3>
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700">
+                              {session.mode === 'takeout' ? 'Order out' : 'Cook at home'}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                              {session.status}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {session.mealCount} options · {session.participantCount} participants
+                          </p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Invite code: <span className="font-mono font-medium">{session.inviteCode}</span>
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-lg">{session.inviteCode}</span>
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700">
+                              {session.mode === 'takeout' ? 'Order out' : 'Cook at home'}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                session.status === 'open'
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-gray-100 text-gray-700'
+                              }`}
                             >
-                              {loadingRecipeId === session.selectedMeal.id
-                                ? 'Loading recipe...'
-                                : session.selectedMeal.title}
-                            </button>
-                          ) : (
-                            <span className="font-medium">{session.selectedMeal.title}</span>
-                          )}
-                        </p>
+                              {session.status}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {session.mealCount} options · {session.participantCount} participants
+                          </p>
+                        </>
                       )}
                     </div>
                     <svg

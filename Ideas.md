@@ -6,11 +6,11 @@ Keep this file lean. Add rough thoughts under `## Ungroomed ideas`; keep active 
 
 <!-- Add new, unreviewed ideas here. Rambling is welcome. -->
 
-for recent sessions it should show the winner not the random ID code
-
-there should be a notes section for every possible entry, like for restaurants you can leave notes about certain dishes, how you liked it etc. should not be immediately visible a user would have to want to go see the notes with an action.
-
 ## Now
+
+- **Make selected winners prominent in recent sessions** — On closed sessions with a final selection, lead with the winning meal/category name and retain the invite code as secondary session metadata. Do not invent a winner for sessions without a final selection.
+
+- **Private library notes** — Let hosts add one private free-text note to each home meal or takeout category, opened deliberately from the library rather than shown on cards. Keep notes out of session, swipe, and public-result payloads; defer restaurant/dish-specific notes until a real restaurant model exists.
 
 - **Library export and import** — Transfer active home meals and takeout categories with versioned JSON, validation, preview, and duplicate reporting. Do not transfer IDs, ownership, tokens, counts, or history.
 

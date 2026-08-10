@@ -90,6 +90,7 @@ Playwright starts its server with a per-run database under `test-results/` and d
 ## Change workflow
 
 - Check `git status` before editing and preserve unrelated or pre-existing work.
+- Accepted backlog-only grooming in `Ideas.md` may be committed and pushed directly to `master`; keep feature-completion cleanup on that feature's branch and PR.
 - Make the smallest coherent change; avoid new production dependencies unless they materially simplify the requested behavior.
 - For an API contract change, update the route, `server/src/types.ts`, `client/src/api/client.ts`, all consumers, and tests together.
 - For a schema change, update fresh-database creation, existing-database migration, server types, queries, and tests together.

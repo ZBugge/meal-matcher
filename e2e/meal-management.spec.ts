@@ -21,7 +21,7 @@ test.describe('Meal Management (#17, #12)', () => {
     await modal.locator('input.input').fill(title);
 
     if (description) {
-      await modal.locator('textarea.input').fill(description);
+      await modal.locator('textarea[placeholder="e.g., Beef tacos with all the fixings"]').fill(description);
     }
 
     await modal.locator('button:has-text("Add Meal")').click();
@@ -50,7 +50,7 @@ test.describe('Meal Management (#17, #12)', () => {
     // When: User changes title and description
     const editModal = page.locator('.card:has(h3:has-text("Edit Meal"))');
     await editModal.locator('input.input').fill('Updated Title');
-    await editModal.locator('textarea.input').fill('Updated description');
+    await editModal.locator('textarea[placeholder="e.g., Beef tacos with all the fixings"]').fill('Updated description');
     await editModal.locator('button:has-text("Save")').click();
 
     // Then: Updated meal appears in the list
@@ -61,7 +61,7 @@ test.describe('Meal Management (#17, #12)', () => {
     await expect(page.locator('text=Original Title')).not.toBeVisible();
   });
 
-  test('host can save a private recipe without exposing it to session participants', async ({ page, request }) => {
+  test('host can save private recipe details and notes without exposing them to session participants', async ({ page, request }) => {
     const uniqueEmail = `test-recipe-${Date.now()}@example.com`;
     await registerAndGoToDashboard(page, uniqueEmail);
 
@@ -92,6 +92,18 @@ Simmer until tender.`);
     await expect(editModal.getByLabel('Ingredient 2 name')).toHaveValue('milk');
     await editModal.getByRole('button', { name: 'Cancel' }).click();
 
+    await page.getByRole('button', { name: 'Notes' }).click();
+    const notesDialog = page.getByRole('dialog', { name: 'Notes for Garlic Soup' });
+    await notesDialog.getByLabel('Private notes').fill('Order extra crusty bread.');
+    await notesDialog.getByRole('button', { name: 'Save notes' }).click();
+    await expect(notesDialog).not.toBeVisible();
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Notes' }).click();
+    const reloadedNotesDialog = page.getByRole('dialog', { name: 'Notes for Garlic Soup' });
+    await expect(reloadedNotesDialog.getByLabel('Private notes')).toHaveValue('Order extra crusty bread.');
+    await reloadedNotesDialog.getByRole('button', { name: 'Cancel' }).click();
+
     await page.getByRole('button', { name: 'Create Session' }).click();
     await page.getByRole('button', { name: 'Create (1 options)' }).click();
     const inviteUrl = await page.locator('input[readonly]').first().inputValue();
@@ -105,6 +117,7 @@ Simmer until tender.`);
     expect(joinPayload.meals[0]).toMatchObject({ title: 'Garlic Soup' });
     expect(joinPayload.meals[0]).not.toHaveProperty('instructions');
     expect(joinPayload.meals[0]).not.toHaveProperty('ingredients');
+    expect(joinPayload.meals[0]).not.toHaveProperty('notes');
 
     const sessionId = joinPayload.sessionId as string;
     const mealId = joinPayload.meals[0].id as string;
@@ -115,6 +128,7 @@ Simmer until tender.`);
     expect(privateRecipe.status).toBe(200);
     expect(privateRecipe.body).toMatchObject({
       instructions: 'Simmer until tender.',
+      notes: 'Order extra crusty bread.',
       ingredients: [
         { amount: '2 bulbs', ingredient: 'garlic' },
         { amount: '4oz', ingredient: 'milk' },
@@ -157,6 +171,7 @@ Simmer until tender.`);
     const publicResultsPayload = await publicResults.json();
     expect(publicResultsPayload.results[0]).not.toHaveProperty('instructions');
     expect(publicResultsPayload.results[0]).not.toHaveProperty('ingredients');
+    expect(publicResultsPayload.results[0]).not.toHaveProperty('notes');
 
     await page.goto(`/results/${sessionId}`);
     await page.getByRole('button', { name: 'Garlic Soup' }).first().click();
@@ -249,10 +264,10 @@ Simmer until tender.`);
     // Wait for modal to close
     await expect(page.locator('text=/Delete 2 Meals/')).not.toBeVisible({ timeout: 5000 });
 
-    // Then: Only the unselected meal remains (check card headings specifically)
-    await expect(page.locator('h3:has-text("Keep This One")')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('h3:has-text("Bulk Delete 1")')).not.toBeVisible();
-    await expect(page.locator('h3:has-text("Bulk Delete 2")')).not.toBeVisible();
+    // Then: Only the unselected meal remains
+    await expect(page.getByText('Keep This One', { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Bulk Delete 1', { exact: true })).not.toBeVisible();
+    await expect(page.getByText('Bulk Delete 2', { exact: true })).not.toBeVisible();
   });
 
   test('edit mode can be toggled on and off', async ({ page }) => {

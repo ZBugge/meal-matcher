@@ -72,6 +72,8 @@ export function Dashboard() {
   const [editIngredients, setEditIngredients] = useState<RecipeIngredient[]>([]);
   const [viewingRecipe, setViewingRecipe] = useState<Meal | null>(null);
   const [loadingRecipeId, setLoadingRecipeId] = useState<string | null>(null);
+  const [notingMeal, setNotingMeal] = useState<Meal | null>(null);
+  const [notesDraft, setNotesDraft] = useState('');
 
   // Animation states
   const [deletingMealIds, setDeletingMealIds] = useState<string[]>([]);
@@ -211,6 +213,16 @@ export function Dashboard() {
     setShowEditMeal(true);
   };
 
+  const openNotes = (meal: Meal) => {
+    setNotingMeal(meal);
+    setNotesDraft(meal.notes || '');
+  };
+
+  const closeNotes = () => {
+    setNotingMeal(null);
+    setNotesDraft('');
+  };
+
   const openRecipe = async (mealId: string, loadedMeal?: Meal) => {
     if (loadedMeal?.type === 'meal') {
       setViewingRecipe(loadedMeal);
@@ -265,6 +277,27 @@ export function Dashboard() {
       setEditIngredients([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update meal');
+    }
+  };
+
+  const handleSaveNotes = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notingMeal) return;
+
+    try {
+      const updatedMeal = await mealsApi.update(notingMeal.id, { notes: notesDraft });
+      setMeals((current) => current.map((meal) =>
+        meal.id === notingMeal.id
+          ? {
+              ...meal,
+              ...updatedMeal,
+              lastSelectedAt: meal.lastSelectedAt,
+            }
+          : meal
+      ));
+      closeNotes();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save notes');
     }
   };
 
@@ -615,6 +648,14 @@ export function Dashboard() {
                         {!editMode && (
                           <div className="flex gap-2">
                             <button
+                              type="button"
+                              onClick={() => openNotes(meal)}
+                              className="text-sm text-gray-500 hover:text-primary-500"
+                              title={`View notes for ${meal.title}`}
+                            >
+                              Notes
+                            </button>
+                            <button
                               onClick={() => openEditMeal(meal)}
                               className="text-gray-400 hover:text-primary-500"
                               title={meal.type === 'category' ? 'Edit category' : 'Edit meal'}
@@ -933,6 +974,49 @@ export function Dashboard() {
                 </button>
                 <button type="submit" className="btn btn-primary flex-1">
                   Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Private Notes Modal */}
+      {notingMeal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div
+            className="card w-full max-w-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="private-notes-title"
+          >
+            <h3 id="private-notes-title" className="text-xl font-bold mb-2">
+              Notes for {notingMeal.title}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              These notes are private to your library and are not shared with session participants.
+            </p>
+            <form onSubmit={handleSaveNotes} className="space-y-4">
+              <div>
+                <label htmlFor="private-notes" className="block text-sm font-medium text-gray-700 mb-1">
+                  Private notes
+                </label>
+                <textarea
+                  id="private-notes"
+                  value={notesDraft}
+                  onChange={(event) => setNotesDraft(event.target.value)}
+                  className="input"
+                  rows={6}
+                  placeholder="e.g., Ask for the spicy sauce on the side"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={closeNotes} className="btn btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary flex-1">
+                  Save notes
                 </button>
               </div>
             </form>

@@ -1268,6 +1268,61 @@ Blend and simmer.`;
     expect(screen.getByRole('dialog', { name: 'Garlic soup' })).toBeInTheDocument();
   });
 
+  it('saves notes through a deliberate action without displaying them on the library card', async () => {
+    vi.mocked(mealsApi.update).mockResolvedValue({
+      ...recipeMeal,
+      notes: 'Ask for extra basil.',
+    });
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('Garlic soup');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Notes' })[0]);
+
+    const dialog = screen.getByRole('dialog', { name: 'Notes for Garlic soup' });
+    expect(within(dialog).getByText(/not shared with session participants/)).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText('Private notes'), {
+      target: { value: 'Ask for extra basil.' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save notes' }));
+
+    await waitFor(() => {
+      expect(mealsApi.update).toHaveBeenCalledWith('recipe-1', { notes: 'Ask for extra basil.' });
+    });
+    expect(screen.queryByRole('dialog', { name: 'Notes for Garlic soup' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Ask for extra basil.')).not.toBeInTheDocument();
+  });
+
+  it('opens the notes action for takeout categories', async () => {
+    vi.mocked(mealsApi.list).mockImplementation(async (type) =>
+      type === 'category'
+        ? [{
+            ...mockMeals[0],
+            id: 'category-1',
+            title: 'Thai food',
+            description: null,
+            type: 'category',
+          }]
+        : []
+    );
+
+    render(
+      <BrowserRouter>
+        <Dashboard />
+      </BrowserRouter>
+    );
+
+    await screen.findByText('My Meals');
+    fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Notes' }));
+
+    expect(screen.getByRole('dialog', { name: 'Notes for Thai food' })).toBeInTheDocument();
+  });
+
   it('does not show recipe fields for takeout categories', async () => {
     vi.mocked(mealsApi.list).mockImplementation(async (type) =>
       type === 'category'

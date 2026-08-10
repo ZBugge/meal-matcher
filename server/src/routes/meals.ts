@@ -35,6 +35,7 @@ function toLibraryMealResponse(meal: Meal, includeArchived = false) {
     id: meal.id,
     title: meal.title,
     description: meal.description,
+    notes: meal.notes ?? null,
     type: meal.type,
     ...(includeArchived ? { archived: meal.archived === 1 } : {}),
     pickCount: meal.pick_count,
@@ -110,7 +111,7 @@ router.get('/', (req, res) => {
       ? [req.session.hostId, requestedType]
       : [req.session.hostId];
     const meals = getAll<Meal>(
-      `SELECT id, title, description, instructions, type, archived, pick_count, created_at,
+      `SELECT id, title, description, instructions, notes, type, archived, pick_count, created_at,
         (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
        FROM meals
        WHERE host_id = ? AND archived = 0${typeFilter}
@@ -139,7 +140,7 @@ router.get('/all', (req, res) => {
       ? [req.session.hostId, requestedType]
       : [req.session.hostId];
     const meals = getAll<Meal>(
-      `SELECT id, title, description, instructions, type, archived, pick_count, created_at,
+      `SELECT id, title, description, instructions, notes, type, archived, pick_count, created_at,
         (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
        FROM meals
        WHERE host_id = ?${typeFilter}
@@ -158,7 +159,7 @@ router.get('/all', (req, res) => {
 router.get('/:id', (req, res) => {
   try {
     const meal = getOne<Meal>(
-      `SELECT id, title, description, instructions, type, archived, pick_count, created_at,
+      `SELECT id, title, description, instructions, notes, type, archived, pick_count, created_at,
         (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
        FROM meals
        WHERE id = ? AND host_id = ?`,
@@ -274,7 +275,7 @@ router.post('/', (req, res) => {
 router.patch('/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, instructions, ingredients } = req.body;
+    const { title, description, instructions, ingredients, notes } = req.body;
 
     // Verify ownership
     const meal = getOne<Meal>(
@@ -326,6 +327,15 @@ router.patch('/:id', (req, res) => {
       }
       updates.push('description = ?');
       params.push(description?.trim() || null);
+    }
+
+    if (notes !== undefined) {
+      if (notes !== null && typeof notes !== 'string') {
+        res.status(400).json({ error: 'Notes must be text' });
+        return;
+      }
+      updates.push('notes = ?');
+      params.push(notes?.trim() || null);
     }
 
     let normalizedIngredients: MealIngredient[] | undefined;

@@ -103,6 +103,7 @@ export interface Meal {
   id: string;
   title: string;
   description: string | null;
+  notes?: string | null;
   instructions?: string | null;
   ingredients?: RecipeIngredient[];
   type: MealType;
@@ -140,7 +141,13 @@ export const mealsApi = {
 
   update: (
     id: string,
-    data: { title?: string; description?: string; instructions?: string | null; ingredients?: RecipeIngredient[] }
+    data: {
+      title?: string;
+      description?: string;
+      notes?: string | null;
+      instructions?: string | null;
+      ingredients?: RecipeIngredient[];
+    }
   ) =>
     request<Meal>(`/meals/${id}`, {
       method: 'PATCH',

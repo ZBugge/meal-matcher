@@ -17,6 +17,7 @@ export interface Meal {
   title: string;
   description: string | null;
   instructions: string | null;
+  notes: string | null;
   type: MealType;
   archived: number; // SQLite boolean (0 or 1)
   pick_count: number;

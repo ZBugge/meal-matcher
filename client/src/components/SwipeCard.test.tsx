@@ -32,14 +32,14 @@ describe('SwipeCard', () => {
     expect(screen.getByText('👆 Swipe to vote')).toBeDefined();
   });
 
-  it('should not render text hint when hintStyle is bounce', () => {
+  it('should keep text hint when hintStyle is bounce', () => {
     render(<SwipeCard {...defaultProps} hintStyle="bounce" />);
-    expect(screen.queryByText('👆 Swipe to vote')).toBeNull();
+    expect(screen.getByText('👆 Swipe to vote')).toBeDefined();
   });
 
-  it('should not render text hint when hintStyle is arrows', () => {
+  it('should keep text hint when hintStyle is arrows', () => {
     render(<SwipeCard {...defaultProps} hintStyle="arrows" />);
-    expect(screen.queryByText('👆 Swipe to vote')).toBeNull();
+    expect(screen.getByText('👆 Swipe to vote')).toBeDefined();
   });
 
   it('should render Nope and Yum indicators on the card', () => {

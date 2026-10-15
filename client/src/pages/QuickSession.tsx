@@ -1,3 +1,4 @@
+import { useWeekPath } from '../hooks/useWeekPath';
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { quickSessionApi, SessionMode } from '../api/client';
@@ -10,6 +11,7 @@ interface MealInput {
 
 export default function QuickSession() {
   const navigate = useNavigate();
+  const weekPath = useWeekPath();
   const [creatorName, setCreatorName] = useState('');
   const [mode, setMode] = useState<SessionMode>('takeout');
   const [drafts, setDrafts] = useState<Record<SessionMode, MealInput[]>>({
@@ -137,7 +139,7 @@ export default function QuickSession() {
       }
 
       // Navigate to share page so creator can share the link
-      navigate(`/session/${response.session.id}/share`);
+      navigate(weekPath(`/session/${response.session.id}/share`));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session');
     } finally {
@@ -211,7 +213,9 @@ export default function QuickSession() {
               {mode === 'home' ? 'Meal Options' : 'Food Categories'}
             </label>
             {mode === 'takeout' && (
-              <div className="flex flex-wrap gap-2 mb-4">
+              <details className="mb-3">
+                <summary className="min-h-12 flex items-center cursor-pointer text-sm font-semibold text-orange-700">Quick picks (optional)</summary>
+                <div className="flex flex-wrap gap-2">
                 {TAKEOUT_CATEGORY_SUGGESTIONS.map((suggestion) => {
                   const selected = meals.some(
                     (meal) => meal.title.trim().toLowerCase() === suggestion.toLowerCase()
@@ -231,7 +235,8 @@ export default function QuickSession() {
                     </button>
                   );
                 })}
-              </div>
+                </div>
+              </details>
             )}
             <div className="space-y-3">
               {meals.map((meal, index) => (

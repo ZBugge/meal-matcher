@@ -29,7 +29,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  return <div className="pb-24">{children}<FamilyNav /></div>;
+  return <>{children}</>;
 }
 
 function Home() {
@@ -50,14 +50,16 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/week" replace />;
   }
 
   return <>{children}</>;
 }
 
 function AppRoutes() {
+  const { user } = useAuth();
   return (
+    <div className={user ? "pb-24" : undefined}>
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<Home />} />
@@ -109,6 +111,8 @@ function AppRoutes() {
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    {user && <FamilyNav />}
+    </div>
   );
 }
 

@@ -37,7 +37,9 @@ test.describe('Authenticated Host Flow', () => {
     await page.click('button[type="submit"]');
 
     // Then: User is redirected to dashboard
-    await expect(page).toHaveURL('/dashboard');
+    await expect(page).toHaveURL('/week');
+    await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Library & votes' }).click();
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
     await expect(page.locator('text=My Meals')).toBeVisible();
 
     // Step 2: Add meals to library
@@ -132,6 +134,7 @@ test.describe('Authenticated Host Flow', () => {
 
     expect(retryResponse.ok).toBe(true);
     await page.goto('/dashboard');
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
     await expect(page.getByText('Selected 1 time')).toBeVisible();
     await expect(page.getByText(/Last selected/)).toBeVisible();
   });
@@ -145,7 +148,9 @@ test.describe('Authenticated Host Flow', () => {
     await page.fill('#password', 'testpassword123');
     await page.fill('#confirmPassword', 'testpassword123');
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL('/dashboard');
+    await expect(page).toHaveURL('/week');
+    await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Library & votes' }).click();
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
 
     // Add one meal first
     await addMeal(page, 'Existing Meal');
@@ -182,7 +187,9 @@ test.describe('Authenticated Host Flow', () => {
     await page.fill('#password', 'testpassword123');
     await page.fill('#confirmPassword', 'testpassword123');
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL('/dashboard');
+    await expect(page).toHaveURL('/week');
+    await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Library & votes' }).click();
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
 
     await addMeal(page, 'Persisted Meal');
     await expect(page.locator('text=Persisted Meal')).toBeVisible();
@@ -197,7 +204,9 @@ test.describe('Authenticated Host Flow', () => {
     await page.click('button[type="submit"]');
 
     // Then: Previous meal is still there
-    await expect(page).toHaveURL('/dashboard');
+    await expect(page).toHaveURL('/week');
+    await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Library & votes' }).click();
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
     await expect(page.locator('text=Persisted Meal')).toBeVisible();
   });
 
@@ -210,7 +219,9 @@ test.describe('Authenticated Host Flow', () => {
     await page.fill('#password', 'testpassword123');
     await page.fill('#confirmPassword', 'testpassword123');
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL('/dashboard');
+    await expect(page).toHaveURL('/week');
+    await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Library & votes' }).click();
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
 
     // Add a meal and create a session
     await addMeal(page, 'History Test Meal');
@@ -227,6 +238,7 @@ test.describe('Authenticated Host Flow', () => {
 
     // Go back to dashboard
     await page.click('text=Dashboard');
+    await page.getByRole('button', { name: 'Show history', exact: true }).click();
 
     // Then: Session appears in Recent Sessions
     await expect(page.locator('text=Recent Sessions')).toBeVisible();

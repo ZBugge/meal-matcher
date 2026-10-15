@@ -43,6 +43,7 @@ test('phone home, library, and recipe remain usable after reload', async ({ page
   expect(recipe.status()).toBe(201);
 
   await page.goto('/dashboard');
+  await page.getByRole('button', { name: 'Show library', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Weeknight Salmon', exact: true })).toBeVisible();
   await checkLayoutAndCapture('phone-library');
   await page.getByRole('button', { name: 'Weeknight Salmon', exact: true }).click();
@@ -55,6 +56,7 @@ test('phone home, library, and recipe remain usable after reload', async ({ page
   await checkLayoutAndCapture('phone-recipe');
 
   await page.reload();
+  await page.getByRole('button', { name: 'Show library', exact: true }).click();
   await page.getByRole('button', { name: 'Weeknight Salmon', exact: true }).click();
   await expect(dialog.getByText('2 fillets')).toBeVisible();
   await expect(dialog.getByText(instructions, { exact: true })).toBeVisible();

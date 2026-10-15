@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SwipeDeck } from './SwipeDeck';
 
 const mockMeals = [
@@ -9,6 +9,27 @@ const mockMeals = [
 ];
 
 describe('SwipeDeck', () => {
+  it('shows the intro only on the first card and keeps guidance after Back', async () => {
+    const { container } = render(<SwipeDeck meals={mockMeals} onSwipe={vi.fn()} onComplete={vi.fn()} />);
+    expect(container.querySelector('[data-swipe-intro="true"]')).not.toBeNull();
+    await waitFor(() => expect(screen.getByText('👆 Swipe to vote')).toBeVisible());
+    fireEvent.click(screen.getByTestId('swipe-yes'));
+    await screen.findByText('Burger');
+    expect(container.querySelector('[data-swipe-intro="true"]')).toBeNull();
+    await waitFor(() => expect(screen.getByText('👆 Swipe to vote')).toBeVisible());
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(screen.getByText('Pizza')).toBeVisible());
+    expect(container.querySelector('[data-swipe-intro="true"]')).toBeNull();
+    await waitFor(() => expect(screen.getByText('👆 Swipe to vote')).toBeVisible());
+  });
+
+  it('does not replay an intro when restoring a later cursor and going Back', async () => {
+    const { container } = render(<SwipeDeck meals={mockMeals} initialIndex={1} initialSwipes={{ '1': 1 }} onSwipe={vi.fn()} onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(screen.getByText('Pizza')).toBeVisible());
+    expect(container.querySelector('[data-swipe-intro="true"]')).toBeNull();
+  });
+
   it('should auto-submit when all swipes are done (not in edit mode)', () => {
     const onComplete = vi.fn();
     const onSwipe = vi.fn();

@@ -8,7 +8,9 @@ test.describe('Meal Management (#17, #12)', () => {
     await page.fill('#password', 'testpassword123');
     await page.fill('#confirmPassword', 'testpassword123');
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL('/dashboard');
+    await expect(page).toHaveURL('/week');
+    await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Library & votes' }).click();
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
   }
 
   // Helper to add a meal via the modal
@@ -124,6 +126,7 @@ test.describe('Meal Management (#17, #12)', () => {
     expect(imported).toMatchObject({ status: 200, body: { ready: 1, imported: 1 } });
 
     await page.reload();
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
     await expect(page.getByText('Backup Soup', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Notes' }).click();
     await expect(page.getByLabel('Private notes')).toHaveValue('Serve with bread.');
@@ -165,6 +168,7 @@ Simmer until tender.`);
 
     await expect(page.getByText('Recipe · 2 ingredients')).toBeVisible();
     await page.reload();
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
     await page.getByTitle('Edit meal').click();
     const editModal = page.locator('.card:has(h3:has-text("Edit Meal"))');
     await expect(editModal.locator('textarea[placeholder="Describe how to make this meal"]'))
@@ -182,6 +186,7 @@ Simmer until tender.`);
     await expect(notesDialog).not.toBeVisible();
 
     await page.reload();
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
     await page.getByRole('button', { name: 'Notes' }).click();
     const reloadedNotesDialog = page.getByRole('dialog', { name: 'Notes for Garlic Soup' });
     await expect(reloadedNotesDialog.getByLabel('Private notes')).toHaveValue('Order extra crusty bread.');
@@ -264,6 +269,7 @@ Simmer until tender.`);
     await resultsRecipe.getByRole('button', { name: 'Close recipe' }).click();
 
     await page.goto('/dashboard');
+    await page.getByRole('button', { name: 'Show history', exact: true }).click();
     const recentSessions = page.locator('section').filter({ hasText: 'Recent Sessions' });
     await recentSessions.getByRole('button', { name: 'Garlic Soup' }).click();
     await expect(page.getByRole('dialog', { name: 'Garlic Soup' })).toBeVisible();

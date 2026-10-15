@@ -1,3 +1,4 @@
+import { useWeekPath } from '../hooks/useWeekPath';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { participantApi, ResultsResponse, MatchResult, mealsApi, ApiException, Meal } from '../api/client';
@@ -15,6 +16,7 @@ export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const weekPath = useWeekPath();
   const [results, setResults] = useState<ResultsResponse | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,7 +127,7 @@ export function Results() {
       setShowSavePrompt(false);
 
       // Navigate to dashboard
-      navigate('/dashboard');
+      navigate(weekPath('/dashboard'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save options');
     } finally {
@@ -180,7 +182,7 @@ export function Results() {
 
   const handleUpdateChoices = () => {
     if (!sessionId) return;
-    navigate(`/session/${sessionId}/swipe`, { state: { editMode: true } });
+    navigate(weekPath(`/session/${sessionId}/swipe`), { state: { editMode: true } });
   };
 
   if (!results || results.status === 'waiting') {
@@ -499,7 +501,7 @@ export function Results() {
         {/* Back to dashboard for logged in users */}
         {user && results.isHost && (
           <div className="text-center mt-8">
-            <Link to="/dashboard" className="btn btn-primary">
+            <Link to={weekPath('/dashboard')} className="btn btn-primary">
               Back to Dashboard
             </Link>
           </div>

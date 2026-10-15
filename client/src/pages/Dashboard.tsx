@@ -1,3 +1,5 @@
+import { useWeekPath } from '../hooks/useWeekPath';
+import { AddToWeek } from '../components/AddToWeek';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -34,13 +36,14 @@ function formatLastSelectedAt(timestamp: string | null | undefined): string {
 export function Dashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const weekPath = useWeekPath();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeMode, setActiveMode] = useState<SessionMode>('home');
-  const [libraryCollapsed, setLibraryCollapsed] = useState(false);
-  const [historyCollapsed, setHistoryCollapsed] = useState(false);
+  const [libraryCollapsed, setLibraryCollapsed] = useState(true);
+  const [historyCollapsed, setHistoryCollapsed] = useState(true);
   const [search, setSearch] = useState('');
 
   // Modal states
@@ -445,7 +448,7 @@ export function Dashboard() {
 
     try {
       const session = await sessionsApi.create(selectedMealIds, sessionMode);
-      navigate(`/session/${session.id}`);
+      navigate(weekPath(`/session/${session.id}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session');
     }
@@ -567,7 +570,7 @@ export function Dashboard() {
         <section className="mb-8" aria-label="Choose meals together">
           <p className="mb-3 text-gray-600">Choose together, then add a few favorites to your week.</p>
           <div className="grid grid-cols-2 gap-4">
-            <button onClick={() => navigate('/quick')} className="btn btn-secondary py-4 text-lg">Quick Session</button>
+            <button onClick={() => navigate(weekPath('/quick'))} className="btn btn-secondary py-4 text-lg">Quick Session</button>
             {meals.length > 0 && <button onClick={openCreateSession} className="btn btn-success py-4 text-lg">Create Session</button>}
           </div>
           {meals.length === 0 && <p className="text-sm text-gray-600 mt-2">Add saved options to create a session from your library, or use Quick Session to start immediately.</p>}
@@ -597,7 +600,7 @@ export function Dashboard() {
               <h2 className="text-2xl font-bold">
                 {activeMode === 'home' ? 'My Meals' : 'My Food Categories'}
               </h2>
-              <button type="button" aria-expanded={!libraryCollapsed} aria-controls="saved-library" onClick={() => setLibraryCollapsed(value => !value)} className="text-sm text-gray-600 underline">
+              <button type="button" aria-expanded={!libraryCollapsed} aria-controls="saved-library" onClick={() => setLibraryCollapsed(value => !value)} className="btn btn-secondary min-h-12 px-4">
                 {libraryCollapsed ? 'Show library' : 'Hide library'}
               </button>
               {activeMeals.length > 0 && (
@@ -733,7 +736,8 @@ export function Dashboard() {
                           {meal.description && (
                             <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
                           )}
-                          {meal.type === 'meal' && !editMode && <button type="button" onClick={() => navigate(`/cook/${meal.id}`)} className="mt-2 text-sm font-medium text-primary-700 underline">Cook this recipe</button>}
+                          {meal.type === 'meal' && !editMode && <AddToWeek mealId={meal.id} title={meal.title} />}
+                          {meal.type === 'meal' && !editMode && <button type="button" onClick={() => navigate(weekPath(`/cook/${meal.id}`))} className="mt-2 text-sm font-medium text-primary-700 underline">Cook this recipe</button>}
                           {meal.type === 'meal'
                             && (meal.instructions || (meal.ingredients?.length ?? 0) > 0) && (
                             <p className="text-xs text-primary-600 mt-2">
@@ -792,7 +796,7 @@ export function Dashboard() {
         {/* Sessions Section */}
         <section>
           <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-2xl font-bold">Recent Sessions</h2>
-            <button type="button" aria-expanded={!historyCollapsed} aria-controls="session-history" onClick={() => setHistoryCollapsed(value => !value)} className="text-sm text-gray-600 underline">{historyCollapsed ? 'Show history' : 'Hide history'}</button>
+            <button type="button" aria-expanded={!historyCollapsed} aria-controls="session-history" onClick={() => setHistoryCollapsed(value => !value)} className="btn btn-secondary min-h-12 px-4">{historyCollapsed ? 'Show history' : 'Hide history'}</button>
           </div>
           <div id="session-history" hidden={historyCollapsed}>
 
@@ -806,7 +810,7 @@ export function Dashboard() {
                 <div
                   key={session.id}
                   className="card cursor-pointer hover:shadow-xl transition-shadow"
-                  onClick={() => navigate(`/session/${session.id}`)}
+                  onClick={() => navigate(weekPath(`/session/${session.id}`))}
                 >
                   <div className="flex justify-between items-center">
                     <div>
@@ -1240,8 +1244,8 @@ export function Dashboard() {
             </div>
 
             {sessionMode === 'takeout' && (
-              <div className="mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Quick picks</p>
+              <details className="mb-4">
+                <summary className="min-h-12 flex items-center cursor-pointer text-sm font-semibold text-primary-700">Quick picks (optional)</summary>
                 <div className="flex flex-wrap gap-2">
                   {TAKEOUT_CATEGORY_SUGGESTIONS.map((suggestion) => {
                     const existing = meals.find(
@@ -1266,7 +1270,7 @@ export function Dashboard() {
                     );
                   })}
                 </div>
-              </div>
+              </details>
             )}
 
             {/* Quick Add Meal */}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { SwipeCard } from './SwipeCard';
 
 interface Meal {
@@ -36,6 +36,8 @@ export function SwipeDeck({
   const [swipes, setSwipes] = useState<Record<string, number>>(initialSwipes);
   const [showReview, setShowReview] = useState(editMode && startingIndex >= meals.length);
 
+  const [introAvailable, setIntroAvailable] = useState(startingIndex === 0);
+  const reducedMotion = useReducedMotion();
   const currentMeal = meals[currentIndex];
   const isComplete = currentIndex >= meals.length;
 
@@ -49,6 +51,7 @@ export function SwipeDeck({
 
   const handleSwipe = (direction: 'left' | 'right') => {
     if (!currentMeal) return;
+    setIntroAvailable(false);
 
     const vote = direction === 'right' ? 1 : 0;
     const newSwipes = { ...swipes, [currentMeal.id]: vote };
@@ -61,6 +64,7 @@ export function SwipeDeck({
 
   const handleMaybe = () => {
     if (!currentMeal) return;
+    setIntroAvailable(false);
 
     const vote = 2;
     const newSwipes = { ...swipes, [currentMeal.id]: vote };
@@ -168,7 +172,7 @@ export function SwipeDeck({
             </button>
           </div>
         ) : (
-          <button onClick={canRetry ? handleSubmit : () => window.location.href = `/results/${window.location.pathname.split('/')[2]}`} className="btn btn-primary w-full py-4 text-lg">
+          <button onClick={canRetry ? handleSubmit : () => window.location.href = `/results/${window.location.pathname.split('/')[2]}${window.location.search}`} className="btn btn-primary w-full py-4 text-lg">
             {canRetry ? 'Retry Submission' : 'View Results'}
           </button>
         )}
@@ -198,9 +202,9 @@ export function SwipeDeck({
         {currentMeal && (
           <motion.div
             key={currentMeal.id}
-            initial={{ scale: 0.95, opacity: 0 }}
+            initial={reducedMotion ? false : { scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
+            exit={reducedMotion ? undefined : { scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
             <SwipeCard
@@ -209,6 +213,7 @@ export function SwipeDeck({
               onSwipe={handleSwipe}
               progress={`${currentIndex + 1} / ${meals.length}`}
               hintStyle={hintStyle}
+              showIntro={currentIndex === 0 && introAvailable}
             />
             <div className="flex justify-center mt-4">
               <button

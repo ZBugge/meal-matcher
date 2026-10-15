@@ -27,7 +27,8 @@ describe('Planning schema compatibility', () => {
     let database = await schema.initializeDatabase();
     for (const [table, columns] of [
       ['plan_entries', ['id', 'host_id', 'week', 'meal_id', 'kind', 'title', 'date', 'created_at']],
-      ['shopping_items', ['id', 'host_id', 'week', 'entry_id', 'source_title', 'amount', 'ingredient', 'state', 'display_order']],
+      ['shopping_items', ['id', 'host_id', 'week', 'entry_id', 'source_title', 'amount', 'ingredient', 'aisle', 'state', 'display_order']],
+      ['dinner_staples', ['id', 'host_id', 'title']],
       ['login_sessions', ['id', 'data', 'expires']],
     ] as const) expect(database.exec(`PRAGMA table_info(${table})`)[0].values.map(row => row[1])).toEqual(columns);
     database.run("INSERT INTO plan_entries(id, host_id, week, kind, title) VALUES ('entry', 'host', '2026-10-12', 'takeout', 'Pizza')");

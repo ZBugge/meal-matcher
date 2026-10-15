@@ -27,7 +27,7 @@ function readWeek(host: string, week: string): WeekPlan {
     entries: getAll<PlanEntry>(`SELECT id, meal_id AS mealId, kind, title, date FROM plan_entries
       WHERE host_id = ? AND week = ? ORDER BY date IS NULL, date, created_at, rowid`, [host, week]),
     shopping: getAll<ShoppingItem>(`SELECT id, entry_id AS entryId, source_title AS sourceTitle,
-      amount, ingredient, state, display_order AS displayOrder FROM shopping_items
+      amount, ingredient, state, aisle, display_order AS displayOrder FROM shopping_items
       WHERE host_id = ? AND week = ? ORDER BY rowid`, [host, week]),
   };
 }
@@ -37,6 +37,7 @@ function mutate(host: string, week: string, action: () => void): WeekPlan {
   const database = getDatabase();
   const entries = getAll<Record<string, string | number | null>>('SELECT * FROM plan_entries WHERE host_id = ? AND week = ?', [host, week]);
   const items = getAll<Record<string, string | number | null>>('SELECT * FROM shopping_items WHERE host_id = ? AND week = ?', [host, week]);
+  const staples = getAll<Record<string, string | number | null>>('SELECT * FROM dinner_staples WHERE host_id = ?', [host]);
   database.run('BEGIN TRANSACTION');
   try { action(); database.run('COMMIT'); }
   catch (error) { database.run('ROLLBACK'); throw error; }
@@ -45,7 +46,8 @@ function mutate(host: string, week: string, action: () => void): WeekPlan {
     database.run('BEGIN TRANSACTION');
     database.run('DELETE FROM shopping_items WHERE host_id = ? AND week = ?', [host, week]);
     database.run('DELETE FROM plan_entries WHERE host_id = ? AND week = ?', [host, week]);
-    for (const [table, rows] of [['plan_entries', entries], ['shopping_items', items]] as const) {
+    database.run('DELETE FROM dinner_staples WHERE host_id = ?', [host]);
+    for (const [table, rows] of [['plan_entries', entries], ['shopping_items', items], ['dinner_staples', staples]] as const) {
       for (const row of rows) {
         const columns = Object.keys(row);
         database.run(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`, Object.values(row));
@@ -113,6 +115,7 @@ router.delete('/:week/entries/:id', (req, res) => {
     res.status(404).json({ error: 'Plan entry not found.' }); return;
   }
   try { res.json(mutate(host, week, () => {
+    getDatabase().run("UPDATE shopping_items SET entry_id = NULL WHERE entry_id = ? AND host_id = ? AND (state = 'bought' OR ? = 1)", [id, host, req.query.keepGroceries === 'true' ? 1 : 0]);
     getDatabase().run('DELETE FROM shopping_items WHERE entry_id = ? AND host_id = ?', [id, host]);
     getDatabase().run('DELETE FROM plan_entries WHERE id = ? AND host_id = ?', [id, host]);
   })); } catch { res.status(500).json({ error: 'Could not remove the meal. Try again.' }); }
@@ -129,20 +132,73 @@ router.post('/:week/items', (req, res) => {
     [randomUUID(), host, week, req.body.ingredient.trim(), req.body.amount?.trim() ?? '']))); }
   catch { res.status(500).json({ error: 'Could not add the item. Try again.' }); }
 });
+
+router.post('/:week/items/bulk', (req, res) => {
+  const host = req.session.hostId!; const { week } = req.params;
+  const body: unknown = req.body;
+  if (!bodyObject(body) || Object.keys(body).some(key => !['ids', 'state'].includes(key)) || !Array.isArray(body.ids)
+    || !body.ids.length || body.ids.length > 1000 || new Set(body.ids).size !== body.ids.length
+    || body.ids.some(id => !text(id, 100)) || !['needed', 'have', 'bought'].includes(body.state as string)) {
+    res.status(400).json({ error: 'Choose items and a valid shopping state.' }); return;
+  }
+  const ids = body.ids as string[];
+  if (ids.some(id => !getOne('SELECT id FROM shopping_items WHERE id = ? AND host_id = ? AND week = ?', [id, host, week]))) {
+    res.status(404).json({ error: 'An item is no longer in your list. Reload and try again.' }); return;
+  }
+  try { res.json(mutate(host, week, () => { for (const id of ids) getDatabase().run('UPDATE shopping_items SET state = ? WHERE id = ? AND host_id = ? AND week = ?', [body.state as string, id, host, week]); })); }
+  catch { res.status(500).json({ error: 'Could not save the selected items. Try again.' }); }
+});
+router.post('/:week/repeat', (req, res) => {
+  const host = req.session.hostId!; const { week } = req.params; const body: unknown = req.body;
+  if (!bodyObject(body) || Object.keys(body).some(key => !['targetWeek', 'entryIds'].includes(key))
+    || typeof body.targetWeek !== 'string' || !validWeek(body.targetWeek) || body.targetWeek === week
+    || !Array.isArray(body.entryIds) || !body.entryIds.length || body.entryIds.length > 500
+    || new Set(body.entryIds).size !== body.entryIds.length || body.entryIds.some(id => !text(id, 100))) {
+    res.status(400).json({ error: 'Select meals and a different Monday.' }); return;
+  }
+  const source = readWeek(host, week); const entries = (body.entryIds as string[]).map(id => source.entries.find(entry => entry.id === id));
+  if (entries.some(entry => !entry)) { res.status(404).json({ error: 'A selected meal is no longer in your week.' }); return; }
+  const target = body.targetWeek;
+  try { res.status(201).json(mutate(host, target, () => {
+    for (const entry of entries as PlanEntry[]) {
+      const id = randomUUID(); const date = entry.date ? new Date(Date.parse(entry.date) + Date.parse(target) - Date.parse(week)).toISOString().slice(0, 10) : null;
+      getDatabase().run('INSERT INTO plan_entries (id, host_id, week, meal_id, kind, title, date) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, host, target, entry.mealId, entry.kind, entry.title, date]);
+      for (const item of source.shopping.filter(row => row.entryId === entry.id)) getDatabase().run('INSERT INTO shopping_items (id, host_id, week, entry_id, source_title, amount, ingredient, aisle, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [randomUUID(), host, target, id, entry.title, item.amount, item.ingredient, item.aisle, item.displayOrder]);
+    }
+  })); } catch { res.status(500).json({ error: 'Could not repeat the week. Try again.' }); }
+});
+router.get('/:week/staples', (req, res) => { res.json(getAll('SELECT id, title FROM dinner_staples WHERE host_id = ? ORDER BY rowid', [req.session.hostId!])); });
+router.post('/:week/staples', (req, res) => {
+  if (!bodyObject(req.body) || Object.keys(req.body).length !== 1 || !text(req.body.title, 100)) { res.status(400).json({ error: 'Enter a dinner staple name.' }); return; }
+  try { mutate(req.session.hostId!, req.params.week, () => getDatabase().run('INSERT INTO dinner_staples (id, host_id, title) VALUES (?, ?, ?)', [randomUUID(), req.session.hostId!, req.body.title.trim()])); res.status(201).json({ saved: true }); }
+  catch { res.status(500).json({ error: 'Could not save the staple.' }); }
+});
+router.patch('/:week/staples/:id', (req, res) => {
+  if (!bodyObject(req.body) || Object.keys(req.body).length !== 1 || !text(req.body.title, 100)) { res.status(400).json({ error: 'Enter a dinner staple name.' }); return; }
+  if (!getOne('SELECT id FROM dinner_staples WHERE id = ? AND host_id = ?', [req.params.id, req.session.hostId!])) { res.status(404).json({ error: 'Staple not found.' }); return; }
+  try { mutate(req.session.hostId!, req.params.week, () => getDatabase().run('UPDATE dinner_staples SET title = ? WHERE id = ? AND host_id = ?', [req.body.title.trim(), req.params.id, req.session.hostId!])); res.json({ saved: true }); }
+  catch { res.status(500).json({ error: 'Could not save the staple.' }); }
+});
+router.delete('/:week/staples/:id', (req, res) => {
+  if (!getOne('SELECT id FROM dinner_staples WHERE id = ? AND host_id = ?', [req.params.id, req.session.hostId!])) { res.status(404).json({ error: 'Staple not found.' }); return; }
+  try { mutate(req.session.hostId!, req.params.week, () => getDatabase().run('DELETE FROM dinner_staples WHERE id = ? AND host_id = ?', [req.params.id, req.session.hostId!])); res.json({ saved: true }); }
+  catch { res.status(500).json({ error: 'Could not remove the staple.' }); }
+});
 router.patch('/:week/items/:id', (req, res) => {
   const { week, id } = req.params;
   const host = req.session.hostId!;
   const body: unknown = req.body;
-  if (!bodyObject(body) || !Object.keys(body).length || Object.keys(body).some(key => !['ingredient', 'amount', 'state'].includes(key))
+  if (!bodyObject(body) || !Object.keys(body).length || Object.keys(body).some(key => !['ingredient', 'amount', 'state', 'aisle'].includes(key))
     || (body.ingredient !== undefined && !text(body.ingredient, 300))
     || (body.amount !== undefined && !text(body.amount, 100, true))
+    || (body.aisle !== undefined && !['Produce', 'Meat & fish', 'Dairy & eggs', 'Bakery', 'Pantry', 'Frozen', 'Other'].includes(body.aisle as string))
     || (body.state !== undefined && !['needed', 'have', 'bought'].includes(body.state as string))) {
     res.status(400).json({ error: 'Check the item details.' }); return;
   }
-  const item = getOne<ShoppingItem>('SELECT ingredient, amount, state FROM shopping_items WHERE id = ? AND host_id = ? AND week = ?', [id, host, week]);
+  const item = getOne<ShoppingItem>('SELECT ingredient, amount, state, aisle FROM shopping_items WHERE id = ? AND host_id = ? AND week = ?', [id, host, week]);
   if (!item) { res.status(404).json({ error: 'Shopping item not found.' }); return; }
-  try { res.json(mutate(host, week, () => getDatabase().run('UPDATE shopping_items SET ingredient = ?, amount = ?, state = ? WHERE id = ?',
-    [(body.ingredient as string | undefined)?.trim() ?? item.ingredient, (body.amount as string | undefined)?.trim() ?? item.amount, (body.state as string | undefined) ?? item.state, id]))); }
+  try { res.json(mutate(host, week, () => getDatabase().run('UPDATE shopping_items SET ingredient = ?, amount = ?, state = ?, aisle = ? WHERE id = ?',
+    [(body.ingredient as string | undefined)?.trim() ?? item.ingredient, (body.amount as string | undefined)?.trim() ?? item.amount, (body.state as string | undefined) ?? item.state, (body.aisle as string | undefined) ?? item.aisle, id]))); }
   catch { res.status(500).json({ error: 'Could not save the item. Try again.' }); }
 });
 router.delete('/:week/items/:id', (req, res) => {

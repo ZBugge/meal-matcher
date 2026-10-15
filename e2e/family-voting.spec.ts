@@ -118,3 +118,36 @@ test('voted quick results keep a noncurrent planning week', async ({ page }) => 
   const currentPlan = await (await page.request.get(`/api/plans/${current}`)).json();
   expect(currentPlan.entries).toHaveLength(0);
 });
+
+test('a signed-in host can end voting from their results tab', async ({ page, browser }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect((await page.request.post('/api/auth/register', { data: { email: `results-host-${randomUUID()}@test.local`, password: 'family-test-password' } })).status()).toBe(201);
+  const meal = await (await page.request.post('/api/meals', { data: { title: 'Results soup' } })).json();
+  const session = await (await page.request.post('/api/sessions', { data: { mealIds: [meal.id], mode: 'home' } })).json();
+  const visitor = await browser.newContext();
+  try {
+    // Another participant has joined but has not voted.
+    const guest = await visitor.newPage();
+    await guest.goto(`/join/${session.inviteCode}`);
+    await guest.locator('#name').fill('Still deciding');
+    await guest.getByRole('button', { name: 'Start Swiping' }).click();
+    await guest.goto(`/results/${session.id}`);
+    await expect(guest.getByRole('heading', { name: 'Waiting for Votes' })).toBeVisible();
+    await expect(guest.getByRole('button', { name: 'End Session & Show Results' })).toHaveCount(0);
+    await page.goto(`/join/${session.inviteCode}?week=2030-01-07`);
+    await page.locator('#name').fill('Host');
+    await page.getByRole('button', { name: 'Start Swiping' }).click();
+    await page.getByTestId('swipe-yes').click();
+    await expect(page).toHaveURL(`/results/${session.id}?week=2030-01-07`);
+    await page.getByRole('button', { name: 'End Session & Show Results' }).click();
+    await expect(page.getByText("1 person hasn't finished voting yet.")).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Waiting for Votes' })).toBeVisible();
+    await page.getByRole('button', { name: 'End Session & Show Results' }).click();
+    await page.getByRole('button', { name: 'End Session', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Results', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(`/results/${session.id}?week=2030-01-07`);
+    await expect(guest.getByRole('heading', { name: 'Results', exact: true })).toBeVisible();
+    await test.info().attach('phone-host-results', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+  } finally { await visitor.close(); }
+});

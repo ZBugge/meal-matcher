@@ -26,6 +26,21 @@ describe('Swipe HTTP API', () => {
     persisted: createHash('sha256').update(fs.readFileSync(process.env.DATABASE_PATH!)).digest('hex'),
   });
 
+  it('identifies only the authenticated owner while results are waiting', async () => {
+    const owner = server.client();
+    expect((await owner.request('/auth/register', 'POST', { email: 'results-owner@example.com', password: 'test-password123' })).status).toBe(201);
+    const meal = await owner.request('/meals', 'POST', { title: 'Host soup' });
+    const session = await owner.request('/sessions', 'POST', { mealIds: [meal.body.id], mode: 'home' });
+    expect(session.status).toBe(201);
+    expect((await owner.request(`/results/${session.body.id}`)).body).toMatchObject({ status: 'waiting', isHost: true });
+    const visitor = server.client();
+    expect((await visitor.request(`/results/${session.body.id}?host=true`)).body).toMatchObject({ status: 'waiting', isHost: false });
+    expect((await visitor.request('/auth/register', 'POST', { email: 'other-results-host@example.com', password: 'test-password123' })).status).toBe(201);
+    expect((await visitor.request(`/results/${session.body.id}?host=true`)).body.isHost).toBe(false);
+    expect((await visitor.request(`/sessions/${session.body.id}/close`, 'POST', {})).status).toBe(404);
+    expect((await owner.request(`/sessions/${session.body.id}/close`, 'POST', {})).status).toBe(200);
+  });
+
   it('preserves the complete accepted ballot when a later replacement vote is invalid', async () => {
     expect((await submit(ballot([1, 2]))).status).toBe(200);
     const accepted = state();

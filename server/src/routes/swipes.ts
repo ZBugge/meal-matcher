@@ -241,6 +241,7 @@ router.get('/results/:sessionId', (req, res) => {
       res.json({
         status: 'waiting',
         mode: session.mode,
+        isHost: requestorIsHost,
         message: 'Session is still open. Results will be available after the host closes it.',
       });
       return;

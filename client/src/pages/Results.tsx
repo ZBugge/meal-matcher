@@ -1,7 +1,7 @@
 import { useWeekPath } from '../hooks/useWeekPath';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { participantApi, ResultsResponse, MatchResult, mealsApi, ApiException, Meal } from '../api/client';
+import { participantApi, sessionsApi, ResultsResponse, MatchResult, mealsApi, ApiException, Meal } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import RecipeViewer from '../components/RecipeViewer';
 import { AddToWeek } from '../components/AddToWeek';
@@ -42,6 +42,7 @@ export function Results() {
 
   const loadResults = useCallback(async () => {
     if (!sessionId) return;
+    if (pollTimeoutRef.current) window.clearTimeout(pollTimeoutRef.current);
 
     try {
       const data = await participantApi.getResults(sessionId, !!user);
@@ -81,11 +82,16 @@ export function Results() {
     if (!sessionId) return;
 
     const creatorToken = sessionStorage.getItem('creatorToken');
-    if (!creatorToken) return;
+    const isHost = Boolean(user && results?.isHost);
+    if (!isHost && !creatorToken) return;
 
     setClosing(true);
     try {
-      await participantApi.closeSession(sessionId, creatorToken);
+      if (isHost) {
+        await sessionsApi.close(sessionId);
+      } else {
+        await participantApi.closeSession(sessionId, creatorToken!);
+      }
       setShowCloseConfirm(false);
       // Reload results to get the final data
       await loadResults();
@@ -262,10 +268,11 @@ export function Results() {
           ) : null}
 
           {/* End Session button for creator */}
-          {isCreator ? (
+          {isCreator || (user && results?.isHost) ? (
             <div className="mt-6">
               <button
                 onClick={() => setShowCloseConfirm(true)}
+                disabled={closing}
                 className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-lg transition-colors"
               >
                 End Session & Show Results

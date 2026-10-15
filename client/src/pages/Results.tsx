@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { participantApi, ResultsResponse, MatchResult, mealsApi, ApiException, Meal } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import RecipeViewer from '../components/RecipeViewer';
+import { AddToWeek } from '../components/AddToWeek';
 
 interface Participant {
   id: string;
@@ -393,6 +394,7 @@ export function Results() {
               {unanimousResults.map((result) => (
                 <ResultCard
                   key={result.mealId}
+                  canPlan={Boolean(user && results.isHost)}
                   result={result}
                   onViewRecipe={canViewRecipes ? handleViewRecipe : undefined}
                   recipeLoading={loadingRecipeId === result.mealId}
@@ -410,6 +412,7 @@ export function Results() {
               {otherResults.map((result) => (
                 <ResultCard
                   key={result.mealId}
+                  canPlan={Boolean(user && results.isHost)}
                   result={result}
                   onViewRecipe={canViewRecipes ? handleViewRecipe : undefined}
                   recipeLoading={loadingRecipeId === result.mealId}
@@ -511,11 +514,12 @@ export function Results() {
 
 interface ResultCardProps {
   result: MatchResult;
+  canPlan?: boolean;
   onViewRecipe?: (mealId: string) => void;
   recipeLoading?: boolean;
 }
 
-function ResultCard({ result, onViewRecipe, recipeLoading }: ResultCardProps) {
+function ResultCard({ result, onViewRecipe, recipeLoading, canPlan }: ResultCardProps) {
   const [showVoters, setShowVoters] = useState(false);
   const getBarColor = () => {
     if (result.percentage >= 75) return 'bg-green-500';
@@ -573,6 +577,7 @@ function ResultCard({ result, onViewRecipe, recipeLoading }: ResultCardProps) {
       </div>
 
       {/* Voter breakdown */}
+      {canPlan && <AddToWeek mealId={result.mealId} title={result.title} />}
       {hasVoterData && (
         <div className="mt-3">
           <button

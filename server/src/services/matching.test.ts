@@ -5,7 +5,7 @@ import { runQuery } from '../db/schema';
 
 describe('Matching Service - Maybe Vote Support', () => {
   beforeAll(async () => {
-    // Initialize in-memory database
+    // Initialize the temporary database allocated by the shared Vitest setup.
     await initializeDatabase();
 
     // Create test data - use INSERT OR IGNORE to avoid conflicts
@@ -17,7 +17,7 @@ describe('Matching Service - Maybe Vote Support', () => {
   });
 
   afterAll(() => {
-    // Cleanup is handled by in-memory database
+    // The shared Vitest setup removes the temporary database.
   });
 
   it('should count yes votes (1) correctly', () => {

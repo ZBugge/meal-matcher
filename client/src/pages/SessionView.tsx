@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { sessionsApi, SessionDetails, MatchResult, mealsApi, Meal } from '../api/client';
 import ConfirmModal from '../components/ConfirmModal';
 import RecipeViewer from '../components/RecipeViewer';
+import { AddToWeek } from '../components/AddToWeek';
 
 export function SessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -373,6 +374,7 @@ function ResultCard({
               />
             </div>
           </div>
+          <AddToWeek mealId={result.mealId} title={result.title} />
         </div>
 
         {canSelect && !isSelected && (
@@ -397,12 +399,12 @@ function ResultCard({
                 <span
                   key={i}
                   className={`text-xs px-2 py-1 rounded ${
-                    voter.vote
+                    voter.vote === 1
                       ? 'bg-green-100 text-green-700'
                       : 'bg-red-100 text-red-700'
                   }`}
                 >
-                  {voter.name}: {voter.vote ? 'Yes' : 'No'}
+                  {voter.name}: {voter.vote === 1 ? 'Yes' : voter.vote === 2 ? 'Maybe' : 'No'}
                 </span>
               ))}
             </div>

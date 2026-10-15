@@ -13,6 +13,8 @@ interface SwipeDeckProps {
   initialSwipes?: Record<string, number>;
   initialIndex?: number;
   onSwipe: (mealId: string, vote: number, allSwipes: Record<string, number>) => void;
+  onProgressChange?: (swipes: Record<string, number>, currentIndex: number) => void;
+  canRetry?: boolean;
   onComplete: (swipes: Record<string, number>) => void;
   editMode?: boolean;
   hintStyle?: 'bounce' | 'arrows' | 'text';
@@ -21,24 +23,27 @@ interface SwipeDeckProps {
 export function SwipeDeck({
   meals,
   initialSwipes = {},
-  initialIndex = 0,
+  initialIndex,
   onSwipe,
   onComplete,
+  onProgressChange,
+  canRetry = false,
   editMode = false,
   hintStyle = 'bounce',
 }: SwipeDeckProps) {
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const startingIndex = initialIndex ?? (editMode ? meals.length : 0);
+  const [currentIndex, setCurrentIndex] = useState(startingIndex);
   const [swipes, setSwipes] = useState<Record<string, number>>(initialSwipes);
-  const [showReview, setShowReview] = useState(editMode || false);
+  const [showReview, setShowReview] = useState(editMode && startingIndex >= meals.length);
 
   const currentMeal = meals[currentIndex];
   const isComplete = currentIndex >= meals.length;
 
   useEffect(() => {
-    if (isComplete && !showReview && !editMode) {
+    if (isComplete && !showReview) {
       setShowReview(true);
       // Auto-submit when all swipes are done (not in edit mode)
-      onComplete(swipes);
+      if (!editMode) onComplete(swipes);
     }
   }, [isComplete, showReview, editMode, swipes, onComplete]);
 
@@ -50,6 +55,7 @@ export function SwipeDeck({
 
     setSwipes(newSwipes);
     onSwipe(currentMeal.id, vote, newSwipes);
+    onProgressChange?.(newSwipes, currentIndex + 1);
     setCurrentIndex((prev) => prev + 1);
   };
 
@@ -61,6 +67,7 @@ export function SwipeDeck({
 
     setSwipes(newSwipes);
     onSwipe(currentMeal.id, vote, newSwipes);
+    onProgressChange?.(newSwipes, currentIndex + 1);
     setCurrentIndex((prev) => prev + 1);
   };
 
@@ -73,10 +80,12 @@ export function SwipeDeck({
     const newSwipes = { ...swipes, [mealId]: newVote };
     setSwipes(newSwipes);
     onSwipe(mealId, newVote, newSwipes);
+    onProgressChange?.(newSwipes, currentIndex);
   };
 
   const handleGoBack = () => {
     if (currentIndex > 0) {
+      onProgressChange?.(swipes, currentIndex - 1);
       setCurrentIndex((prev) => prev - 1);
       setShowReview(false);
     }
@@ -84,6 +93,7 @@ export function SwipeDeck({
 
   const handleBackToSwipe = () => {
     setShowReview(false);
+    onProgressChange?.(swipes, meals.length - 1);
     setCurrentIndex(meals.length - 1);
   };
 
@@ -99,7 +109,7 @@ export function SwipeDeck({
           {editMode ? 'Edit Your Choices' : 'Your Choices'}
         </h2>
         <p className="text-gray-600 text-center mb-6">
-          {editMode ? 'Tap any meal to change your vote' : 'Your votes have been submitted'}
+          {editMode ? 'Tap any meal to change your vote' : canRetry ? 'Your votes have not been submitted. Try again.' : 'Your votes have been submitted'}
         </p>
 
         <div className="space-y-3 mb-8">
@@ -158,8 +168,8 @@ export function SwipeDeck({
             </button>
           </div>
         ) : (
-          <button onClick={() => window.location.href = `/results/${window.location.pathname.split('/')[2]}`} className="btn btn-primary w-full py-4 text-lg">
-            View Results
+          <button onClick={canRetry ? handleSubmit : () => window.location.href = `/results/${window.location.pathname.split('/')[2]}`} className="btn btn-primary w-full py-4 text-lg">
+            {canRetry ? 'Retry Submission' : 'View Results'}
           </button>
         )}
       </div>

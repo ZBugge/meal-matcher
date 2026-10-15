@@ -34,7 +34,7 @@ test.describe('Quick Session Flow', () => {
     await expect(page.locator('text=Update Your Choices')).toBeVisible();
   });
 
-  test('participant can update choices while session is open', async ({ page, context }) => {
+  test('participant can update choices while session is open', async ({ page, browser }) => {
     // Given: A session has been created
     await page.goto('/');
     await page.fill('#name', 'Host');
@@ -47,7 +47,7 @@ test.describe('Quick Session Flow', () => {
     const inviteCode = shareUrl.split('/join/')[1];
 
     // When: A participant joins from the invite link
-    const participantPage = await context.newPage();
+    const participantPage = await browser.newPage({ baseURL: test.info().project.use.baseURL });
     await participantPage.goto(`/join/${inviteCode}`);
 
     // And: Enters their name and starts swiping
@@ -67,5 +67,14 @@ test.describe('Quick Session Flow', () => {
     // Then: Participant is taken back to swipe page in edit mode
     await expect(participantPage).toHaveURL(/\/session\/.*\/swipe/);
     await expect(participantPage.locator('text=Update your choices')).toBeVisible();
+    await expect(participantPage.getByRole('button', { name: 'Sushi YUM' })).toBeVisible();
+    await participantPage.getByRole('button', { name: 'Sushi YUM' }).click();
+    await expect(participantPage.getByRole('button', { name: 'Sushi MAYBE' })).toBeVisible();
+    await participantPage.getByRole('button', { name: 'Submit Votes' }).click();
+    await expect(participantPage).toHaveURL(/\/results\//);
+    await participantPage.reload();
+    await participantPage.getByRole('button', { name: 'Update Your Choices' }).click();
+    await expect(participantPage.getByRole('button', { name: 'Sushi MAYBE' })).toBeVisible();
+    await participantPage.close();
   });
 });

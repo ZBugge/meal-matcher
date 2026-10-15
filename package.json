@@ -4,6 +4,8 @@
   "description": "Collaborative meal decision app with swipe interface",
   "private": true,
   "scripts": {
+    "verify": "node scripts/verify.mjs",
+    "audit:adversarial": "node scripts/audit-adversarial.mjs",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",

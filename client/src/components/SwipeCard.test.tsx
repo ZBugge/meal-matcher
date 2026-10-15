@@ -51,7 +51,7 @@ describe('SwipeCard', () => {
   it('should apply stronger shadow and border styles to card', () => {
     const { container } = render(<SwipeCard {...defaultProps} />);
     const card = container.querySelector('.shadow-2xl.border-2.border-gray-300');
-    expect(card).toBeDefined();
+    expect(card).not.toBeNull();
   });
 
   it('should render smaller, more subtle buttons', () => {

@@ -1,4 +1,13 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function voteByTitle(page: Page, votes: Record<string, 'yes' | 'no'>) {
+  for (let index = 0; index < Object.keys(votes).length; index++) {
+    const title = await page.locator('h2').innerText();
+    expect(votes[title], `Unexpected card: ${title}`).toBeDefined();
+    await page.getByTestId(`swipe-${votes[title]}`).click();
+    if (index < Object.keys(votes).length - 1) await expect(page.locator('h2')).not.toHaveText(title);
+  }
+}
 
 test.describe('Authenticated Host Flow', () => {
   // Helper to add a meal via the modal
@@ -10,14 +19,14 @@ test.describe('Authenticated Host Flow', () => {
     await modal.locator('input.input').fill(title);
 
     if (description) {
-      await modal.locator('textarea.input').fill(description);
+      await modal.getByPlaceholder('e.g., Beef tacos with all the fixings').fill(description);
     }
 
     await modal.locator('button:has-text("Add Meal")').click();
     await expect(page.locator('h3:has-text("Add New Meal")')).not.toBeVisible();
   }
 
-  test('full flow: register, create meals, start session, invite participant, get results', async ({ page, context }) => {
+  test('full flow: register, create meals, start session, invite participant, get results', async ({ page, browser }) => {
     const uniqueEmail = `host-${Date.now()}@example.com`;
 
     // Step 1: Register a new account
@@ -60,42 +69,43 @@ test.describe('Authenticated Host Flow', () => {
     const inviteCode = inviteUrl.split('/join/')[1];
 
     // Open participant in new tab
-    const participantPage = await context.newPage();
+    const participantPage = await browser.newPage({ baseURL: test.info().project.use.baseURL });
     await participantPage.goto(`/join/${inviteCode}`);
 
     // Participant enters name
     await participantPage.fill('#name', 'Family Member');
     await participantPage.click('text=Start Swiping');
 
-    // Participant swipes
-    await participantPage.locator('[data-testid="swipe-yes"]').click();
-    await participantPage.locator('[data-testid="swipe-no"]').click();
-    await participantPage.locator('[data-testid="swipe-yes"]').click();
+    await voteByTitle(participantPage, { 'Homemade Pizza': 'yes', 'Thai Curry': 'no', 'Grilled Salmon': 'yes' });
 
     // Participant sees results
     await expect(participantPage).toHaveURL(/\/results\//, { timeout: 5000 });
 
-    // Step 5: Host joins directly via the link (open in new context page, not popup)
-    const hostSwipePage = await context.newPage();
+    // The host keeps their login; the invited partner has a separate browser context.
+    const hostSwipePage = await page.context().newPage();
     await hostSwipePage.goto(`/join/${inviteCode}`);
 
     // Host enters name and swipes
     await hostSwipePage.fill('#name', 'Host');
     await hostSwipePage.click('text=Start Swiping');
 
-    await hostSwipePage.locator('[data-testid="swipe-yes"]').click();
-    await hostSwipePage.locator('[data-testid="swipe-yes"]').click();
-    await hostSwipePage.locator('[data-testid="swipe-no"]').click();
+    await voteByTitle(hostSwipePage, { 'Homemade Pizza': 'yes', 'Thai Curry': 'yes', 'Grilled Salmon': 'no' });
 
     // Host sees results
     await expect(hostSwipePage).toHaveURL(/\/results\//, { timeout: 5000 });
 
+    await participantPage.close();
+    await hostSwipePage.close();
+
     // Step 6: Back to main page, close session to see results
     await page.reload();
+    await expect(page.getByText('2 of 2 participants have voted')).toBeVisible();
     await page.click('text=Close Session');
 
     // Then: Results section appears
     await expect(page.locator('h2:has-text("Results")')).toBeVisible({ timeout: 5000 });
+
+    await expect(page.getByText('Homemade Pizza', { exact: true }).first()).toBeVisible();
 
     // And: Can see vote percentages
     await expect(page.locator('text=/%/').first()).toBeVisible();

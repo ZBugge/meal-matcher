@@ -157,3 +157,26 @@ export interface QuickSessionRequest {
   meals: { title: string; description?: string }[];
   mode?: SessionMode;
 }
+
+
+export interface PlanEntry {
+  id: string;
+  mealId: string | null;
+  kind: 'home' | 'takeout';
+  title: string;
+  date: string | null;
+}
+export interface ShoppingItem {
+  id: string;
+  entryId: string | null;
+  sourceTitle: string | null;
+  amount: string;
+  ingredient: string;
+  state: 'needed' | 'have' | 'bought';
+  displayOrder: number;
+}
+export interface WeekPlan {
+  week: string;
+  entries: PlanEntry[];
+  shopping: ShoppingItem[];
+}

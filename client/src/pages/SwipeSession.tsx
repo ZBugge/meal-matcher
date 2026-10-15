@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { participantApi } from '../api/client';
 import type { SessionMode } from '../api/client';
@@ -9,6 +9,7 @@ interface SessionData {
   participantId: string;
   displayName: string;
   mode?: SessionMode;
+  submittedSwipes?: Record<string, number>;
   meals: Array<{
     id: string;
     title: string;
@@ -19,56 +20,54 @@ interface SessionData {
 
 export function SwipeSession() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  return <SwipeSessionContent key={sessionId} sessionId={sessionId} />;
+}
+
+function SwipeSessionContent({ sessionId }: { sessionId: string | undefined }) {
   const navigate = useNavigate();
   const location = useLocation();
   const editMode = location.state?.editMode || false;
-  const [sessionData, setSessionData] = useState<SessionData | null>(null);
+  const [sessionData, setSessionData] = useState<SessionData | null>(() => {
+    try {
+      const stored = sessionId && sessionStorage.getItem(`session_${sessionId}`);
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(sessionData ? '' : 'Session data not found. Please rejoin the session.');
   const [sessionClosed, setSessionClosed] = useState(false);
   const [hintStyle, setHintStyle] = useState<'bounce' | 'arrows' | 'text'>('bounce');
 
-  // Initialize progress hook with placeholder values first
+  // Session context is hydrated before the progress key and deck are initialized.
   const displayName = sessionData?.displayName || '';
   const { progress, saveProgress, clearProgress } = useSwipeProgress(
     sessionId || '',
-    displayName
+    displayName,
+    sessionData?.participantId
   );
 
-  const loadSessionData = useCallback(() => {
-    if (!sessionId) return;
-
-    // Try to get session data from storage
-    const stored = sessionStorage.getItem(`session_${sessionId}`);
-    if (stored) {
-      setSessionData(JSON.parse(stored));
-    } else {
-      // No session data - redirect to join
-      setError('Session data not found. Please rejoin the session.');
-    }
-  }, [sessionId]);
+  const active = useRef(false);
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
+  }, []);
 
   useEffect(() => {
-    loadSessionData();
-  }, [loadSessionData]);
+    if (!submitted) return;
+    const timeout = window.setTimeout(() => navigate(`/results/${sessionId}`), 1500);
+    return () => window.clearTimeout(timeout);
+  }, [submitted, sessionId, navigate]);
 
-  const handleSwipe = (
-    _mealId: string,
-    _vote: number,
-    allSwipes: Record<string, number>
-  ) => {
+  const handleProgress = (allSwipes: Record<string, number>, currentIndex: number) => {
     if (!sessionData || !sessionId) return;
-
-    // Calculate current index from swipes
-    const currentIndex = Object.keys(allSwipes).length;
-
-    // Save progress to local storage
     saveProgress(sessionData.participantId, allSwipes, currentIndex);
   };
 
   const handleComplete = async (swipes: Record<string, number>) => {
-    if (!sessionId || !sessionData) return;
+    if (!sessionId || !sessionData || submitting) return;
 
     setSubmitting(true);
     setError('');
@@ -82,16 +81,18 @@ export function SwipeSession() {
 
       await participantApi.submitSwipes(sessionId, sessionData.participantId, swipeArray);
 
-      // Clear local storage progress (but keep session data for "Update Choices")
+      if (!active.current) return;
+      const updatedSession = { ...sessionData, submittedSwipes: { ...swipes } };
+      sessionStorage.setItem(`session_${sessionId}`, JSON.stringify(updatedSession));
+      setSessionData(updatedSession);
+
+      // Keep the last accepted ballot in this tab's context; clear only the draft.
       clearProgress();
 
       setSubmitted(true);
 
-      // Navigate to results after a brief moment
-      setTimeout(() => {
-        navigate(`/results/${sessionId}`);
-      }, 1500);
     } catch (err) {
+      if (!active.current) return;
       // Check if the session was closed
       if (err && typeof err === 'object' && 'sessionClosed' in err && err.sessionClosed) {
         // Clear storage
@@ -161,20 +162,9 @@ export function SwipeSession() {
     );
   }
 
-  if (submitting) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="card text-center max-w-md">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4" />
-          <p className="text-gray-600">Submitting your votes...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Get initial state from progress if available
-  const initialSwipes = progress?.swipes || {};
-  const initialIndex = editMode ? sessionData.meals.length : (progress?.currentIndex || 0);
+  const initialSwipes = progress?.swipes || (editMode ? sessionData.submittedSwipes : undefined) || {};
+  const initialIndex = progress?.currentIndex ?? (editMode ? sessionData.meals.length : 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-200 to-gray-300 py-6 px-4">
@@ -212,15 +202,20 @@ export function SwipeSession() {
         )}
 
         {/* Swipe deck */}
+        {submitting && <p role="status" className="text-center mb-4">Submitting your votes...</p>}
+        <fieldset disabled={submitting} className={submitting ? 'pointer-events-none opacity-50' : ''}>
         <SwipeDeck
           meals={sessionData.meals}
           initialSwipes={initialSwipes}
           initialIndex={initialIndex}
-          onSwipe={handleSwipe}
+          onSwipe={() => {}}
+          onProgressChange={handleProgress}
+          canRetry={!!error}
           onComplete={handleComplete}
           editMode={editMode}
           hintStyle={hintStyle}
         />
+        </fieldset>
       </div>
     </div>
   );

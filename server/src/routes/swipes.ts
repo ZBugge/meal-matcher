@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { runQuery, getOne, getAll } from '../db/schema';
+import { runQuery, getOne, getAll, getDatabase, saveDatabase } from '../db/schema';
 import { Session, Meal, Participant, JoinSessionRequest, SubmitSwipesRequest } from '../types';
 import { calculateResults } from '../services/matching';
 
@@ -111,9 +111,9 @@ router.post('/join/:inviteCode', (req, res) => {
 router.post('/swipes/:sessionId', (req, res) => {
   try {
     const { sessionId } = req.params;
-    const { participantId, swipes } = req.body as SubmitSwipesRequest;
+    const { participantId, swipes } = (req.body ?? {}) as SubmitSwipesRequest;
 
-    if (!participantId || !swipes || swipes.length === 0) {
+    if (typeof participantId !== 'string' || !participantId.trim() || !Array.isArray(swipes) || swipes.length === 0) {
       res.status(400).json({ error: 'Participant ID and swipes are required' });
       return;
     }
@@ -144,33 +144,75 @@ router.post('/swipes/:sessionId', (req, res) => {
 
     const mealToSessionMeal = new Map(sessionMeals.map(sm => [sm.meal_id, sm.id]));
 
-    // Delete existing swipes if updating choices
-    if (participant.submitted === 1) {
-      runQuery('DELETE FROM swipes WHERE participant_id = ?', [participantId]);
+    // A completed deck submits one vote for every option, including on edits.
+    if (swipes.length !== sessionMeals.length) {
+      res.status(400).json({ error: 'A vote is required for every option in the session' });
+      return;
     }
 
-    // Insert swipes
+    // Validate the entire replacement before touching any accepted choices.
+    const seenMealIds = new Set<string>();
     for (const swipe of swipes) {
+      if (!swipe || typeof swipe !== 'object' || Array.isArray(swipe) || typeof swipe.mealId !== 'string') {
+        res.status(400).json({ error: 'Each swipe must contain a meal ID and numeric vote' });
+        return;
+      }
       const sessionMealId = mealToSessionMeal.get(swipe.mealId);
       if (!sessionMealId) {
         res.status(400).json({ error: `Invalid meal ID: ${swipe.mealId}` });
         return;
       }
 
+      if (seenMealIds.has(swipe.mealId)) {
+        res.status(400).json({ error: 'Each option must have exactly one vote' });
+        return;
+      }
+      seenMealIds.add(swipe.mealId);
+
       // Validate vote value
       if (![0, 1, 2].includes(swipe.vote)) {
-        res.status(400).json({ error: `Invalid vote value: ${swipe.vote}. Must be 0 (no), 1 (yes), or 2 (maybe)` });
+        res.status(400).json({ error: 'Invalid vote value. Must be 0 (no), 1 (yes), or 2 (maybe)' });
         return;
       }
 
-      runQuery(
-        'INSERT OR REPLACE INTO swipes (id, participant_id, session_meal_id, vote) VALUES (?, ?, ?, ?)',
-        [uuidv4(), participantId, sessionMealId, swipe.vote]
-      );
     }
 
-    // Mark participant as submitted
-    runQuery('UPDATE participants SET submitted = 1 WHERE id = ?', [participantId]);
+    const database = getDatabase();
+    const previousSwipes = getAll<{
+      id: string; participant_id: string; session_meal_id: string; vote: number; created_at: string;
+    }>('SELECT * FROM swipes WHERE participant_id = ?', [participantId]);
+    database.run('BEGIN TRANSACTION');
+    try {
+      database.run('DELETE FROM swipes WHERE participant_id = ?', [participantId]);
+      for (const swipe of swipes) {
+        database.run(
+          'INSERT INTO swipes (id, participant_id, session_meal_id, vote) VALUES (?, ?, ?, ?)',
+          [uuidv4(), participantId, mealToSessionMeal.get(swipe.mealId)!, swipe.vote]
+        );
+      }
+      database.run('UPDATE participants SET submitted = 1 WHERE id = ?', [participantId]);
+      database.run('COMMIT');
+    } catch (error) {
+      database.run('ROLLBACK');
+      throw error;
+    }
+    try {
+      // Export only after commit: sql.js export closes and reopens its connection.
+      saveDatabase();
+    } catch (error) {
+      // A failed disk write must not leave a rejected ballot accepted in memory.
+      database.run('BEGIN TRANSACTION');
+      database.run('DELETE FROM swipes WHERE participant_id = ?', [participantId]);
+      for (const swipe of previousSwipes) {
+        database.run(
+          'INSERT INTO swipes (id, participant_id, session_meal_id, vote, created_at) VALUES (?, ?, ?, ?, ?)',
+          [swipe.id, swipe.participant_id, swipe.session_meal_id, swipe.vote, swipe.created_at]
+        );
+      }
+      database.run('UPDATE participants SET submitted = ? WHERE id = ?', [participant.submitted, participantId]);
+      database.run('COMMIT');
+      throw error;
+    }
 
     res.json({ message: 'Swipes submitted successfully' });
   } catch (error) {
@@ -281,7 +323,7 @@ router.post('/close-session/:sessionId', (req, res) => {
     );
 
     // Calculate and return results
-    const results = calculateResults(sessionId, true);
+    const results = calculateResults(sessionId, req.session.hostId === session.host_id);
 
     res.json({
       message: 'Session closed successfully',

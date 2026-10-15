@@ -1,0 +1,4 @@
+interface:
+  display_name: "MealMatch Delivery"
+  short_description: "Check and run scoped MealMatch delivery batches"
+  default_prompt: "Use $meal-match-delivery to continue the authorized family-app delivery through implementation, tests, review and normal shipping. Make reasonable reversible choices and hand me a working app for feedback."

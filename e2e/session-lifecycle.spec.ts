@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Session Lifecycle (#1)', () => {
-  test('host can end session early and participants see ended message', async ({ page, context }) => {
+  test('host can end session early and participants see ended message', async ({ page, browser }) => {
     // Given: Host creates a quick session
     await page.goto('/');
     await page.fill('#name', 'Host');
@@ -22,7 +22,7 @@ test.describe('Session Lifecycle (#1)', () => {
     await expect(page).toHaveURL(/\/results\//, { timeout: 5000 });
 
     // When: Participant joins but hasn't finished swiping
-    const participantPage = await context.newPage();
+    const participantPage = await browser.newPage({ baseURL: test.info().project.use.baseURL });
     await participantPage.goto(`/join/${inviteCode}`);
     await participantPage.fill('#name', 'Slow Participant');
     await participantPage.click('text=Start Swiping');
@@ -48,9 +48,10 @@ test.describe('Session Lifecycle (#1)', () => {
 
     // And: Participant can go home
     await expect(participantPage.locator('button:has-text("Go Home")')).toBeVisible();
+    await participantPage.close();
   });
 
-  test('host sees confirmation when ending session with unsubmitted participants', async ({ page, context }) => {
+  test('host sees confirmation when ending session with unsubmitted participants', async ({ page, browser }) => {
     // Given: Host creates a quick session
     await page.goto('/');
     await page.fill('#name', 'Host');
@@ -68,28 +69,30 @@ test.describe('Session Lifecycle (#1)', () => {
     await expect(page).toHaveURL(/\/results\//, { timeout: 5000 });
 
     // Participant joins but doesn't swipe
-    const participantPage = await context.newPage();
+    const participantPage = await browser.newPage({ baseURL: test.info().project.use.baseURL });
     await participantPage.goto(`/join/${inviteCode}`);
     await participantPage.fill('#name', 'Waiting Participant');
     await participantPage.click('text=Start Swiping');
 
     // Wait for participant to show up in the session
-    await page.waitForTimeout(1000);
+    await expect(page.getByText('1 of 2 people have finished voting')).toBeVisible();
 
     // When: Host tries to end session
     await page.click('text=End Session & Show Results');
 
     // Then: Confirmation modal appears warning about unfinished participants
     await expect(page.locator('text=End Session?')).toBeVisible();
+    await expect(page.getByText("1 person hasn't finished voting yet.")).toBeVisible();
 
     // When: Host confirms by clicking the button inside the modal
     await page.locator('.fixed.inset-0 button:has-text("End Session")').click();
 
     // Then: Session ends and results are shown
     await expect(page.locator('h1:has-text("Results")')).toBeVisible({ timeout: 5000 });
+    await participantPage.close();
   });
 
-  test('waiting participant sees vote count update in real-time', async ({ page, context }) => {
+  test('waiting participant sees vote count update in real-time', async ({ page, browser }) => {
     // Given: Host creates a session
     await page.goto('/');
     await page.fill('#name', 'Host');
@@ -105,17 +108,21 @@ test.describe('Session Lifecycle (#1)', () => {
     await page.locator('[data-testid="swipe-yes"]').click();
     await expect(page).toHaveURL(/\/results\//, { timeout: 5000 });
 
+    await expect(page.getByText('1 of 1 people have finished voting')).toBeVisible();
+
     // Participant 1 joins
-    const participant1 = await context.newPage();
+    const participant1 = await browser.newPage({ baseURL: test.info().project.use.baseURL });
     await participant1.goto(`/join/${inviteCode}`);
     await participant1.fill('#name', 'Participant 1');
     await participant1.click('text=Start Swiping');
+    await expect(page.getByText('1 of 2 people have finished voting')).toBeVisible();
     await participant1.locator('[data-testid="swipe-yes"]').click();
     await expect(participant1).toHaveURL(/\/results\//, { timeout: 5000 });
 
     // Then: Host page shows participant count updating
     // "X of Y people have finished voting"
-    await expect(page.locator('text=/\\d+ of \\d+ people have finished voting/')).toBeVisible();
+    await expect(page.getByText('2 of 2 people have finished voting')).toBeVisible();
+    await participant1.close();
   });
 
   test('participant can go home after session ends', async ({ page }) => {

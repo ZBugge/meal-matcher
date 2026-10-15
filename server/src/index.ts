@@ -1,3 +1,4 @@
+import plansRoutes from './routes/plans';
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
@@ -8,6 +9,7 @@ import mealsRoutes from './routes/meals';
 import sessionsRoutes from './routes/sessions';
 import swipesRoutes from './routes/swipes';
 import quickSessionRoutes from './routes/quick-session';
+import { SqliteSessionStore } from './services/sessionStore';
 
 declare module 'express-session' {
   interface SessionData {
@@ -45,20 +47,23 @@ app.use(express.json());
 // Session middleware
 const sessionSecret = process.env.SESSION_SECRET || 'dev-secret-change-in-production';
 app.use(session({
+  store: new SqliteSessionStore(),
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
+  rolling: true,
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+    maxAge: 1000 * 60 * 60 * 24 * 30,
   },
 }));
 
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/meals', mealsRoutes);
+app.use('/api/plans', plansRoutes);
 app.use('/api/sessions', sessionsRoutes);
 app.use('/api/quick-session', quickSessionRoutes);
 app.use('/api', swipesRoutes);

@@ -7,7 +7,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: `http://localhost:${process.env.MEALMATCH_API_PORT || '3000'}`,
         changeOrigin: true,
       },
     },

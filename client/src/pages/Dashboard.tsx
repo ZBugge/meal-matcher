@@ -39,6 +39,9 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeMode, setActiveMode] = useState<SessionMode>('home');
+  const [libraryCollapsed, setLibraryCollapsed] = useState(false);
+  const [historyCollapsed, setHistoryCollapsed] = useState(false);
+  const [search, setSearch] = useState('');
 
   // Modal states
   const [showAddMeal, setShowAddMeal] = useState(false);
@@ -86,6 +89,7 @@ export function Dashboard() {
 
   const activeType = activeMode === 'home' ? 'meal' : 'category';
   const activeMeals = meals.filter((meal) => meal.type === activeType);
+  const visibleMeals = activeMeals.filter(meal => `${meal.title} ${meal.description || ''}`.toLowerCase().includes(search.trim().toLowerCase()));
   const sessionType = sessionMode === 'home' ? 'meal' : 'category';
   const sessionMeals = meals.filter((meal) => meal.type === sessionType);
 
@@ -560,6 +564,14 @@ export function Dashboard() {
         )}
 
         {/* Saved options */}
+        <section className="mb-8" aria-label="Choose meals together">
+          <p className="mb-3 text-gray-600">Choose together, then add a few favorites to your week.</p>
+          <div className="grid grid-cols-2 gap-4">
+            <button onClick={() => navigate('/quick')} className="btn btn-secondary py-4 text-lg">Quick Session</button>
+            {meals.length > 0 && <button onClick={openCreateSession} className="btn btn-success py-4 text-lg">Create Session</button>}
+          </div>
+          {meals.length === 0 && <p className="text-sm text-gray-600 mt-2">Add saved options to create a session from your library, or use Quick Session to start immediately.</p>}
+        </section>
         <section className="mb-12">
           <div className="inline-flex rounded-lg bg-gray-100 p-1 mb-6" aria-label="Food library">
             <button
@@ -580,11 +592,14 @@ export function Dashboard() {
             </button>
           </div>
 
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
+            <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-2xl font-bold">
                 {activeMode === 'home' ? 'My Meals' : 'My Food Categories'}
               </h2>
+              <button type="button" aria-expanded={!libraryCollapsed} aria-controls="saved-library" onClick={() => setLibraryCollapsed(value => !value)} className="text-sm text-gray-600 underline">
+                {libraryCollapsed ? 'Show library' : 'Hide library'}
+              </button>
               {activeMeals.length > 0 && (
                 <>
                   <button
@@ -628,6 +643,12 @@ export function Dashboard() {
             )}
           </div>
 
+          <div id="saved-library" hidden={libraryCollapsed}>
+          <label className="mb-4 block text-sm font-medium text-gray-600">
+            Search your {activeMode === 'home' ? 'recipes' : 'categories'}
+            <input type="search" className="input mt-2" value={search} onChange={event => setSearch(event.target.value)} placeholder="Find a favorite…" />
+          </label>
+          {activeMeals.length > 0 && visibleMeals.length === 0 && <p className="py-4 text-gray-500">No matching options. Try another search.</p>}
           {activeMeals.length === 0 ? (
             activeMode === 'takeout' && !takeoutOnboardingDismissed ? (
               <div className="card text-center py-12">
@@ -659,7 +680,7 @@ export function Dashboard() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <AnimatePresence mode="popLayout">
-                {activeMeals.map((meal) => {
+                {visibleMeals.map((meal) => {
                   const isDeleting = deletingMealIds.includes(meal.id);
                   const isSingleDelete = deletingMealIds.length === 1 && isDeleting;
                   const isSelectedForDeletion = selectedForDeletion.includes(meal.id);
@@ -712,6 +733,7 @@ export function Dashboard() {
                           {meal.description && (
                             <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
                           )}
+                          {meal.type === 'meal' && !editMode && <button type="button" onClick={() => navigate(`/cook/${meal.id}`)} className="mt-2 text-sm font-medium text-primary-700 underline">Cook this recipe</button>}
                           {meal.type === 'meal'
                             && (meal.instructions || (meal.ingredients?.length ?? 0) > 0) && (
                             <p className="text-xs text-primary-600 mt-2">
@@ -764,36 +786,15 @@ export function Dashboard() {
               </AnimatePresence>
             </div>
           )}
-        </section>
-
-        {/* Create Session Buttons */}
-        <section className="mb-12">
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => navigate('/')}
-              className="btn btn-secondary py-4 text-lg"
-            >
-              Quick Session
-            </button>
-            {meals.length > 0 ? (
-              <button
-                onClick={openCreateSession}
-                className="btn btn-success py-4 text-lg"
-              >
-                Create Session
-              </button>
-            ) : null}
           </div>
-          {meals.length === 0 ? (
-            <p className="text-sm text-gray-600 mt-2 text-center">
-              Add saved options to create a session from your library, or use Quick Session to start immediately.
-            </p>
-          ) : null}
         </section>
 
         {/* Sessions Section */}
         <section>
-          <h2 className="text-2xl font-bold mb-4">Recent Sessions</h2>
+          <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-2xl font-bold">Recent Sessions</h2>
+            <button type="button" aria-expanded={!historyCollapsed} aria-controls="session-history" onClick={() => setHistoryCollapsed(value => !value)} className="text-sm text-gray-600 underline">{historyCollapsed ? 'Show history' : 'Hide history'}</button>
+          </div>
+          <div id="session-history" hidden={historyCollapsed}>
 
           {sessions.length === 0 ? (
             <div className="card text-center py-8">
@@ -882,6 +883,7 @@ export function Dashboard() {
               ))}
             </div>
           )}
+          </div>
         </section>
       </main>
 

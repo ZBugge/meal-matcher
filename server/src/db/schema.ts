@@ -1,6 +1,7 @@
 import initSqlJs, { Database } from 'sql.js';
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 
 let db: Database | null = null;
 
@@ -85,6 +86,7 @@ function runMigrations(database: Database): void {
     ON meal_ingredients(meal_id, display_order)
   `);
 
+  createPlanningTables(database);
   saveDatabase();
 }
 
@@ -96,7 +98,29 @@ function columnExists(database: Database, table: string, column: string): boolea
   return result[0].values.some((row) => row[nameIndex] === column);
 }
 
+function createPlanningTables(database: Database): void {
+  database.run(`
+    CREATE TABLE IF NOT EXISTS login_sessions (
+      id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS plan_entries (
+      id TEXT PRIMARY KEY, host_id TEXT NOT NULL REFERENCES hosts(id),
+      week TEXT NOT NULL, meal_id TEXT REFERENCES meals(id), kind TEXT NOT NULL,
+      title TEXT NOT NULL, date TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_plan_entries_host_week ON plan_entries(host_id, week);
+    CREATE TABLE IF NOT EXISTS shopping_items (
+      id TEXT PRIMARY KEY, host_id TEXT NOT NULL REFERENCES hosts(id), week TEXT NOT NULL,
+      entry_id TEXT REFERENCES plan_entries(id), source_title TEXT,
+      amount TEXT NOT NULL DEFAULT '', ingredient TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT 'needed', display_order INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_shopping_items_host_week ON shopping_items(host_id, week);
+  `);
+}
+
 function createTables(database: Database): void {
+  createPlanningTables(database);
   database.run(`
     -- Host accounts
     CREATE TABLE IF NOT EXISTS hosts (
@@ -204,7 +228,31 @@ export function saveDatabase(): void {
 
   const data = db.export();
   const buffer = Buffer.from(data);
-  fs.writeFileSync(DATABASE_PATH, buffer);
+  // Write beside the database, then replace it atomically. A failed/partial
+  // write must never truncate the last successfully persisted database.
+  const temporaryPath = `${DATABASE_PATH}.${randomUUID()}.tmp`;
+  try {
+    fs.writeFileSync(temporaryPath, buffer);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        fs.renameSync(temporaryPath, DATABASE_PATH);
+        break;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        // Windows scanners can briefly lock either file. Preserve atomic replacement
+        // and bound the total sharing-violation retry delay to 150 milliseconds.
+        if (attempt >= 4 || !['EPERM', 'EACCES', 'EBUSY'].includes(code || '')) throw error;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10 * 2 ** attempt);
+      }
+    }
+  } catch (error) {
+    try {
+      fs.rmSync(temporaryPath, { force: true });
+    } catch {
+      // Preserve the original persistence error if temporary-file cleanup fails.
+    }
+    throw error;
+  }
 }
 
 // Helper to run queries and save automatically

@@ -40,3 +40,4 @@ agents/orchestrator/.env
 # PLaywright
 playwright-report/
 test-results/
+.verification/

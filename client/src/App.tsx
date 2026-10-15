@@ -9,6 +9,10 @@ import { SwipeSession } from './pages/SwipeSession';
 import { Results } from './pages/Results';
 import QuickSession from './pages/QuickSession';
 import { ShareSession } from './pages/ShareSession';
+import { WeekPlan } from './pages/WeekPlan';
+import { ShoppingList } from './pages/ShoppingList';
+import { CookingRecipe } from './pages/CookingRecipe';
+import { FamilyNav } from './components/FamilyNav';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -25,7 +29,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  return <div className="pb-24">{children}<FamilyNav /></div>;
+}
+
+function Home() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="p-8 text-center">Opening your kitchen…</div>;
+  return user ? <Navigate to="/week" replace /> : <QuickSession />;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -50,7 +60,8 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/" element={<QuickSession />} />
+      <Route path="/" element={<Home />} />
+      <Route path="/quick" element={<QuickSession />} />
       <Route
         path="/login"
         element={
@@ -75,6 +86,9 @@ function AppRoutes() {
       <Route path="/results/:sessionId" element={<Results />} />
 
       {/* Protected routes */}
+      <Route path="/week" element={<ProtectedRoute><WeekPlan /></ProtectedRoute>} />
+      <Route path="/shopping" element={<ProtectedRoute><ShoppingList /></ProtectedRoute>} />
+      <Route path="/cook/:mealId" element={<ProtectedRoute><CookingRecipe /></ProtectedRoute>} />
       <Route
         path="/dashboard"
         element={

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
-  // Get stored value or use initial value
-  const [storedValue, setStoredValue] = useState<T>(() => {
+  const readValue = (): T => {
     try {
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
@@ -10,18 +9,32 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
       console.error('Error reading from localStorage:', error);
       return initialValue;
     }
-  });
+  };
+  const [entry, setEntry] = useState(() => ({ key, value: readValue() }));
 
-  // Update localStorage when value changes
+  // Hydrate a new key before children commit; never copy the old key's value to it.
+  const current = entry.key === key ? entry : { key, value: readValue() };
+  if (entry.key !== key) setEntry(current);
+
   useEffect(() => {
+    if (entry.key !== key) return;
     try {
-      window.localStorage.setItem(key, JSON.stringify(storedValue));
+      if (entry.value === null) window.localStorage.removeItem(key);
+      else window.localStorage.setItem(key, JSON.stringify(entry.value));
     } catch (error) {
       console.error('Error writing to localStorage:', error);
     }
-  }, [key, storedValue]);
+  }, [key, entry]);
 
-  return [storedValue, setStoredValue] as const;
+  const setStoredValue = (value: T | ((previous: T) => T)) => {
+    setEntry(previous => ({
+      key,
+      value: typeof value === 'function'
+        ? (value as (previous: T) => T)(previous.key === key ? previous.value : current.value)
+        : value,
+    }));
+  };
+  return [current.value, setStoredValue] as const;
 }
 
 // Swipe progress types
@@ -34,7 +47,7 @@ export interface SwipeProgress {
   savedAt: number;
 }
 
-export function useSwipeProgress(sessionId: string, participantName: string) {
+export function useSwipeProgress(sessionId: string, participantName: string, participantId?: string) {
   const key = `swipe_session_${sessionId}_${participantName}`;
   const [progress, setProgress] = useLocalStorage<SwipeProgress | null>(key, null);
 
@@ -58,5 +71,9 @@ export function useSwipeProgress(sessionId: string, participantName: string) {
     window.localStorage.removeItem(key);
   };
 
-  return { progress, saveProgress, clearProgress };
+  const ownProgress = progress?.sessionId === sessionId &&
+    progress.participantName === participantName &&
+    (!participantId || progress.participantId === participantId) ? progress : null;
+
+  return { progress: ownProgress, saveProgress, clearProgress };
 }

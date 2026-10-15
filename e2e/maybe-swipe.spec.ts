@@ -1,4 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function voteByTitle(page: Page, votes: Record<string, 'yes' | 'no' | 'maybe'>) {
+  for (let index = 0; index < Object.keys(votes).length; index++) {
+    const title = await page.locator('h2').innerText();
+    expect(votes[title], `Unexpected card: ${title}`).toBeDefined();
+    if (votes[title] === 'maybe') await page.getByRole('button', { name: 'Maybe', exact: true }).click();
+    else await page.getByTestId(`swipe-${votes[title]}`).click();
+    // Wait for the exit animation so the next vote targets the next card.
+    if (index < Object.keys(votes).length - 1) await expect(page.locator('h2')).not.toHaveText(title);
+  }
+}
 
 test.describe('Maybe Swipe Flow (#28)', () => {
   test('user can swipe maybe and it shows in results', async ({ page }) => {
@@ -21,14 +32,7 @@ test.describe('Maybe Swipe Flow (#28)', () => {
     await page.click('text=Start Swiping');
     await expect(page).toHaveURL(/\/session\/.*\/swipe/);
 
-    // When: User swipes Yes on first meal
-    await page.locator('[data-testid="swipe-yes"]').click();
-
-    // When: User swipes Maybe on second meal
-    await page.click('button:has-text("Maybe")');
-
-    // When: User swipes No on third meal
-    await page.locator('[data-testid="swipe-no"]').click();
+    await voteByTitle(page, { Pizza: 'yes', Tacos: 'maybe', Sushi: 'no' });
 
     // Then: User is redirected to results (waiting) page
     await expect(page).toHaveURL(/\/results\//, { timeout: 5000 });
@@ -40,11 +44,13 @@ test.describe('Maybe Swipe Flow (#28)', () => {
 
     // Then: Results page shows
     await expect(page.locator('h1:has-text("Results")')).toBeVisible({ timeout: 5000 });
-    // The maybe vote should appear in results - check for "maybe" text
-    await expect(page.locator('text=/maybe/')).toBeVisible();
+    await expect(page.locator('section h3')).toHaveText(['Pizza', 'Tacos', 'Sushi']);
+    const tacos = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Tacos', exact: true }) });
+    await expect(tacos).toContainText('0 yes, 1 maybe / 1 total');
+    await expect(tacos).toContainText('100%');
   });
 
-  test('maybe votes are ranked below unanimous yes votes', async ({ page, context }) => {
+  test('maybe votes are ranked below unanimous yes votes', async ({ page, browser }) => {
     // Given: A session is created with 2 meals
     await page.goto('/');
     await page.fill('#name', 'Host');
@@ -60,20 +66,16 @@ test.describe('Maybe Swipe Flow (#28)', () => {
 
     // Host swipes: Yes on both
     await page.click('text=Start Swiping');
-    await page.locator('[data-testid="swipe-yes"]').click();
-    await page.locator('[data-testid="swipe-yes"]').click();
+    await voteByTitle(page, { 'Unanimous Choice': 'yes', 'Maybe Choice': 'yes' });
     await expect(page).toHaveURL(/\/results\//, { timeout: 5000 });
 
     // Participant joins and swipes: Yes on first, Maybe on second
-    const participantPage = await context.newPage();
+    const participantPage = await browser.newPage({ baseURL: test.info().project.use.baseURL });
     await participantPage.goto(`/join/${inviteCode}`);
     await participantPage.fill('#name', 'Participant');
     await participantPage.click('text=Start Swiping');
 
-    // Yes on Unanimous Choice
-    await participantPage.locator('[data-testid="swipe-yes"]').click();
-    // Maybe on Maybe Choice
-    await participantPage.click('button:has-text("Maybe")');
+    await voteByTitle(participantPage, { 'Unanimous Choice': 'yes', 'Maybe Choice': 'maybe' });
 
     await expect(participantPage).toHaveURL(/\/results\//, { timeout: 5000 });
 
@@ -84,11 +86,14 @@ test.describe('Maybe Swipe Flow (#28)', () => {
     // Then: Results show with the data
     await expect(page.locator('h1:has-text("Results")')).toBeVisible({ timeout: 5000 });
 
-    // The unanimous yes (Unanimous Choice) should have 100% - check it appears
-    await expect(page.locator('text=Unanimous Choice')).toBeVisible();
-    await expect(page.locator('text=Maybe Choice')).toBeVisible();
-
-    // One should be unanimous (Everyone agreed!)
-    await expect(page.locator('text=Everyone agreed!')).toBeVisible();
+    await expect(page.locator('section h3')).toHaveText(['Unanimous Choice', 'Maybe Choice']);
+    const unanimous = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Unanimous Choice', exact: true }) });
+    const maybe = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Maybe Choice', exact: true }) });
+    await expect(unanimous).toContainText('2 yes / 2 total');
+    await expect(unanimous).toContainText('Everyone agreed!');
+    await expect(maybe).toContainText('1 yes, 1 maybe / 2 total');
+    await expect(maybe).toContainText('100%');
+    await expect(maybe).not.toContainText('Everyone agreed!');
+    await participantPage.close();
   });
 });

@@ -109,6 +109,8 @@ describe('database schema migrations', () => {
     const mealColumns = freshDatabase.exec('PRAGMA table_info(meals)')[0].values;
     expect(mealColumns.some((column) => column[1] === 'instructions')).toBe(true);
     expect(mealColumns.some((column) => column[1] === 'notes')).toBe(true);
+    expect(freshDatabase.exec('PRAGMA table_info(shopping_items)')[0].values.some(column => column[1] === 'aisle')).toBe(true);
+    expect(freshDatabase.exec('PRAGMA table_info(dinner_staples)')[0].values.map(column => column[1])).toEqual(['id', 'host_id', 'title']);
     const ingredientColumns = freshDatabase.exec('PRAGMA table_info(meal_ingredients)')[0].values;
     expect(ingredientColumns.map((column) => column[1])).toEqual([
       'id',
@@ -176,4 +178,20 @@ describe('database schema migrations', () => {
     })]);
     reopenedDatabase.close();
   });
+  it('adds aisle and staple storage to existing family plans without losing progress', async () => {
+    process.env.DATABASE_PATH = freshDatabasePath; vi.resetModules();
+    const schema = await import('./schema'); const database = await schema.initializeDatabase();
+    database.run("INSERT INTO hosts (id, email, password_hash) VALUES ('family', 'family@test', 'hash')");
+    database.run("INSERT INTO plan_entries (id, host_id, week, kind, title) VALUES ('dinner', 'family', '2026-10-12', 'takeout', 'Pizza')");
+    database.run("INSERT INTO shopping_items (id, host_id, week, ingredient, amount, state) VALUES ('item', 'family', '2026-10-12', 'Milk', '1 carton', 'bought')");
+    database.run('ALTER TABLE shopping_items DROP COLUMN aisle; DROP TABLE dinner_staples;'); schema.saveDatabase(); database.close();
+    vi.resetModules(); const migrated = await import('./schema'); const reopened = await migrated.initializeDatabase();
+    expect(migrated.getAll('SELECT ingredient, amount, state, aisle FROM shopping_items')).toEqual([{ ingredient: 'Milk', amount: '1 carton', state: 'bought', aisle: null }]);
+    expect(migrated.getAll('SELECT title FROM plan_entries')).toEqual([{ title: 'Pizza' }]);
+    expect(migrated.getAll('SELECT * FROM dinner_staples')).toEqual([]);
+    migrated.runQuery("INSERT INTO dinner_staples VALUES ('staple', 'family', 'Tofu night')"); reopened.close();
+    vi.resetModules(); const again = await import('./schema'); const final = await again.initializeDatabase();
+    expect(again.getAll('SELECT title FROM dinner_staples')).toEqual([{ title: 'Tofu night' }]); final.close();
+  });
+
 });

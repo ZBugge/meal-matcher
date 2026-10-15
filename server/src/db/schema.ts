@@ -87,6 +87,7 @@ function runMigrations(database: Database): void {
   `);
 
   createPlanningTables(database);
+  if (!columnExists(database, 'shopping_items', 'aisle')) database.run('ALTER TABLE shopping_items ADD COLUMN aisle TEXT');
   saveDatabase();
 }
 
@@ -100,6 +101,9 @@ function columnExists(database: Database, table: string, column: string): boolea
 
 function createPlanningTables(database: Database): void {
   database.run(`
+    CREATE TABLE IF NOT EXISTS dinner_staples (
+      id TEXT PRIMARY KEY, host_id TEXT NOT NULL REFERENCES hosts(id), title TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS login_sessions (
       id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL
     );
@@ -113,7 +117,7 @@ function createPlanningTables(database: Database): void {
       id TEXT PRIMARY KEY, host_id TEXT NOT NULL REFERENCES hosts(id), week TEXT NOT NULL,
       entry_id TEXT REFERENCES plan_entries(id), source_title TEXT,
       amount TEXT NOT NULL DEFAULT '', ingredient TEXT NOT NULL,
-      state TEXT NOT NULL DEFAULT 'needed', display_order INTEGER NOT NULL DEFAULT 0
+      aisle TEXT, state TEXT NOT NULL DEFAULT 'needed', display_order INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_shopping_items_host_week ON shopping_items(host_id, week);
   `);

@@ -173,6 +173,7 @@ export interface ShoppingItem {
   amount: string;
   ingredient: string;
   state: 'needed' | 'have' | 'bought';
+  aisle: string | null;
   displayOrder: number;
 }
 export interface WeekPlan {
@@ -180,3 +181,5 @@ export interface WeekPlan {
   entries: PlanEntry[];
   shopping: ShoppingItem[];
 }
+
+export interface DinnerStaple { id: string; title: string }

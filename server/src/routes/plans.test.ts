@@ -23,7 +23,7 @@ describe('Private weekly planning HTTP API', () => {
   });
   const get = () => owner.request<WeekPlan>(`/plans/${week}`);
   const add = (body: unknown = { mealId }) => owner.request<WeekPlan>(`/plans/${week}/entries`, 'POST', body);
-  const state = () => ({ entries: getAll('SELECT * FROM plan_entries ORDER BY rowid'), items: getAll('SELECT * FROM shopping_items ORDER BY rowid'), disk: createHash('sha256').update(fs.readFileSync(process.env.DATABASE_PATH!)).digest('hex') });
+  const state = () => ({ entries: getAll('SELECT * FROM plan_entries ORDER BY id'), items: getAll('SELECT * FROM shopping_items ORDER BY id'), staples: getAll('SELECT * FROM dinner_staples ORDER BY id'), disk: createHash('sha256').update(fs.readFileSync(process.env.DATABASE_PATH!)).digest('hex') });
 
   it('reads an empty week without writing and requires authentication', async () => {
     const initial = state();
@@ -50,7 +50,8 @@ describe('Private weekly planning HTTP API', () => {
     expect(response.body.shopping).toHaveLength(5);
     expect((await owner.request(`/plans/${week}/entries/${second.id}`, 'PATCH', { date: null })).status).toBe(200);
     response = await owner.request(`/plans/${week}/entries/${first.id}`, 'DELETE');
-    expect(response.body.shopping).toHaveLength(3);
+    expect(response.body.shopping).toHaveLength(4);
+    expect(response.body.shopping.find(row => row.id === spinach.id)).toMatchObject({ entryId: null, state: 'bought', amount: 'two handfuls' });
     expect(response.body.shopping.some(row => row.id === extraId)).toBe(true);
     expect(response.body.shopping.some(row => row.entryId === first.id)).toBe(false);
     expect((await get()).body).toEqual(response.body);
@@ -117,4 +118,77 @@ describe('Private weekly planning HTTP API', () => {
       expect(state()).toEqual(before); expect((await get()).body).toEqual(plan);
     }
   });
+  it('keeps requested groceries as editable standalone rows and always retains purchased progress', async () => {
+    const plan = (await add()).body;
+    await owner.request(`/plans/${week}/items/${plan.shopping[0].id}`, 'PATCH', { state: 'bought', aisle: 'Other' });
+    const removed = await owner.request<WeekPlan>(`/plans/${week}/entries/${plan.entries[0].id}?keepGroceries=true`, 'DELETE');
+    expect(removed.body.entries).toEqual([]);
+    expect(removed.body.shopping).toHaveLength(2);
+    expect(removed.body.shopping.every(row => row.entryId === null)).toBe(true);
+    expect((await owner.request(`/plans/${week}/items/${plan.shopping[1].id}`, 'PATCH', { amount: '3 bags', state: 'bought' })).status).toBe(200);
+    expect((await get()).body.shopping[0]).toMatchObject({ state: 'bought', aisle: 'Other' });
+  });
+  it('validates every bulk item and restores all accepted states if persistence fails', async () => {
+    const plan = (await add()).body; const ids = plan.shopping.map(row => row.id);
+    const foreign = (await stranger.request<WeekPlan>(`/plans/${week}/items`, 'POST', { ingredient: 'Private' })).body.shopping[0];
+    const before = state();
+    for (const body of [{ ids: [ids[0], foreign.id], state: 'have' }, { ids: [ids[0], 'stale'], state: 'have' }, { ids: [], state: 'have' }, { ids: [ids[0], ids[0]], state: 'have' }, { ids, state: 'invalid' }]) {
+      expect([400, 404]).toContain((await owner.request(`/plans/${week}/items/bulk`, 'POST', body)).status);
+      expect(state()).toEqual(before);
+    }
+    const write = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw new Error('Disk full'); });
+    expect((await owner.request(`/plans/${week}/items/bulk`, 'POST', { ids, state: 'have' })).status).toBe(500);
+    expect(state()).toEqual(before); write.mockRestore();
+    const saved = await owner.request<WeekPlan>(`/plans/${week}/items/bulk`, 'POST', { ids, state: 'have' });
+    expect(saved.body.shopping.every(row => row.state === 'have')).toBe(true);
+  });
+  it('repeats a reviewed source selection with shifted dates, fresh groceries and IDs, appending atomically', async () => {
+    await add({ mealId, date: '2026-10-14' }); await add(); await add({ kind: 'takeout', title: 'Pizza', date: '2026-10-16' });
+    let source = (await get()).body;
+    await owner.request(`/plans/${week}/items/bulk`, 'POST', { ids: source.shopping.map(row => row.id), state: 'bought' });
+    source = (await get()).body;
+    const targetWeek = '2026-10-26';
+    const existing = (await owner.request<WeekPlan>(`/plans/${targetWeek}/entries`, 'POST', { kind: 'takeout', title: 'Existing dinner' })).body;
+    const entryIds = source.entries.map(entry => entry.id);
+    const before = state();
+    for (const body of [{ targetWeek, entryIds: [entryIds[0], 'missing'] }, { targetWeek: week, entryIds }, { targetWeek: '2026-10-27', entryIds }, { targetWeek, entryIds: [] }]) {
+      expect([400, 404]).toContain((await owner.request(`/plans/${week}/repeat`, 'POST', body)).status); expect(state()).toEqual(before);
+    }
+    expect((await stranger.request(`/plans/${week}/repeat`, 'POST', { targetWeek, entryIds })).status).toBe(404);
+    const write = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw new Error('Disk full'); });
+    expect((await owner.request(`/plans/${week}/repeat`, 'POST', { targetWeek, entryIds })).status).toBe(500);
+    expect(state()).toEqual(before); write.mockRestore();
+    const repeated = await owner.request<WeekPlan>(`/plans/${week}/repeat`, 'POST', { targetWeek, entryIds });
+    expect(repeated.status).toBe(201); expect(repeated.body.entries).toHaveLength(4);
+    expect(repeated.body.entries).toContainEqual(existing.entries[0]);
+    expect(repeated.body.entries.filter(entry => entry.title === 'Family soup').map(entry => entry.date)).toEqual(['2026-10-28', null]);
+    expect(repeated.body.entries.find(entry => entry.title === 'Pizza')?.date).toBe('2026-10-30');
+    expect(repeated.body.shopping).toHaveLength(4);
+    expect(repeated.body.shopping.every(row => row.state === 'needed' && !source.shopping.some(old => old.id === row.id))).toBe(true);
+    expect((await get()).body).toEqual(source);
+    const SQL = await initSqlJs(); const reopened = new SQL.Database(fs.readFileSync(process.env.DATABASE_PATH!));
+    try { expect(reopened.exec(`SELECT COUNT(*) FROM plan_entries WHERE week = '${targetWeek}'`)[0].values).toEqual([[4]]); } finally { reopened.close(); }
+  });
+  it('persists editable/removable household dinner staples across weeks, privately and with rollback', async () => {
+    expect((await owner.request(`/plans/${week}/staples`, 'POST', { title: 'Salmon night' })).status).toBe(201);
+    const staples = (await owner.request<{ id: string; title: string }[]>(`/plans/2026-10-19/staples`)).body;
+    expect(staples).toHaveLength(1);
+    const id = staples[0].id; const before = state();
+    expect((await stranger.request(`/plans/${week}/staples`)).body).toEqual([]);
+    expect((await stranger.request(`/plans/${week}/staples/${id}`, 'PATCH', { title: 'Stolen' })).status).toBe(404);
+    expect((await stranger.request(`/plans/${week}/staples/${id}`, 'DELETE')).status).toBe(404);
+    expect(state()).toEqual(before);
+    const write = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw new Error('Disk full'); });
+    for (const [path, method, body] of [['/staples', 'POST', { title: 'Tofu' }], [`/staples/${id}`, 'PATCH', { title: 'Changed' }], [`/staples/${id}`, 'DELETE', undefined]] as const) {
+      expect((await owner.request(`/plans/${week}${path}`, method, body)).status).toBe(500); expect(state()).toEqual(before);
+    }
+    write.mockRestore();
+    expect((await owner.request(`/plans/${week}/staples/${id}`, 'PATCH', { title: 'Asian tofu' })).status).toBe(200);
+    const SQL = await initSqlJs(); const reopened = new SQL.Database(fs.readFileSync(process.env.DATABASE_PATH!));
+    try { expect(reopened.exec(`SELECT title FROM dinner_staples WHERE id = '${id}'`)[0].values).toEqual([['Asian tofu']]); } finally { reopened.close(); }
+    expect((await owner.request(`/plans/${week}/staples/${id}`, 'DELETE')).status).toBe(200);
+    expect((await owner.request(`/plans/${week}/staples`)).body).toEqual([]);
+    expect((await get()).body).toEqual({ week, entries: [], shopping: [] });
+  });
+
 });

@@ -1,12 +1,17 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { planningApi } from '../api/planning';
-import { currentWeekStart } from '../lib/week';
+import { selectedWeek } from '../lib/week';
 
 export function AddToWeek({ mealId, title }: { mealId: string; title: string }) {
+  const [params] = useSearchParams();
+  const week = selectedWeek(params.get('week'));
+  return <AddToWeekTarget key={`${week}:${mealId}`} mealId={mealId} title={title} week={week} />;
+}
+
+function AddToWeekTarget({ mealId, title, week }: { mealId: string; title: string; week: string }) {
   const [state, setState] = useState<'idle' | 'saving' | 'added'>('idle');
   const [error, setError] = useState('');
-  const week = currentWeekStart();
   async function add() {
     if (state !== 'idle') return;
     setState('saving');

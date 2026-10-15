@@ -18,7 +18,7 @@ export function CookingRecipe() {
     return () => { active = false; };
   }, [mealId, reload]);
   return <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-    <div className="flex flex-wrap gap-4"><Link className="btn btn-secondary" to={`/week?week=${week}`}>Back to week plan</Link><Link className="btn btn-secondary" to="/dashboard">My Meals</Link></div>
+    <div className="flex flex-wrap gap-4"><Link className="btn btn-secondary" to={`/week?week=${week}`}>Back to week plan</Link><Link className="btn btn-secondary" to={`/dashboard?week=${week}`}>My Meals</Link></div>
     {loading && <p role="status">Opening recipe…</p>}
     {error && <div role="alert" className="card text-red-700">{error} <button className="underline" onClick={() => setReload(value => value + 1)}>Retry</button></div>}
     {meal && <><h1 className="text-4xl font-bold break-words">{meal.title}</h1>{meal.description && <p className="text-xl">{meal.description}</p>}

@@ -1,3 +1,4 @@
+import { useWeekPath } from '../hooks/useWeekPath';
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { participantApi, SessionMode } from '../api/client';
@@ -5,6 +6,7 @@ import { participantApi, SessionMode } from '../api/client';
 export function JoinSession() {
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const navigate = useNavigate();
+  const weekPath = useWeekPath();
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
@@ -58,7 +60,7 @@ export function JoinSession() {
         })
       );
 
-      navigate(`/session/${response.sessionId}/swipe`);
+      navigate(weekPath(`/session/${response.sessionId}/swipe`));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join session');
       setJoining(false);

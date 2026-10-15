@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
+import { motion, useMotionValue, useTransform, PanInfo, useReducedMotion } from 'framer-motion';
 
 interface SwipeCardProps {
   title: string;
@@ -6,14 +6,17 @@ interface SwipeCardProps {
   onSwipe: (direction: 'left' | 'right') => void;
   progress: string;
   hintStyle?: 'bounce' | 'arrows' | 'text';
+  showIntro?: boolean;
 }
 
 const SWIPE_THRESHOLD = 50;
 const VELOCITY_THRESHOLD = 300;
 const ROTATION_RANGE = 12;
 
-export function SwipeCard({ title, description, onSwipe, progress, hintStyle = 'bounce' }: SwipeCardProps) {
+export function SwipeCard({ title, description, onSwipe, progress, hintStyle = 'bounce', showIntro = true }: SwipeCardProps) {
   const x = useMotionValue(0);
+  const reducedMotion = useReducedMotion();
+  const animateIntro = showIntro && hintStyle === 'bounce' && !reducedMotion;
 
   // Transform x movement into rotation (responds faster with smaller range)
   const rotate = useTransform(x, [-100, 0, 100], [-ROTATION_RANGE, 0, ROTATION_RANGE]);
@@ -53,43 +56,8 @@ export function SwipeCard({ title, description, onSwipe, progress, hintStyle = '
         <span className="text-sm text-gray-500">{progress}</span>
       </div>
 
-      {/* Text hint - above card */}
-      {hintStyle === 'text' && (
-        <motion.div
-          className="text-center mb-2 text-sm text-gray-700 font-medium"
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-        >
-          👆 Swipe to vote
-        </motion.div>
-      )}
-
-      {/* Arrow hints - left and right sides */}
-      {hintStyle === 'arrows' && (
-        <>
-          <motion.div
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-0 text-red-400"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 0.6, x: 0 }}
-            transition={{ repeat: Infinity, duration: 1.5, repeatType: 'reverse' }}
-          >
-            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </motion.div>
-          <motion.div
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-0 text-green-400"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 0.6, x: 0 }}
-            transition={{ repeat: Infinity, duration: 1.5, repeatType: 'reverse' }}
-          >
-            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </motion.div>
-        </>
-      )}
+      <p className="text-center mb-2 text-sm text-gray-700 font-medium">👆 Swipe to vote</p>
+      <p className="text-center mb-3 text-xs text-gray-600">Left: Nope · Right: Yum · Tap Maybe if unsure</p>
 
       {/* Card */}
       <motion.div
@@ -103,19 +71,20 @@ export function SwipeCard({ title, description, onSwipe, progress, hintStyle = '
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.9}
         onDragEnd={handleDragEnd}
-        whileTap={{ scale: 1.02 }}
-        initial={hintStyle === 'bounce' ? { x: 0 } : undefined}
+        whileTap={reducedMotion ? undefined : { scale: 1.02 }}
+        data-swipe-intro={animateIntro ? "true" : "false"}
+        initial={animateIntro ? { x: 0 } : undefined}
         animate={
-          hintStyle === 'bounce'
+          animateIntro
             ? {
-                x: [0, 15, -15, 10, -10, 0],
+                x: [0, -18, 18, 0],
               }
             : undefined
         }
         transition={
-          hintStyle === 'bounce'
+          animateIntro
             ? {
-                duration: 1,
+                duration: 2,
                 delay: 0.3,
                 ease: 'easeInOut',
               }

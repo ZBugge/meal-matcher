@@ -29,7 +29,7 @@ export function Register() {
 
     try {
       await register(email, password);
-      navigate('/dashboard');
+      navigate('/week');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {

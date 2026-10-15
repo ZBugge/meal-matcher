@@ -183,38 +183,9 @@ describe('SwipeSession - Visual Improvements', () => {
     expect(background).not.toBeNull();
   });
 
-  it('should render hint style toggle button', () => {
-    render(
-      <BrowserRouter>
-        <SwipeSession />
-      </BrowserRouter>
-    );
-    const toggleButton = screen.getByText(/Hint: bounce/i);
-    expect(toggleButton).toBeDefined();
-  });
-
-  it('should cycle through hint styles when toggle is clicked', () => {
-    render(
-      <BrowserRouter>
-        <SwipeSession />
-      </BrowserRouter>
-    );
-
-    // Initial state should be bounce
-    expect(screen.getByText(/Hint: bounce/i)).toBeDefined();
-
-    // Click once - should become arrows
-    const toggleButton = screen.getByText(/Hint: bounce/i);
-    fireEvent.click(toggleButton);
-    expect(screen.getByText(/Hint: arrows/i)).toBeDefined();
-
-    // Click again - should become text
-    fireEvent.click(screen.getByText(/Hint: arrows/i));
-    expect(screen.getByText(/Hint: text/i)).toBeDefined();
-
-    // Click once more - should cycle back to bounce
-    fireEvent.click(screen.getByText(/Hint: text/i));
-    expect(screen.getByText(/Hint: bounce/i)).toBeDefined();
+  it('keeps the voting screen free of development hint switches', () => {
+    render(<BrowserRouter><SwipeSession /></BrowserRouter>);
+    expect(screen.queryByText(/Hint: /i)).toBeNull();
   });
 
   it('should display user greeting', () => {
@@ -226,19 +197,5 @@ describe('SwipeSession - Visual Improvements', () => {
     expect(screen.getByText(/Hey Test User!/i)).toBeDefined();
   });
 
-  it('should pass hintStyle prop to SwipeDeck', () => {
-    render(
-      <BrowserRouter>
-        <SwipeSession />
-      </BrowserRouter>
-    );
 
-    // Initial hint style should be bounce
-    expect(screen.getByTestId('hint-style').textContent).toBe('bounce');
-
-    // Toggle to arrows
-    const toggleButton = screen.getByText(/Hint: bounce/i);
-    fireEvent.click(toggleButton);
-    expect(screen.getByTestId('hint-style').textContent).toBe('arrows');
-  });
 });

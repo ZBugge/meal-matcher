@@ -9,17 +9,19 @@ test('family week survives reload and shares shopping and cooking across phones'
   await page.locator('#password').fill(password);
   await page.locator('#confirmPassword').fill(password);
   await page.getByRole('button', { name: 'Create Account' }).click();
-  await expect(page).toHaveURL('/dashboard');
+  await expect(page).toHaveURL('/week');
   // Seed through the real authenticated API so this scenario focuses on the family flow.
   const soup = await page.request.post('/api/meals', { data: { title: 'Sunday soup', type: 'meal', instructions: '1. Rinse the beans.\n2. Simmer for 20 minutes.', ingredients: [{ amount: '2 cans', ingredient: 'Beans' }, { amount: '1 bag', ingredient: 'Spinach' }] } });
   expect(soup.ok()).toBeTruthy();
   const soupId = (await soup.json()).id;
   const pasta = await page.request.post('/api/meals', { data: { title: 'Simple pasta', type: 'meal', instructions: 'Boil and serve.', ingredients: [{ amount: '500 g', ingredient: 'Pasta' }] } });
   expect(pasta.ok()).toBeTruthy();
-  await page.goto('/week?week=2026-10-12');
-  await page.getByRole('checkbox', { name: 'Sunday soup' }).check();
-  await page.getByRole('checkbox', { name: 'Simple pasta' }).check();
-  await page.getByRole('button', { name: 'Add selected recipes (2)' }).click();
+  await page.goto('/dashboard?week=2026-10-12');
+  await page.getByRole('button', { name: 'Show library', exact: true }).click();
+  await page.getByRole('button', { name: 'Add Sunday soup to this week', exact: true }).click();
+  await page.getByRole('button', { name: 'Add Simple pasta to this week', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Added · View week' })).toHaveCount(2);
+  await page.getByRole('link', { name: 'Added · View week' }).first().click();
   await expect(page.getByRole('heading', { name: 'Sunday soup' })).toBeVisible();
   await page.getByLabel('Night for Sunday soup').selectOption('2026-10-14');
   await expect(page.getByLabel('Night for Sunday soup')).toBeEnabled();
@@ -50,7 +52,7 @@ test('family week survives reload and shares shopping and cooking across phones'
     await phone.locator('#email').fill(email);
     await phone.locator('#password').fill(password);
     await phone.getByRole('button', { name: 'Sign In' }).click();
-    await expect(phone).toHaveURL('/dashboard');
+    await expect(phone).toHaveURL('/week');
     await phone.goto('/shopping?week=2026-10-12');
     await expect(phone.getByLabel('Status for Beans')).toHaveValue('have');
     await expect(phone.getByLabel('Status for Spinach')).toHaveValue('bought');

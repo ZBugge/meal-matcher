@@ -1,3 +1,4 @@
+import { useWeekPath } from '../hooks/useWeekPath';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { SessionMode } from '../api/client';
@@ -5,6 +6,7 @@ import type { SessionMode } from '../api/client';
 export function ShareSession() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const weekPath = useWeekPath();
   const [inviteCode, setInviteCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState<SessionMode>('home');
@@ -58,7 +60,7 @@ export function ShareSession() {
   };
 
   const handleContinue = () => {
-    navigate(`/session/${sessionId}/swipe`);
+    navigate(weekPath(`/session/${sessionId}/swipe`));
   };
 
   return (

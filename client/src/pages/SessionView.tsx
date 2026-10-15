@@ -1,3 +1,4 @@
+import { useWeekPath } from '../hooks/useWeekPath';
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { sessionsApi, SessionDetails, MatchResult, mealsApi, Meal } from '../api/client';
@@ -6,6 +7,7 @@ import RecipeViewer from '../components/RecipeViewer';
 import { AddToWeek } from '../components/AddToWeek';
 
 export function SessionView() {
+  const weekPath = useWeekPath();
   const { sessionId } = useParams<{ sessionId: string }>();
   const [session, setSession] = useState<SessionDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,7 +106,7 @@ export function SessionView() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="card text-center">
           <p className="text-red-600 mb-4">{error || 'Session not found'}</p>
-          <Link to="/dashboard" className="btn btn-primary">
+          <Link to={weekPath('/dashboard')} className="btn btn-primary">
             Back to Dashboard
           </Link>
         </div>
@@ -119,7 +121,7 @@ export function SessionView() {
       {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link to="/dashboard" className="text-primary-600 hover:underline flex items-center gap-1">
+          <Link to={weekPath('/dashboard')} className="text-primary-600 hover:underline flex items-center gap-1">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>

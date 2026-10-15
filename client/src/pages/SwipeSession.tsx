@@ -1,3 +1,4 @@
+import { useWeekPath } from '../hooks/useWeekPath';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { participantApi } from '../api/client';
@@ -25,6 +26,7 @@ export function SwipeSession() {
 
 function SwipeSessionContent({ sessionId }: { sessionId: string | undefined }) {
   const navigate = useNavigate();
+  const weekPath = useWeekPath();
   const location = useLocation();
   const editMode = location.state?.editMode || false;
   const [sessionData, setSessionData] = useState<SessionData | null>(() => {
@@ -39,7 +41,6 @@ function SwipeSessionContent({ sessionId }: { sessionId: string | undefined }) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(sessionData ? '' : 'Session data not found. Please rejoin the session.');
   const [sessionClosed, setSessionClosed] = useState(false);
-  const [hintStyle, setHintStyle] = useState<'bounce' | 'arrows' | 'text'>('bounce');
 
   // Session context is hydrated before the progress key and deck are initialized.
   const displayName = sessionData?.displayName || '';
@@ -57,9 +58,9 @@ function SwipeSessionContent({ sessionId }: { sessionId: string | undefined }) {
 
   useEffect(() => {
     if (!submitted) return;
-    const timeout = window.setTimeout(() => navigate(`/results/${sessionId}`), 1500);
+    const timeout = window.setTimeout(() => navigate(weekPath(`/results/${sessionId}`)), 1500);
     return () => window.clearTimeout(timeout);
-  }, [submitted, sessionId, navigate]);
+  }, [submitted, sessionId, navigate, weekPath]);
 
   const handleProgress = (allSwipes: Record<string, number>, currentIndex: number) => {
     if (!sessionData || !sessionId) return;
@@ -180,19 +181,6 @@ function SwipeSessionContent({ sessionId }: { sessionId: string | undefined }) {
                 } you'd like.`}
           </p>
 
-          {/* Dev toggle for swipe hint styles */}
-          <div className="mt-3">
-            <button
-              onClick={() => {
-                setHintStyle(prev =>
-                  prev === 'bounce' ? 'arrows' : prev === 'arrows' ? 'text' : 'bounce'
-                );
-              }}
-              className="text-xs px-3 py-1 bg-white rounded-full shadow-md border border-gray-300 hover:bg-gray-50 transition-colors"
-            >
-              Hint: {hintStyle}
-            </button>
-          </div>
         </div>
 
         {error && (
@@ -213,7 +201,6 @@ function SwipeSessionContent({ sessionId }: { sessionId: string | undefined }) {
           canRetry={!!error}
           onComplete={handleComplete}
           editMode={editMode}
-          hintStyle={hintStyle}
         />
         </fieldset>
       </div>

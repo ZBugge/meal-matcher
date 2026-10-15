@@ -177,6 +177,7 @@ describe('QuickSession', () => {
   it('adds takeout suggestions without creating duplicate option names', () => {
     renderQuickSession();
 
+    fireEvent.click(screen.getByText('Quick picks (optional)'));
     fireEvent.click(screen.getByRole('button', { name: 'Pizza' }));
     expect(screen.getByPlaceholderText('Option 1')).toHaveValue('Pizza');
 

@@ -6,6 +6,8 @@ test.describe('Home and takeout session modes', () => {
 
     await expect(page.getByText('Food Categories')).toBeVisible();
     await page.getByLabel('Your Name').fill('Takeout Tester');
+    await expect(page.getByRole('button', { name: 'Pizza', exact: true })).toHaveCount(0);
+    await page.getByText('Quick picks (optional)').click();
     await page.getByRole('button', { name: 'Pizza' }).click();
     await expect(page.getByPlaceholder('Option 1')).toHaveValue('Pizza');
 
@@ -22,7 +24,9 @@ test.describe('Home and takeout session modes', () => {
     await page.getByLabel('Password', { exact: true }).fill('password123');
     await page.getByLabel('Confirm Password').fill('password123');
     await page.getByRole('button', { name: 'Create Account' }).click();
-    await expect(page).toHaveURL('/dashboard');
+    await expect(page).toHaveURL('/week');
+    await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Library & votes' }).click();
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
 
     await page.getByRole('button', { name: 'Takeout' }).click();
     await page.getByRole('button', { name: 'Start with popular categories' }).click();
@@ -37,6 +41,7 @@ test.describe('Home and takeout session modes', () => {
     await expect(page.getByText('Mexican')).toBeVisible();
 
     await page.reload();
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
     await page.getByRole('button', { name: 'Takeout' }).click();
     await expect(page.getByText('Mexican')).toBeVisible();
 
@@ -49,6 +54,7 @@ test.describe('Home and takeout session modes', () => {
     await expect(page.getByText('Options in Session (1)')).toBeVisible();
 
     await page.goto('/dashboard');
+    await page.getByRole('button', { name: 'Show library', exact: true }).click();
     await page.getByRole('button', { name: 'Takeout' }).click();
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await page.locator('input[type="checkbox"]').check();

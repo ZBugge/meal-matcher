@@ -78,6 +78,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Edit')).toBeDefined();
@@ -92,6 +94,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.queryByText('Edit')).toBeNull();
@@ -104,6 +108,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     expect(await screen.findByText(/Last selected Jan 4, 2024/)).toBeDefined();
     expect(screen.getByText('Never selected')).toBeDefined();
@@ -115,6 +121,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Edit')).toBeDefined();
@@ -133,6 +141,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Edit')).toBeDefined();
@@ -151,6 +161,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -171,6 +183,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Edit')).toBeDefined();
@@ -194,6 +208,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Edit')).toBeDefined();
@@ -215,6 +231,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -233,6 +251,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Edit')).toBeDefined();
@@ -258,6 +278,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -281,6 +303,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -305,6 +329,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Edit')).toBeDefined();
@@ -337,6 +363,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Edit')).toBeDefined();
@@ -371,6 +399,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -401,6 +431,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Edit')).toBeDefined();
@@ -434,6 +466,8 @@ describe('Dashboard - Edit Mode and Delete', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Edit')).toBeDefined();
@@ -469,6 +503,8 @@ describe('Dashboard - Edit Meal Functionality', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -484,6 +520,8 @@ describe('Dashboard - Edit Meal Functionality', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -504,6 +542,8 @@ describe('Dashboard - Edit Meal Functionality', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -523,6 +563,8 @@ describe('Dashboard - Edit Meal Functionality', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Tacos')).toBeDefined();
@@ -544,6 +586,8 @@ describe('Dashboard - Edit Meal Functionality', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -577,6 +621,8 @@ describe('Dashboard - Edit Meal Functionality', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -615,6 +661,8 @@ describe('Dashboard - Edit Meal Functionality', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -641,6 +689,8 @@ describe('Dashboard - Edit Meal Functionality', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -669,6 +719,8 @@ describe('Dashboard - Edit Meal Functionality', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -699,6 +751,8 @@ describe('Dashboard - Edit Meal Functionality', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Pizza')).toBeDefined();
@@ -732,6 +786,8 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Create Session')).toBeDefined();
@@ -762,6 +818,8 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Create Session')).toBeDefined();
@@ -803,6 +861,8 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Create Session')).toBeDefined();
@@ -840,6 +900,8 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Create Session')).toBeDefined();
@@ -863,6 +925,8 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Create Session')).toBeDefined();
@@ -893,6 +957,8 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Create Session')).toBeDefined();
@@ -920,6 +986,8 @@ describe('Dashboard - Quick Add Meal in Create Session', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await waitFor(() => {
       expect(screen.getByText('Create Session')).toBeDefined();
@@ -972,6 +1040,8 @@ describe('Dashboard - Home and takeout modes', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('My Meals');
     fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
@@ -1003,10 +1073,13 @@ describe('Dashboard - Home and takeout modes', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('My Meals');
     fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create Session' }));
+    fireEvent.click(screen.getByText('Quick picks (optional)'));
     fireEvent.click(screen.getByRole('button', { name: 'Mexican' }));
 
     await waitFor(() => {
@@ -1034,6 +1107,8 @@ describe('Dashboard - Home and takeout modes', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('My Meals');
     fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
@@ -1066,6 +1141,8 @@ describe('Dashboard - Home and takeout modes', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('My Meals');
     fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
@@ -1113,6 +1190,8 @@ describe('Dashboard - Private Recipes', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('Garlic soup');
     fireEvent.click(screen.getByTitle('Edit meal'));
@@ -1150,6 +1229,8 @@ describe('Dashboard - Private Recipes', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('My Meals');
     fireEvent.click(screen.getByRole('button', { name: 'Add Meal' }));
@@ -1198,6 +1279,8 @@ describe('Dashboard - Private Recipes', () => {
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('My Meals');
     fireEvent.click(screen.getByRole('button', { name: 'Add Meal' }));
@@ -1232,6 +1315,8 @@ Blend and simmer.`;
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('My Meals');
     fireEvent.click(screen.getByRole('button', { name: 'Garlic soup' }));
@@ -1262,6 +1347,8 @@ Blend and simmer.`;
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     const recentSessions = (await screen.findByText('Recent Sessions')).closest('section');
     expect(recentSessions).not.toBeNull();
@@ -1286,6 +1373,8 @@ Blend and simmer.`;
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('Garlic soup');
     fireEvent.click(screen.getAllByRole('button', { name: 'Notes' })[0]);
@@ -1322,6 +1411,8 @@ Blend and simmer.`;
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('My Meals');
     fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));
@@ -1349,6 +1440,8 @@ Blend and simmer.`;
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     const recentSessions = (await screen.findByText('Recent Sessions')).closest('section');
     expect(recentSessions).not.toBeNull();
@@ -1380,6 +1473,8 @@ Blend and simmer.`;
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('My Meals');
     fireEvent.click(screen.getByRole('button', { name: 'Import' }));
@@ -1414,6 +1509,8 @@ Blend and simmer.`;
         <Dashboard />
       </BrowserRouter>
     );
+    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('My Meals');
     fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));

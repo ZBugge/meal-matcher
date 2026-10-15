@@ -47,7 +47,7 @@ export function WeekPlan() {
       <section className="card space-y-3" aria-label="Choose together">
         <h2 className="text-xl font-bold">Decide what goes on the menu</h2>
         <p className="text-gray-600">Vote on your options, then use "Add to this week" on the results you agree on. Adding a recipe also adds its ingredients to shopping.</p>
-        <Link className="btn btn-primary" to={`/dashboard?week=${week}`}>Start a vote or view results</Link>
+        <Link className="btn btn-primary inline-flex min-h-12 items-center" to={`/dashboard?week=${week}`}>Start a vote or view results</Link>
         <p className="text-sm text-gray-600">Planning solo? Open your library and explicitly add a recipe to this week.</p>
       </section>
       <form className="card space-y-3" onSubmit={async e => { e.preventDefault(); if (await save(() => planningApi.addEntry(week, { kind: 'takeout', title: takeout }))) setTakeout(''); }}><h2 className="text-xl font-bold">Plan a takeout night</h2>

@@ -109,6 +109,7 @@ test('voted quick results keep a noncurrent planning week', async ({ page }) => 
   // The host session page must preserve the planning destination too.
   await page.locator('#session-history .card').first().click();
   await expect(page).toHaveURL(`/session/${sessionId}?week=${week}`);
+  await expect(page.getByRole('link', { name: 'Join & Swipe', exact: true })).toHaveAttribute('href', new RegExp(`/join/[^?]+[?]week=${week}$`));
   await page.getByRole('button', { name: 'Close Session', exact: true }).click();
   await page.getByRole('button', { name: 'Add Future Thai night to this week', exact: true }).click();
   await page.getByRole('link', { name: 'Added · View week' }).click();

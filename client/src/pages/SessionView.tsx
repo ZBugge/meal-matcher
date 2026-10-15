@@ -157,7 +157,7 @@ export function SessionView() {
               {copied ? 'Copied!' : 'Copy'}
             </button>
             <a
-              href={`/join/${session.inviteCode}`}
+              href={weekPath(`/join/${session.inviteCode}`)}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-secondary whitespace-nowrap"

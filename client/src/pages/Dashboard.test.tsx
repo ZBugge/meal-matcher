@@ -1073,8 +1073,6 @@ describe('Dashboard - Home and takeout modes', () => {
         <Dashboard />
       </BrowserRouter>
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Show library' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Show history' }));
 
     await screen.findByText('My Meals');
     fireEvent.click(screen.getByRole('button', { name: 'Takeout' }));

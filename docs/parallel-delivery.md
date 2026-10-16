@@ -22,6 +22,16 @@ node scripts/delivery-contract.mjs check .verification/delivery/contract.json .v
 
 These checks validate supplied declarations, not filesystem isolation or the truth of a worker's report. Inspect each actual worktree status and diff, including untracked files and rename destinations. Coordinator integrates sequentially. No worker changes shared memory, switches the coordinator's branch, publishes, or delegates.
 
+Before a TypeScript builder releases ownership, run its deterministic handoff check from that builder's assigned worktree (use an absolute contract path when the coordinator stores it elsewhere):
+
+```powershell
+node scripts/delivery-handoff.mjs .verification/delivery/contract.json builder-owner
+```
+
+It checks the actual registered worktree, base ancestry and dirty/committed path ownership (both rename paths), runs affected package builds including configuration-only changes without executing arbitrary contract commands, and records a receipt/logs under that worker's ignored `.verification/delivery/handoff/`. A pass requires the same HEAD and source fingerprint before and after. Assignments without applicable package builds are explicitly unsupported and cannot receive a passing receipt. A receipt on changed source is stale; repeat the affected check. Targeted behavior tests and authored browser acceptance still travel with the builder, and final integration review/full verification remain required. The coordinator inspects the receipt and actual source; a handoff receipt cannot authorize a merge.
+
+Run checks before sending the final hand-back, while the other builder/coordinator can still make independent progress. This catches type failures on the worker's critical path rather than waiting for the integrated full suite. After worker handback the coordinator may take over the one consolidated repair within the original file union; record that ownership transition and keep the original source audit. Do not run simultaneous edits against a released slice.
+
 ## Short assignments
 
 Give each worker: outcome and acceptance, assigned directory/base, exact file allowlist, settled interfaces, targeted checks, forbidden shared edits, stopping condition, and concise hand-back format. Fresh context, normally under 500 words. Ask for changed files, check evidence, start/end times, material findings and blockers. For TypeScript changes require the affected package type check/build before handback as well as targeted tests; passing runtime tests cannot establish type correctness. When adding form controls, inspect existing browser locators for ambiguity and use explicit accessible names. Do not send the backlog or whole conversation. Skip extra scouts and test-running agents.
@@ -48,3 +58,5 @@ The initial adoption target remains at least 20% estimated elapsed reduction, at
 If builders occupy fraction p of sequential delivery, two perfectly balanced builders can reduce that portion by at most half: overall speedup is bounded by 1 / (1 - p/2), before overhead. At p=0.6, the ceiling is roughly 1.43x. Overlapping final review/checks can also help, but additional builders cannot fix a serial shared-contract bottleneck. Stop splitting when conflicts, idle time or repair erase the gain; improve scope/contracts or use one writer.
 
 Use the next authorized eligible work as the second trial; never duplicate an implementation or consume an unselected backlog item merely to manufacture a benchmark. Keep confidence and cost claims provisional until evidence supports them.
+
+The first two trials (2026-10-16) estimated11.59% and16.05% whole-delivery reductions, below the20% target, despite41.5% and38.8% builder-stage reductions. Setup, integration, repair and release overhead dominated these short tasks. Keep the single-writer default, use the handoff check to prevent the demonstrated missed-build failure, and reserve two builders for larger independent slices whose observed durations can amortize overhead. These results do not justify a third builder, broader spending, or claims of proven dramatic delivery savings. Timing records live in the canonical CoS briefs and ignored run evidence; metrics are reconstructed scheduling comparisons, not sequential controls.

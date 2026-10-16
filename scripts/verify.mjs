@@ -185,7 +185,7 @@ async function main() {
     const server = path.join(root, 'server');
     const node = (...parts) => path.join(root, ...parts);
     const checks = [
-      { id: 'verification-tests', name: 'Verification and delivery tool tests', cwd: root, args: ['--test', node('scripts', 'verify.test.mjs'), node('scripts', 'delivery-contract.test.mjs'), node('scripts', 'delivery-metrics.test.mjs')] },
+      { id: 'verification-tests', name: 'Verification and delivery tool tests', cwd: root, args: ['--test', node('scripts', 'verify.test.mjs'), node('scripts', 'delivery-contract.test.mjs'), node('scripts', 'delivery-metrics.test.mjs'), node('scripts', 'delivery-handoff.test.mjs')] },
       { id: 'server-tests', name: 'Server tests', cwd: server, args: [node('server', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=2', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'server-results.json')}`] },
       { id: 'client-tests', name: 'Client tests', cwd: client, args: [node('client', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=2', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'client-results.json')}`] },
       { id: 'lint', name: 'Client lint', cwd: client, args: [node('client', 'node_modules', 'eslint', 'bin', 'eslint.js'), 'src'] },

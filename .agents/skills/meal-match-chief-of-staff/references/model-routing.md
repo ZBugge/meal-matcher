@@ -1,6 +1,6 @@
 # MealMatch subagent model routing
 
-Updated 2026-10-15 after Zach chose his existing Codex plan and requested aggressive cost savings (MM-D009). This is the single home for role/model choices. Recheck available model IDs and effort values before spawning. Use existing-plan authentication only; never fall back to separately billed API calls or buy credits automatically.
+Updated 2026-10-16 for Zach's requested measured parallel-delivery trial (MM-I009), retaining existing-plan aggressive savings (MM-D009). This is the single home for role/model choices. Recheck available model IDs and effort values before spawning. Use existing-plan authentication only; never fall back to separately billed API calls or buy credits automatically.
 
 ## Choose the smallest suitable role
 
@@ -17,12 +17,13 @@ Scout work needs a narrow question and direct evidence. Skip it when the coordin
 
 ## Aggressive economy defaults
 
-- One active feature, one writer, one independent reviewer. No automatic scout, committee of reviewers, competing implementations, speculative next-feature agent, or nested delegation. Parallelism is useful only when it reduces total work.
+- One active feature, one coordinator/integrator, one independent reviewer. One writer is the default for small or coupled work; two builders may own disjoint slices in separate worktrees after shared contracts are settled. No automatic scout, committee of reviewers, competing implementations, speculative next-feature agent, or nested delegation.
 - Prefer a Sol-medium delivery coordinator selected in the UI. The current chat's model cannot be changed by spawning cheaper children; don't claim otherwise.
 - For a qualifying task use one Luna builder and one Sol-medium review. Otherwise the coordinator builds directly or assigns one Sol-medium worker when that saves work. Use Sol-high review when the change needs it; don't add it to every simple patch.
 - Initial implementation plus one focused repair on the small-task lane. If Luna still fails, hand the evidence to Sol once; do not repeat the investigation. Maximum three implementation attempts across all models. One initial independent review and one consolidated recheck after fixes; a still-unresolved item is checkpointed rather than retried indefinitely.
 - Aim for two delegated turns on the normal builder/reviewer path; maximum five per milestone, including follow-ups, handoff, recheck, and any specialist assignment. Direct coordinator implementation can need only the reviewer. Do not add hidden clarification or housekeeping turns outside this allowance.
-- Maximum one active worker beside the coordinator except a brief, explicitly justified overlap of independent work. No worker spawns children. No separate agent just to run tests, poll CI, write routine notes, or repeat a conclusion.
+- At most two active builders beside the coordinator, only when both are needed for an authorized outcome and the shorter slice exceeds setup/handoff/integration overhead. Use the [parallel delivery procedure](../../../../docs/parallel-delivery.md) for ownership, timing and rollback checks. The two-builder lane targets three delegated turns (two builders plus reviewer), retaining the five-turn ceiling and reserving two repair/recheck turns. Its two initial builders count as two implementation attempts, leaving one consolidated repair. No worker spawns children. No separate agent just to run tests, poll CI, write routine notes, or repeat a conclusion.
+- Freeze the integrated candidate before independent review; run deterministic verification concurrently with that review. Coordinator alone integrates, records canonical memory and publishes. A repair invalidates affected evidence. Keep the one-writer path when the split adds waiting, conflicts or repeated work.
 - Use fresh-context assignments, relevant paths and failure excerpts; aim for a task brief of 500 words or less and a hand-back of 300 words or less. These are defaults, not reasons to omit necessary requirements/evidence. Do not copy the whole chat or backlog.
 - Use deterministic scripts for verification, reports, status, and waiting. Reuse installed dependencies. Run focused checks while editing and the full suite at the existing candidate/CI/post-merge gates; unchanged code does not justify another full run.
 - Preserve acceptance criteria, independent review, privacy/data-preservation invariants, and full verification. Reduce agent overhead before reducing assurance. Measure total observed usage including coordinator, repairs and review; don't equate the cheaper model's rate with guaranteed savings.

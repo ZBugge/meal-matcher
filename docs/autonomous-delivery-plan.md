@@ -1,5 +1,7 @@
 # Cost-conscious autonomous MealMatch delivery
 
+**Parallel-delivery update, 2026-10-16 (MM-I009):** Zach requested implementation and measurement of faster delivery with subagents. The active [routing policy](../.agents/skills/meal-match-chief-of-staff/references/model-routing.md) and [parallel delivery procedure](parallel-delivery.md) now permit two independent builders in separate worktrees and concurrent final verification/review of a frozen candidate, within the existing economy and attempt limits. This supersedes historical single-worker scheduling below, not acceptance, authorization, privacy or merge gates. Speed and cost gains require evidence.
+
 **Superseded delivery process, 2026-10-15 (MM-D012):** Zach requested direct set-and-forget feature shipping and rejected the setup/approval staircase. Keep the economical model choices and meaningful verification; use native Git/PR delivery, with no bespoke helper, new branch protection, or infrastructure pilot as a prerequisite. Build the recipe/plan/shopping/cooking loop, then connect voting and phone installation; hand over a usable app for feedback. Existing configured repository requirements still apply. The detailed proposal below is retained as background, not an active gate against shipping.
 
 2026-10-15, America/New_York. Delivery-loop proposal; not enabled. Zach subsequently selected his existing Codex plan and aggressive savings (MM-D009). The model-routing/economy policy is active; publishing and the product queue remain a separate implementation stage.

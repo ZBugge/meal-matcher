@@ -43,6 +43,7 @@ export default function RecipeFields({
           Instructions
         </label>
         <textarea
+          aria-label="Instructions"
           value={instructions}
           onChange={(event) => onInstructionsChange(event.target.value)}
           className="input"
@@ -57,7 +58,7 @@ export default function RecipeFields({
           <button
             type="button"
             onClick={() => onIngredientsChange([...ingredients, { amount: '', ingredient: '' }])}
-            className="text-sm font-medium text-primary-600 hover:text-primary-700"
+            className="btn btn-secondary"
           >
             Add ingredient
           </button>
@@ -68,7 +69,7 @@ export default function RecipeFields({
         ) : (
           <div className="space-y-2">
             {ingredients.map((row, index) => (
-              <div key={index} className="grid grid-cols-[minmax(0,0.35fr)_minmax(0,1fr)_auto] gap-2 items-center">
+              <div key={index} className="grid grid-cols-1 gap-3 p-4 border border-stone-200 rounded-xl bg-white">
                 <input
                   type="text"
                   value={row.amount}
@@ -86,12 +87,12 @@ export default function RecipeFields({
                   aria-label={`Ingredient ${index + 1} name`}
                   required
                 />
-                <div className="flex">
+                <div className="flex flex-wrap gap-3 border-t border-stone-200 pt-3">
                   <button
                     type="button"
                     onClick={() => moveIngredient(index, -1)}
                     disabled={index === 0}
-                    className="p-1 text-gray-500 disabled:text-gray-300"
+                    className="btn btn-secondary min-w-12 disabled:opacity-40"
                     aria-label={`Move ingredient ${index + 1} up`}
                   >
                     ↑
@@ -100,7 +101,7 @@ export default function RecipeFields({
                     type="button"
                     onClick={() => moveIngredient(index, 1)}
                     disabled={index === ingredients.length - 1}
-                    className="p-1 text-gray-500 disabled:text-gray-300"
+                    className="btn btn-secondary min-w-12 disabled:opacity-40"
                     aria-label={`Move ingredient ${index + 1} down`}
                   >
                     ↓
@@ -108,7 +109,7 @@ export default function RecipeFields({
                   <button
                     type="button"
                     onClick={() => onIngredientsChange(ingredients.filter((_, rowIndex) => rowIndex !== index))}
-                    className="p-1 text-red-500"
+                    className="btn text-red-700 min-w-12"
                     aria-label={`Remove ingredient ${index + 1}`}
                   >
                     ×

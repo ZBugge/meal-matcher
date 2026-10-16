@@ -209,8 +209,8 @@ describe('SwipeDeck', () => {
     );
 
     // Check vote labels
-    expect(screen.getByText('YUM')).toBeDefined(); // Pizza: vote 1
-    expect(screen.getByText('NOPE')).toBeDefined(); // Burger: vote 0
+    expect(screen.getByText('YES')).toBeDefined(); // Pizza: vote 1
+    expect(screen.getByText('NO')).toBeDefined(); // Burger: vote 0
     expect(screen.getByText('MAYBE')).toBeDefined(); // Salad: vote 2
   });
 });

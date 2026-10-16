@@ -25,12 +25,12 @@ test.describe('Home and takeout session modes', () => {
     await page.getByLabel('Confirm Password').fill('password123');
     await page.getByRole('button', { name: 'Create Account' }).click();
     await expect(page).toHaveURL('/week');
-    await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Library & votes' }).click();
+    await page.goto(`/dashboard${new URL(page.url()).search}`);
     await page.getByRole('button', { name: 'Show library', exact: true }).click();
 
     await page.getByRole('button', { name: 'Takeout' }).click();
     await page.getByRole('button', { name: 'Start with popular categories' }).click();
-    const onboardingModal = page.locator('.card:has(h3:has-text("Start with popular categories"))');
+    const onboardingModal = page.getByRole('dialog', { name: 'Start with popular categories', exact: true });
     const mexican = onboardingModal.getByRole('checkbox', { name: 'Mexican' });
     await mexican.check();
     await expect(mexican).toBeChecked();

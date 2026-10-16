@@ -36,7 +36,7 @@ export function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
+              <div role="alert" className="bg-red-50 text-red-800 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
@@ -82,7 +82,7 @@ export function Login() {
 
           <p className="mt-6 text-center text-gray-600">
             Don't have an account?{' '}
-            <Link to="/register" className="text-primary-600 hover:underline">
+            <Link to="/register" className="inline-flex min-h-12 items-center text-primary-700 hover:underline">
               Create one
             </Link>
           </p>

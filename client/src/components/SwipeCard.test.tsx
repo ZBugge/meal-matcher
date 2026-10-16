@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { SwipeCard } from './SwipeCard';
 
 describe('SwipeCard', () => {
@@ -42,10 +42,10 @@ describe('SwipeCard', () => {
     expect(screen.getByText('👆 Swipe to vote')).toBeDefined();
   });
 
-  it('should render Nope and Yum indicators on the card', () => {
+  it('should render No and Yes indicators on the card', () => {
     render(<SwipeCard {...defaultProps} />);
-    expect(screen.getByText('NOPE')).toBeDefined();
-    expect(screen.getByText('YUM!')).toBeDefined();
+    expect(screen.getByText('NO')).toBeDefined();
+    expect(screen.getByText('YES')).toBeDefined();
   });
 
   it('should apply stronger shadow and border styles to card', () => {
@@ -54,9 +54,12 @@ describe('SwipeCard', () => {
     expect(card).not.toBeNull();
   });
 
-  it('should render smaller, more subtle buttons', () => {
-    const { container } = render(<SwipeCard {...defaultProps} />);
-    const buttons = container.querySelectorAll('.w-10.h-10.opacity-70');
-    expect(buttons.length).toBe(2); // One for left, one for right
+  it('offers clearly labelled No and Yes tap choices', () => {
+    const onSwipe = vi.fn();
+    render(<SwipeCard {...defaultProps} onSwipe={onSwipe} />);
+    const no = screen.getByRole('button', { name: 'No' });
+    const yes = screen.getByRole('button', { name: 'Yes' });
+    fireEvent.click(no); fireEvent.click(yes);
+    expect(onSwipe.mock.calls).toEqual([['left'], ['right']]);
   });
 });

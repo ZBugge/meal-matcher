@@ -1,7 +1,9 @@
 import { useWeekPath } from '../hooks/useWeekPath';
 import { AddToWeek } from '../components/AddToWeek';
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ModalSheet } from '../components/ModalSheet';
+import { FamilyHeader } from '../components/FamilyHeader';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import {
@@ -34,7 +36,14 @@ function formatLastSelectedAt(timestamp: string | null | undefined): string {
 }
 
 export function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const recipesPage = useLocation().pathname === '/recipes';
+  const [showManage, setShowManage] = useState(false);
+  const [detailMeal, setDetailMeal] = useState<Meal | null>(null);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const beginSave = () => { if (savingRef.current) return false; savingRef.current = true; setSaving(true); setError(''); return true; };
+  const endSave = () => { savingRef.current = false; setSaving(false); };
   const navigate = useNavigate();
   const weekPath = useWeekPath();
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -105,6 +114,7 @@ export function Dashboard() {
   }, [user?.takeoutOnboardingDismissed]);
 
   const loadData = async () => {
+    setError('');
     try {
       const [homeMealsData, categoriesData, sessionsData] = await Promise.all([
         mealsApi.list('meal'),
@@ -124,6 +134,7 @@ export function Dashboard() {
   };
 
   const markTakeoutOnboardingComplete = async (): Promise<boolean> => {
+    if (!beginSave()) return false;
     try {
       await authApi.updatePreferences(true);
       setTakeoutOnboardingDismissed(true);
@@ -131,12 +142,13 @@ export function Dashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save your takeout setup preference');
       return false;
-    }
+    } finally { endSave(); }
   };
 
   const handleAddMeal = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!beginSave()) return;
     try {
       const hasRecipe = Boolean(newMealInstructions.trim()) || newMealIngredients.length > 0;
       const meal = activeMode === 'home'
@@ -160,10 +172,11 @@ export function Dashboard() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : `Failed to add ${activeMode === 'home' ? 'meal' : 'category'}`);
-    }
+    } finally { endSave(); }
   };
 
   const openAddMeal = () => {
+    setError('');
     setNewMealTitle('');
     setNewMealDescription('');
     setNewMealInstructions('');
@@ -188,6 +201,7 @@ export function Dashboard() {
   };
 
   const openTakeoutOnboarding = () => {
+    setError('');
     setSelectedStarterCategories([]);
     setShowTakeoutOnboarding(true);
   };
@@ -198,6 +212,7 @@ export function Dashboard() {
       return;
     }
 
+    if (!beginSave()) return;
     try {
       const categories = await Promise.all(
         selectedStarterCategories.map((title) => mealsApi.create(title, undefined, 'category'))
@@ -208,7 +223,7 @@ export function Dashboard() {
       setTakeoutOnboardingDismissed(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add food categories');
-    }
+    } finally { endSave(); }
   };
 
   const handleAddOwnCategory = async () => {
@@ -218,6 +233,7 @@ export function Dashboard() {
   };
 
   const openEditMeal = (meal: Meal) => {
+    setError('');
     setEditingMeal(meal);
     setEditTitle(meal.title);
     setEditDescription(meal.description || '');
@@ -227,6 +243,7 @@ export function Dashboard() {
   };
 
   const openNotes = (meal: Meal) => {
+    setError('');
     setNotingMeal(meal);
     setNotesDraft(meal.notes || '');
   };
@@ -257,6 +274,7 @@ export function Dashboard() {
     e.preventDefault();
     if (!editingMeal) return;
 
+    if (!beginSave()) return;
     try {
       const hasLoadedRecipe = editingMeal.instructions !== undefined
         || editingMeal.ingredients !== undefined;
@@ -283,6 +301,7 @@ export function Dashboard() {
           : m
       ));
       setShowEditMeal(false);
+      setDetailMeal(null);
       setEditingMeal(null);
       setEditTitle('');
       setEditDescription('');
@@ -290,13 +309,14 @@ export function Dashboard() {
       setEditIngredients([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update meal');
-    }
+    } finally { endSave(); }
   };
 
   const handleSaveNotes = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!notingMeal) return;
 
+    if (!beginSave()) return;
     try {
       const updatedMeal = await mealsApi.update(notingMeal.id, { notes: notesDraft });
       setMeals((current) => current.map((meal) =>
@@ -309,12 +329,14 @@ export function Dashboard() {
           : meal
       ));
       closeNotes();
+      setDetailMeal(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save notes');
-    }
+    } finally { endSave(); }
   };
 
   const handleExportLibrary = async () => {
+    if (!beginSave()) return;
     setLibraryTransferLoading(true);
     try {
       const data = await mealsApi.exportLibrary();
@@ -329,6 +351,7 @@ export function Dashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to export library');
     } finally {
+      endSave();
       setLibraryTransferLoading(false);
     }
   };
@@ -337,6 +360,7 @@ export function Dashboard() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (!beginSave()) return;
     setLibraryTransferLoading(true);
     try {
       const data = JSON.parse(await file.text()) as LibraryExportData;
@@ -348,6 +372,7 @@ export function Dashboard() {
       setLibraryImportPreview(null);
       setError(err instanceof Error ? err.message : 'Failed to read import file');
     } finally {
+      endSave();
       setLibraryTransferLoading(false);
       event.target.value = '';
     }
@@ -355,6 +380,7 @@ export function Dashboard() {
 
   const handleConfirmImport = async () => {
     if (!libraryImportData) return;
+    if (!beginSave()) return;
     setLibraryTransferLoading(true);
     try {
       const result = await mealsApi.importLibrary(libraryImportData);
@@ -363,6 +389,7 @@ export function Dashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import library');
     } finally {
+      endSave();
       setLibraryTransferLoading(false);
     }
   };
@@ -385,9 +412,11 @@ export function Dashboard() {
         setMeals(meals.filter((m) => m.id !== id));
         setDeletingMealIds([]);
       }, 400);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete meal');
       setDeletingMealIds([]);
+      return false;
     }
   };
 
@@ -399,12 +428,12 @@ export function Dashboard() {
   const handleConfirmSingleDelete = async () => {
     if (!mealToDelete) return;
 
-    await handleDeleteMeal(mealToDelete.id);
-    setShowDeleteConfirm(false);
-    setMealToDelete(null);
+    if (!beginSave()) return;
+    try { if (await handleDeleteMeal(mealToDelete.id)) { setShowDeleteConfirm(false); setMealToDelete(null); setDetailMeal(null); } } finally { endSave(); }
   };
 
   const handleBulkDelete = async () => {
+    if (!beginSave()) return;
     try {
       // Mark all selected meals as deleting to trigger animation
       setDeletingMealIds(selectedForDeletion);
@@ -422,7 +451,7 @@ export function Dashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete meals');
       setDeletingMealIds([]);
-    }
+    } finally { endSave(); }
   };
 
   const confirmBulkDelete = () => {
@@ -446,20 +475,18 @@ export function Dashboard() {
       return;
     }
 
+    if (!beginSave()) return;
     try {
       const session = await sessionsApi.create(selectedMealIds, sessionMode);
       navigate(weekPath(`/session/${session.id}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session');
-    }
+    } finally { endSave(); }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
 
   const openCreateSession = () => {
+    setError('');
     setSessionMode(activeMode);
     setSelectedMealIds(activeMeals.map((meal) => meal.id));
     setQuickAddTitle('');
@@ -489,6 +516,7 @@ export function Dashboard() {
     e.preventDefault();
     if (!quickAddTitle.trim()) return;
 
+    if (!beginSave()) return;
     try {
       const meal = sessionMode === 'home'
         ? await mealsApi.create(quickAddTitle.trim(), undefined)
@@ -501,7 +529,7 @@ export function Dashboard() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add meal');
-    }
+    } finally { endSave(); }
   };
 
   const handleTakeoutSuggestion = async (title: string, selectForSession: boolean) => {
@@ -518,6 +546,7 @@ export function Dashboard() {
       return;
     }
 
+    if (!beginSave()) return;
     setAddingSuggestion(title);
     try {
       const category = await mealsApi.create(title, undefined, 'category');
@@ -529,6 +558,7 @@ export function Dashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add food category');
     } finally {
+      endSave();
       setAddingSuggestion(null);
     }
   };
@@ -536,37 +566,28 @@ export function Dashboard() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+        <p role="status" className="text-muted">Opening your kitchen…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-primary-600">MealMatch</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">{user?.email}</span>
-            <button onClick={handleLogout} className="text-sm text-gray-600 hover:text-gray-900">
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {error && (
-          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg mb-6">
+    <div className="min-h-screen bg-paper">
+      {!recipesPage && <FamilyHeader />}
+      <main className="family-page">
+        <div className="flex items-start justify-between gap-3"><div><p className="eyebrow">Your family kitchen</p><h1 className="page-title mt-1">{recipesPage ? 'Recipes' : 'Choose together'}</h1></div>{recipesPage && <button className="btn btn-primary" onClick={() => { setError(''); openAddMeal(); }}>{activeMode === 'home' ? 'Add recipe' : 'Add Category'}</button>}</div>
+        {error && !showAddMeal && !showEditMeal && !notingMeal && !showCreateSession && !showTakeoutOnboarding && !showLibraryImport && !showDeleteConfirm && !showManage && !detailMeal && (
+          <div role="alert" className="bg-red-50 text-red-800 px-4 py-3 rounded-lg mb-6">
             {error}
-            <button onClick={() => setError('')} className="ml-2 font-bold">
+            <button className="btn btn-secondary ml-2" onClick={() => { setLoading(true); loadData(); }}>Retry loading</button>
+            <button onClick={() => setError('')} aria-label="Dismiss error" className="ml-2 min-w-12 min-h-12 font-bold">
               ×
             </button>
           </div>
         )}
 
         {/* Saved options */}
+        {!recipesPage && <>
         <section className="mb-8" aria-label="Choose meals together">
           <p className="mb-3 text-gray-600">Choose together, then add a few favorites to your week.</p>
           <div className="grid grid-cols-2 gap-4">
@@ -575,6 +596,7 @@ export function Dashboard() {
           </div>
           {meals.length === 0 && <p className="text-sm text-gray-600 mt-2">Add saved options to create a session from your library, or use Quick Session to start immediately.</p>}
         </section>
+        </>}
         <section className="mb-12">
           <div className="inline-flex rounded-lg bg-gray-100 p-1 mb-6" aria-label="Food library">
             <button
@@ -597,13 +619,14 @@ export function Dashboard() {
 
           <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-2xl font-bold">
+              {!recipesPage && <h2 className="text-2xl font-bold">
                 {activeMode === 'home' ? 'My Meals' : 'My Food Categories'}
-              </h2>
-              <button type="button" aria-expanded={!libraryCollapsed} aria-controls="saved-library" onClick={() => setLibraryCollapsed(value => !value)} className="btn btn-secondary min-h-12 px-4">
+              </h2>}
+              {recipesPage && <button className="min-h-12 px-3 text-sm font-semibold text-primary-700 underline" onClick={() => { setError(''); setShowManage(true); }}>Manage library</button>}
+              {!recipesPage && <button type="button" aria-expanded={!libraryCollapsed} aria-controls="saved-library" onClick={() => setLibraryCollapsed(value => !value)} className="btn btn-secondary min-h-12 px-4">
                 {libraryCollapsed ? 'Show library' : 'Hide library'}
-              </button>
-              {activeMeals.length > 0 && (
+              </button>}
+              {!recipesPage && activeMeals.length > 0 && (
                 <>
                   <button
                     onClick={toggleEditMode}
@@ -622,7 +645,7 @@ export function Dashboard() {
                 </>
               )}
             </div>
-            {!editMode && (
+            {!editMode && !recipesPage && (
               <div className="flex flex-wrap justify-end gap-2">
                 <button
                   type="button"
@@ -646,7 +669,8 @@ export function Dashboard() {
             )}
           </div>
 
-          <div id="saved-library" hidden={libraryCollapsed}>
+          {recipesPage && editMode && <div className="flex flex-wrap gap-3 mb-4"><button className="btn btn-secondary" onClick={toggleEditMode}>Done</button><button className="btn btn-danger" disabled={!selectedForDeletion.length} onClick={confirmBulkDelete}>Delete Selected ({selectedForDeletion.length})</button></div>}
+          <div id="saved-library" hidden={!recipesPage && libraryCollapsed}>
           <label className="mb-4 block text-sm font-medium text-gray-600">
             Search your {activeMode === 'home' ? 'recipes' : 'categories'}
             <input type="search" className="input mt-2" value={search} onChange={event => setSearch(event.target.value)} placeholder="Find a favorite…" />
@@ -681,6 +705,7 @@ export function Dashboard() {
               </div>
             )
           ) : (
+            recipesPage ? <ul className="divide-y divide-stone-200">{visibleMeals.map(meal => <li key={meal.id} className="flex gap-3 items-center py-2">{editMode && <label className="min-h-12 min-w-12 flex items-center justify-center"><input type="checkbox" checked={selectedForDeletion.includes(meal.id)} onChange={() => toggleMealForDeletion(meal.id)} aria-label={`Select ${meal.title} for deletion`} /></label>}<button className="flex-1 min-w-0 min-h-16 text-left py-3 flex items-center justify-between gap-3" onClick={() => { setError(''); setDetailMeal(meal); }} disabled={editMode}><span className="min-w-0"><span className="dinner-title text-xl block">{meal.title}</span><span className="block text-sm text-muted mt-1">{meal.type === 'category' ? 'Takeout category' : meal.ingredients?.length ? `${meal.ingredients.length} ingredients` : 'Saved family recipe'}</span></span><span aria-hidden="true">→</span></button></li>)}</ul> :
             <div className="grid gap-4 sm:grid-cols-2">
               <AnimatePresence mode="popLayout">
                 {visibleMeals.map((meal) => {
@@ -758,14 +783,14 @@ export function Dashboard() {
                             <button
                               type="button"
                               onClick={() => openNotes(meal)}
-                              className="text-sm text-gray-500 hover:text-primary-500"
+                              className="min-w-12 min-h-12 text-sm text-muted hover:text-primary-600"
                               title={`View notes for ${meal.title}`}
                             >
                               Notes
                             </button>
                             <button
                               onClick={() => openEditMeal(meal)}
-                              className="text-gray-400 hover:text-primary-500"
+                              className="icon-button text-muted hover:text-primary-600"
                               title={meal.type === 'category' ? 'Edit category' : 'Edit meal'}
                             >
                               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -774,7 +799,7 @@ export function Dashboard() {
                             </button>
                             <button
                               onClick={() => confirmDeleteSingleMeal(meal)}
-                              className="text-gray-400 hover:text-red-500"
+                              className="icon-button text-muted hover:text-red-700"
                               title={meal.type === 'category' ? 'Archive category' : 'Archive meal'}
                             >
                               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -794,7 +819,7 @@ export function Dashboard() {
         </section>
 
         {/* Sessions Section */}
-        <section>
+        {!recipesPage && <section>
           <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-2xl font-bold">Recent Sessions</h2>
             <button type="button" aria-expanded={!historyCollapsed} aria-controls="session-history" onClick={() => setHistoryCollapsed(value => !value)} className="btn btn-secondary min-h-12 px-4">{historyCollapsed ? 'Show history' : 'Hide history'}</button>
           </div>
@@ -809,7 +834,9 @@ export function Dashboard() {
               {sessions.map((session) => (
                 <div
                   key={session.id}
-                  className="card cursor-pointer hover:shadow-xl transition-shadow"
+                  className="card cursor-pointer hover:border-primary-300 transition-colors"
+                  role="link" tabIndex={0}
+                  onKeyDown={event => { if (event.target === event.currentTarget && event.key === 'Enter') navigate(weekPath(`/session/${session.id}`)); }}
                   onClick={() => navigate(weekPath(`/session/${session.id}`))}
                 >
                   <div className="flex justify-between items-center">
@@ -837,7 +864,7 @@ export function Dashboard() {
                                 session.selectedMeal.title
                               )}
                             </h3>
-                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700">
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-700">
                               {session.mode === 'takeout' ? 'Order out' : 'Cook at home'}
                             </span>
                             <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
@@ -855,7 +882,7 @@ export function Dashboard() {
                         <>
                           <div className="flex items-center gap-2">
                             <span className="font-mono font-bold text-lg">{session.inviteCode}</span>
-                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700">
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-700">
                               {session.mode === 'takeout' ? 'Order out' : 'Cook at home'}
                             </span>
                             <span
@@ -888,8 +915,11 @@ export function Dashboard() {
             </div>
           )}
           </div>
-        </section>
+        </section>}
       </main>
+
+      {showManage && <ModalSheet title="Manage library" busy={saving || libraryTransferLoading} onClose={() => setShowManage(false)}>{error && !showLibraryImport && <p role="alert" className="text-red-800">{error}</p>}<p className="text-muted">Import or export your private recipes and categories, or select options to delete.</p><button className="menu-action" disabled={libraryTransferLoading} onClick={handleExportLibrary}>Export</button><button className="menu-action" disabled={libraryTransferLoading} onClick={() => { setError(''); setShowLibraryImport(true); }}>Import</button><button className="menu-action" disabled={libraryTransferLoading} onClick={() => { setEditMode(true); setSelectedForDeletion([]); setShowManage(false); }}>Select options to delete</button></ModalSheet>}
+      {detailMeal && <ModalSheet title={detailMeal.title} onClose={() => setDetailMeal(null)} busy={saving}>{error && !showEditMeal && !notingMeal && !viewingRecipe && !showDeleteConfirm && <p role="alert" className="text-red-800">{error}</p>}{detailMeal.description && <p className="text-muted">{detailMeal.description}</p>}{detailMeal.type === 'meal' && <><button className="menu-action" onClick={() => openRecipe(detailMeal.id, detailMeal)}>Read recipe</button><AddToWeek mealId={detailMeal.id} title={detailMeal.title} /><button className="menu-action" onClick={() => navigate(weekPath(`/cook/${detailMeal.id}`))}>Cook this recipe</button></>}<button className="menu-action" onClick={() => openEditMeal(detailMeal)}>Edit {detailMeal.type === 'meal' ? 'recipe' : 'category'}</button><button className="menu-action" onClick={() => openNotes(detailMeal)}>Private notes</button><p className="text-sm text-muted">{formatLastSelectedAt(detailMeal.lastSelectedAt)} · Selected {detailMeal.pickCount} times</p><button className="menu-action text-red-700" onClick={() => confirmDeleteSingleMeal(detailMeal)}>Delete {detailMeal.type === 'meal' ? 'recipe' : 'category'}</button></ModalSheet>}
 
       {viewingRecipe && (
         <RecipeViewer meal={viewingRecipe} onClose={() => setViewingRecipe(null)} />
@@ -897,9 +927,9 @@ export function Dashboard() {
 
       {/* Takeout onboarding modal */}
       {showTakeoutOnboarding && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="card w-full max-w-lg">
-            <h3 className="text-xl font-bold mb-2">Start with popular categories</h3>
+        <ModalSheet title="Start with popular categories" onClose={() => setShowTakeoutOnboarding(false)} busy={saving || libraryTransferLoading}>
+          {error && <p role="alert" className="rounded-xl bg-red-50 text-red-800 p-3">{error}</p>}
+          <fieldset disabled={saving || libraryTransferLoading} className="min-w-0">
             <p className="text-sm text-gray-600 mb-5">
               Pick the kinds of food you&apos;d like to consider. You can always add or remove categories later.
             </p>
@@ -913,15 +943,15 @@ export function Dashboard() {
                       key={suggestion}
                       className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
                         selected
-                          ? 'bg-orange-100 border-orange-300 text-orange-800'
-                          : 'bg-white border-gray-300 text-gray-700 hover:border-orange-400'
+                          ? 'bg-primary-100 border-primary-300 text-primary-800'
+                          : 'bg-white border-gray-300 text-gray-700 hover:border-primary-400'
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={selected}
                         onChange={() => toggleStarterCategory(suggestion)}
-                        className="accent-orange-500"
+                        className="accent-primary-500"
                       />
                       {suggestion}
                     </label>
@@ -946,20 +976,16 @@ export function Dashboard() {
                 Add selected ({selectedStarterCategories.length})
               </button>
             </div>
-          </div>
-        </div>
+
+          </fieldset>
+        </ModalSheet>
       )}
 
       {/* Library Import Modal */}
       {showLibraryImport && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div
-            className="card w-full max-w-lg max-h-[90vh] overflow-y-auto"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="library-import-title"
-          >
-            <h3 id="library-import-title" className="text-xl font-bold mb-2">Import library</h3>
+        <ModalSheet title="Import library" onClose={closeLibraryImport} busy={saving || libraryTransferLoading}>
+          {error && <p role="alert" className="rounded-xl bg-red-50 text-red-800 p-3">{error}</p>}
+          <fieldset disabled={saving || libraryTransferLoading} className="min-w-0">
             <p className="text-sm text-gray-600 mb-4">
               Choose a MealMatch JSON export to preview new options and duplicates before saving.
             </p>
@@ -1031,18 +1057,19 @@ export function Dashboard() {
                 </button>
               )}
             </div>
-          </div>
-        </div>
+
+          </fieldset>
+        </ModalSheet>
       )}
 
       {/* Add Meal Modal */}
       {showAddMeal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4">
-              {activeMode === 'home' ? 'Add New Meal' : 'Add Food Category'}
-            </h3>
-            <form onSubmit={handleAddMeal} className="space-y-4">
+        <ModalSheet title={activeMode === 'home' ? 'Add New Meal' : 'Add Food Category'} onClose={closeAddMeal} busy={saving || libraryTransferLoading} fullHeight={activeMode === 'home'} footer={<>
+          {error && <p role="alert" className="rounded-xl bg-red-50 text-red-800 p-3 mb-3">{error}</p>}
+          <div className="flex gap-3"><button type="button" disabled={saving || libraryTransferLoading} onClick={closeAddMeal} className="btn btn-secondary flex-1">Cancel</button><button type="submit" form="add-library-option" disabled={saving || libraryTransferLoading} className="btn btn-primary flex-1">{activeMode === 'home' ? 'Add Meal' : 'Add Category'}</button></div>
+        </>}>
+          <fieldset disabled={saving || libraryTransferLoading} className="min-w-0">
+            <form id="add-library-option" onSubmit={handleAddMeal} className="space-y-4">
               {activeMode === 'home' && (
                 <RecipePasteImport
                   onParsed={(recipe) => {
@@ -1059,6 +1086,7 @@ export function Dashboard() {
                 </label>
                 <input
                   type="text"
+                  aria-label="Title"
                   value={newMealTitle}
                   onChange={(e) => setNewMealTitle(e.target.value)}
                   className="input"
@@ -1072,6 +1100,7 @@ export function Dashboard() {
                   Description (optional)
                 </label>
                 <textarea
+                  aria-label="Description (optional)"
                   value={newMealDescription}
                   onChange={(e) => setNewMealDescription(e.target.value)}
                   className="input"
@@ -1087,31 +1116,20 @@ export function Dashboard() {
                   onIngredientsChange={setNewMealIngredients}
                 />
               )}
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={closeAddMeal}
-                  className="btn btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary flex-1">
-                  {activeMode === 'home' ? 'Add Meal' : 'Add Category'}
-                </button>
-              </div>
             </form>
-          </div>
-        </div>
+
+          </fieldset>
+        </ModalSheet>
       )}
 
       {/* Edit Meal Modal */}
       {showEditMeal && editingMeal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4">
-              {editingMeal.type === 'category' ? 'Edit Category' : 'Edit Meal'}
-            </h3>
-            <form onSubmit={handleUpdateMeal} className="space-y-4">
+        <ModalSheet title={editingMeal?.type === 'category' ? 'Edit Category' : 'Edit Meal'} onClose={() => setShowEditMeal(false)} busy={saving || libraryTransferLoading} fullHeight={editingMeal.type === 'meal'} footer={<>
+          {error && <p role="alert" className="rounded-xl bg-red-50 text-red-800 p-3 mb-3">{error}</p>}
+          <div className="flex gap-3"><button type="button" disabled={saving || libraryTransferLoading} onClick={() => setShowEditMeal(false)} className="btn btn-secondary flex-1">Cancel</button><button type="submit" form="edit-library-option" disabled={saving || libraryTransferLoading} className="btn btn-primary flex-1">Save</button></div>
+        </>}>
+          <fieldset disabled={saving || libraryTransferLoading} className="min-w-0">
+            <form id="edit-library-option" onSubmit={handleUpdateMeal} className="space-y-4">
               {editingMeal.type === 'meal' && (
                 <RecipePasteImport
                   onParsed={(recipe) => {
@@ -1128,6 +1146,7 @@ export function Dashboard() {
                 </label>
                 <input
                   type="text"
+                  aria-label="Title"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   className="input"
@@ -1141,6 +1160,7 @@ export function Dashboard() {
                   Description (optional)
                 </label>
                 <textarea
+                  aria-label="Description (optional)"
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   className="input"
@@ -1156,35 +1176,17 @@ export function Dashboard() {
                   onIngredientsChange={setEditIngredients}
                 />
               )}
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowEditMeal(false)}
-                  className="btn btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary flex-1">
-                  Save
-                </button>
-              </div>
             </form>
-          </div>
-        </div>
+
+          </fieldset>
+        </ModalSheet>
       )}
 
       {/* Private Notes Modal */}
       {notingMeal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div
-            className="card w-full max-w-lg"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="private-notes-title"
-          >
-            <h3 id="private-notes-title" className="text-xl font-bold mb-2">
-              Notes for {notingMeal.title}
-            </h3>
+        <ModalSheet title={`Notes for ${notingMeal?.title}`} onClose={closeNotes} busy={saving || libraryTransferLoading}>
+          {error && <p role="alert" className="rounded-xl bg-red-50 text-red-800 p-3">{error}</p>}
+          <fieldset disabled={saving || libraryTransferLoading} className="min-w-0">
             <p className="text-sm text-gray-600 mb-4">
               These notes are private to your library and are not shared with session participants.
             </p>
@@ -1212,15 +1214,16 @@ export function Dashboard() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+
+          </fieldset>
+        </ModalSheet>
       )}
 
       {/* Create Session Modal */}
       {showCreateSession && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="card w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
-            <h3 className="text-xl font-bold mb-4">Create Session</h3>
+        <ModalSheet title="Create Session" onClose={() => setShowCreateSession(false)} busy={saving || libraryTransferLoading}>
+          {error && <p role="alert" className="rounded-xl bg-red-50 text-red-800 p-3">{error}</p>}
+          <fieldset disabled={saving || libraryTransferLoading} className="min-w-0">
 
             <div className="grid grid-cols-2 gap-2 bg-gray-100 rounded-lg p-1 mb-4">
               <button
@@ -1261,8 +1264,8 @@ export function Dashboard() {
                         onClick={() => handleTakeoutSuggestion(suggestion, true)}
                         className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
                           selected
-                            ? 'bg-orange-100 border-orange-300 text-orange-800'
-                            : 'bg-white border-gray-300 text-gray-700 hover:border-orange-400'
+                            ? 'bg-primary-100 border-primary-300 text-primary-800'
+                            : 'bg-white border-gray-300 text-gray-700 hover:border-primary-400'
                         }`}
                       >
                         {selected ? `✓ ${suggestion}` : suggestion}
@@ -1343,13 +1346,17 @@ export function Dashboard() {
                 Create ({selectedMealIds.length} options)
               </button>
             </div>
-          </div>
-        </div>
+
+          </fieldset>
+        </ModalSheet>
       )}
 
       {/* Confirmation Modal */}
       <ConfirmModal
         isOpen={showDeleteConfirm}
+        busy={saving}
+        error={error}
+        isDanger
         title={mealToDelete
           ? `Delete ${mealToDelete.type === 'category' ? 'Category' : 'Meal'}?`
           : `Delete ${selectedForDeletion.length} ${activeMode === 'takeout' ? 'Categor' : 'Meal'}${

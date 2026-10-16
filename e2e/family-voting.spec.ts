@@ -9,9 +9,9 @@ test('an authenticated quick-session choice can become a planned meal', async ({
   await page.getByRole('button', { name: 'Close Session', exact: true }).click();
   await page.getByRole('button', { name: 'Add Thai night to this week', exact: true }).click();
   await page.getByRole('link', { name: 'Added · View week' }).click();
-  await expect(page.getByRole('heading', { name: 'Thai night', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Thai night Takeout night', exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Thai night', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Thai night Takeout night', exact: true })).toBeVisible();
 });
 
 test('a family can search the library, collapse it, and plan several voted meals', async ({ page, browser }) => {
@@ -54,7 +54,7 @@ test('a family can search the library, collapse it, and plan several voted meals
     await partner.emulateMedia({ reducedMotion: 'reduce' });
     await partner.goto(invite);
     await partner.locator('#name').fill('Partner');
-    await partner.getByRole('button', { name: 'Start Swiping' }).click();
+    await partner.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
     for (let index = 0; index < 2; index++) {
       await expect(partner.getByText('👆 Swipe to vote', { exact: true })).toBeVisible();
       await expect(partner.locator('[data-swipe-intro="true"]')).toHaveCount(0);
@@ -76,8 +76,8 @@ test('a family can search the library, collapse it, and plan several voted meals
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Unchosen casserole' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Choose recipes' })).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: 'Salmon bowls', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Asian tofu', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Salmon bowls Home cooking', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Asian tofu Home cooking', exact: true })).toBeVisible();
     const library = await (await page.request.get('/api/meals')).json();
     expect(library.every((meal: { pickCount: number }) => meal.pickCount === 0)).toBe(true);
   } finally { await partner.close(); }
@@ -97,14 +97,14 @@ test('voted quick results keep a noncurrent planning week', async ({ page }) => 
   await page.getByPlaceholder('Option 1').fill('Future Thai night');
   await page.getByRole('button', { name: 'Create Session', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/share\\?week=${week}$`));
-  await page.getByRole('button', { name: /Start Swiping|Start Voting|Continue to/ }).click();
+  await page.getByRole('button', { name: /Start Swiping|Start voting|Continue to/i }).click();
   await page.getByTestId('swipe-yes').click();
   await expect(page).toHaveURL(new RegExp(`/results/[^?]+\\?week=${week}$`));
   await page.getByRole('button', { name: 'Update Your Choices', exact: true }).click();
   await page.getByRole('button', { name: 'Submit Votes', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/results/[^?]+\\?week=${week}$`));
   const sessionId = new URL(page.url()).pathname.split('/').pop();
-  await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Library & votes' }).click();
+  await page.goto(`/dashboard${new URL(page.url()).search}`);
   await page.getByRole('button', { name: 'Show history', exact: true }).click();
   // The host session page must preserve the planning destination too.
   await page.locator('#session-history .card').first().click();
@@ -114,7 +114,7 @@ test('voted quick results keep a noncurrent planning week', async ({ page }) => 
   await page.getByRole('button', { name: 'Add Future Thai night to this week', exact: true }).click();
   await page.getByRole('link', { name: 'Added · View week' }).click();
   await expect(page).toHaveURL(`/week?week=${week}`);
-  await expect(page.getByRole('heading', { name: 'Future Thai night', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Future Thai night Takeout night', exact: true })).toBeVisible();
   const currentPlan = await (await page.request.get(`/api/plans/${current}`)).json();
   expect(currentPlan.entries).toHaveLength(0);
 });
@@ -130,13 +130,13 @@ test('a signed-in host can end voting from their results tab', async ({ page, br
     const guest = await visitor.newPage();
     await guest.goto(`/join/${session.inviteCode}`);
     await guest.locator('#name').fill('Still deciding');
-    await guest.getByRole('button', { name: 'Start Swiping' }).click();
+    await guest.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
     await guest.goto(`/results/${session.id}`);
     await expect(guest.getByRole('heading', { name: 'Waiting for Votes' })).toBeVisible();
     await expect(guest.getByRole('button', { name: 'End Session & Show Results' })).toHaveCount(0);
     await page.goto(`/join/${session.inviteCode}?week=2030-01-07`);
     await page.locator('#name').fill('Host');
-    await page.getByRole('button', { name: 'Start Swiping' }).click();
+    await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
     await page.getByTestId('swipe-yes').click();
     await expect(page).toHaveURL(`/results/${session.id}?week=2030-01-07`);
     await page.getByRole('button', { name: 'End Session & Show Results' }).click();

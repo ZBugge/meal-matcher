@@ -62,22 +62,22 @@ describe('ConfirmModal', () => {
     expect(onCancel).toHaveBeenCalledOnce();
   });
 
-  it('should call onCancel when backdrop is clicked', () => {
+  it('handles native Escape dismissal through the cancel event', () => {
     const onCancel = vi.fn();
-    const { container } = render(
-      <ConfirmModal
-        isOpen={true}
-        title="Test Title"
-        message="Test message"
-        onConfirm={() => {}}
-        onCancel={onCancel}
-      />
-    );
-    const backdrop = container.querySelector('.absolute.inset-0');
-    if (backdrop) {
-      fireEvent.click(backdrop);
-      expect(onCancel).toHaveBeenCalledOnce();
-    }
+    render(<ConfirmModal isOpen title="Test Title" message="Test message" onConfirm={() => {}} onCancel={onCancel} />);
+    const dialog = screen.getByRole('dialog', { name: 'Test Title' });
+    expect(dialog.tagName).toBe('DIALOG');
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it('blocks dismissal and repeat confirmation while saving', () => {
+    const onCancel = vi.fn(); const onConfirm = vi.fn();
+    render(<ConfirmModal isOpen busy title="Saving dinner" message="Keep this open" onConfirm={onConfirm} onCancel={onCancel} />);
+    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Saving…' }));
+    expect(onCancel).not.toHaveBeenCalled(); expect(onConfirm).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
   });
 
   it('should display multiline messages correctly', () => {

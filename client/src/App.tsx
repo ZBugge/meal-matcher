@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -13,6 +13,7 @@ import { WeekPlan } from './pages/WeekPlan';
 import { ShoppingList } from './pages/ShoppingList';
 import { CookingRecipe } from './pages/CookingRecipe';
 import { FamilyNav } from './components/FamilyNav';
+import { FamilyHeader } from './components/FamilyHeader';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -58,8 +59,11 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { user } = useAuth();
+  const location = useLocation();
+  const familyPage = ['/week', '/shopping', '/recipes'].includes(location.pathname);
   return (
-    <div className={user ? "pb-24" : undefined}>
+    <div className={user ? "family-content" : undefined}>
+    {user && familyPage && <FamilyHeader />}
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<Home />} />
@@ -89,6 +93,7 @@ function AppRoutes() {
 
       {/* Protected routes */}
       <Route path="/week" element={<ProtectedRoute><WeekPlan /></ProtectedRoute>} />
+      <Route path="/recipes" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/shopping" element={<ProtectedRoute><ShoppingList /></ProtectedRoute>} />
       <Route path="/cook/:mealId" element={<ProtectedRoute><CookingRecipe /></ProtectedRoute>} />
       <Route

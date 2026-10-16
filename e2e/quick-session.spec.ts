@@ -16,7 +16,7 @@ test.describe('Quick Session Flow', () => {
     await expect(page).toHaveURL(/\/session\/.*\/share/);
 
     // When: User starts swiping
-    await page.click('text=Start Swiping');
+    await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
 
     // Then: User is on swipe page
     await expect(page).toHaveURL(/\/session\/.*\/swipe/);
@@ -52,7 +52,7 @@ test.describe('Quick Session Flow', () => {
 
     // And: Enters their name and starts swiping
     await participantPage.fill('#name', 'Participant');
-    await participantPage.click('text=Start Swiping');
+    await participantPage.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
 
     // And: Swipes on the meal
     await participantPage.locator('[data-testid="swipe-yes"]').click();
@@ -67,8 +67,8 @@ test.describe('Quick Session Flow', () => {
     // Then: Participant is taken back to swipe page in edit mode
     await expect(participantPage).toHaveURL(/\/session\/.*\/swipe/);
     await expect(participantPage.locator('text=Update your choices')).toBeVisible();
-    await expect(participantPage.getByRole('button', { name: 'Sushi YUM' })).toBeVisible();
-    await participantPage.getByRole('button', { name: 'Sushi YUM' }).click();
+    await expect(participantPage.getByRole('button', { name: 'Sushi YES' })).toBeVisible();
+    await participantPage.getByRole('button', { name: 'Sushi YES' }).click();
     await expect(participantPage.getByRole('button', { name: 'Sushi MAYBE' })).toBeVisible();
     await participantPage.getByRole('button', { name: 'Submit Votes' }).click();
     await expect(participantPage).toHaveURL(/\/results\//);

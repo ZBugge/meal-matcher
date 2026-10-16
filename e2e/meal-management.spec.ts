@@ -9,17 +9,17 @@ test.describe('Meal Management (#17, #12)', () => {
     await page.fill('#confirmPassword', 'testpassword123');
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL('/week');
-    await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Library & votes' }).click();
+    await page.goto(`/dashboard${new URL(page.url()).search}`);
     await page.getByRole('button', { name: 'Show library', exact: true }).click();
   }
 
   // Helper to add a meal via the modal
   async function addMeal(page: import('@playwright/test').Page, title: string, description?: string) {
     await page.click('text=Add Meal');
-    await expect(page.locator('h3:has-text("Add New Meal")')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Add New Meal', exact: true })).toBeVisible();
 
     // Fill the title input (first input in the modal)
-    const modal = page.locator('.card:has(h3:has-text("Add New Meal"))');
+    const modal = page.getByRole('dialog', { name: 'Add New Meal', exact: true });
     await modal.locator('input.input').fill(title);
 
     if (description) {
@@ -29,7 +29,7 @@ test.describe('Meal Management (#17, #12)', () => {
     await modal.locator('button:has-text("Add Meal")').click();
 
     // Wait for modal to close
-    await expect(page.locator('h3:has-text("Add New Meal")')).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Add New Meal', exact: true })).not.toBeVisible();
   }
 
   test('user can edit meal title and description (#17)', async ({ page }) => {
@@ -47,10 +47,10 @@ test.describe('Meal Management (#17, #12)', () => {
     await page.locator('button[title="Edit meal"]').first().click();
 
     // Then: Edit modal appears
-    await expect(page.locator('h3:has-text("Edit Meal")')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Edit Meal', exact: true })).toBeVisible();
 
     // When: User changes title and description
-    const editModal = page.locator('.card:has(h3:has-text("Edit Meal"))');
+    const editModal = page.getByRole('dialog', { name: 'Edit Meal', exact: true });
     await editModal.locator('input.input').fill('Updated Title');
     await editModal.locator('textarea[placeholder="e.g., Beef tacos with all the fixings"]').fill('Updated description');
     await editModal.locator('button:has-text("Save")').click();
@@ -152,7 +152,7 @@ test.describe('Meal Management (#17, #12)', () => {
     await registerAndGoToDashboard(page, uniqueEmail);
 
     await page.getByRole('button', { name: 'Add Meal' }).click();
-    const addModal = page.locator('.card:has(h3:has-text("Add New Meal"))');
+    const addModal = page.getByRole('dialog', { name: 'Add New Meal', exact: true });
     await addModal.getByRole('button', { name: 'Paste a full recipe' }).click();
     await addModal.getByLabel('Recipe text to parse').fill(`Title: Garlic Soup
 Description: Creamy roasted garlic soup
@@ -170,7 +170,7 @@ Simmer until tender.`);
     await page.reload();
     await page.getByRole('button', { name: 'Show library', exact: true }).click();
     await page.getByTitle('Edit meal').click();
-    const editModal = page.locator('.card:has(h3:has-text("Edit Meal"))');
+    const editModal = page.getByRole('dialog', { name: 'Edit Meal', exact: true });
     await expect(editModal.locator('textarea[placeholder="Describe how to make this meal"]'))
       .toHaveValue('Simmer until tender.');
     await expect(editModal.getByLabel('Ingredient 1 amount')).toHaveValue('2 bulbs');

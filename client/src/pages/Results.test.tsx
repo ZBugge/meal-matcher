@@ -187,4 +187,20 @@ describe('Results - Update Choices', () => {
     // Should NOT show Update Your Choices button (session is closed)
     expect(screen.queryByText('Update Your Choices')).toBeNull();
   });
+  it('keeps failed anonymous closure inside its native confirmation for retry', async () => {
+    sessionStorage.setItem('creatorToken', 'secret-test-token');
+    sessionStorage.setItem('sessionId', 'session123');
+    vi.mocked(participantApi.getResults).mockResolvedValue({ status: 'waiting', mode: 'home' });
+    vi.mocked(participantApi.getSessionStatus).mockResolvedValue({ status: 'open', selectedMealId: null, mode: 'home', participants: [{ id: 'unfinished', displayName: 'Alex', submitted: false }] });
+    vi.mocked(participantApi.closeSession).mockRejectedValue(new Error('Close failed'));
+    render(<BrowserRouter><Results /></BrowserRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'End Session & Show Results' }));
+    fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
+    const error = await screen.findByRole('alert');
+    expect(screen.getByRole('dialog', { name: 'End Session?' })).toContainElement(error);
+    expect(error).toHaveTextContent('Close failed');
+    expect(screen.getByRole('button', { name: 'End Session' })).toBeEnabled();
+    expect(participantApi.closeSession).toHaveBeenCalledWith('session123', 'secret-test-token');
+  });
+
 });

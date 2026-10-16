@@ -13,6 +13,7 @@ export function SessionView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [viewingRecipe, setViewingRecipe] = useState<Meal | null>(null);
   const [loadingRecipeId, setLoadingRecipeId] = useState<string | null>(null);
@@ -38,9 +39,7 @@ export function SessionView() {
     if (!session) return;
 
     const inviteUrl = `${window.location.origin}/join/${session.inviteCode}`;
-    await navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try { await navigator.clipboard.writeText(inviteUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { setError('Clipboard access is unavailable. Select and copy the invite link.'); }
   };
 
   const handleCloseSession = async () => {
@@ -59,15 +58,15 @@ export function SessionView() {
   };
 
   const closeSession = async () => {
-    if (!sessionId) return;
-
+    if (!sessionId || closing) return;
+    setClosing(true); setError('');
     try {
       await sessionsApi.close(sessionId);
       setShowConfirmModal(false);
       loadSession(); // Reload to get results
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to close session');
-    }
+    } finally { setClosing(false); }
   };
 
   const handleSelectMeal = async (mealId: string) => {
@@ -101,7 +100,7 @@ export function SessionView() {
     );
   }
 
-  if (error || !session) {
+  if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="card text-center">
@@ -117,15 +116,15 @@ export function SessionView() {
   const submittedCount = session.participants.filter((p) => p.submitted).length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-paper">
       {/* Header */}
       <header className="bg-white shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex flex-wrap gap-3 justify-between items-center">
           <Link to={weekPath('/dashboard')} className="text-primary-600 hover:underline flex items-center gap-1">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Dashboard
+            Choose together
           </Link>
           <span
             className={`px-3 py-1 rounded text-sm font-medium ${
@@ -136,22 +135,24 @@ export function SessionView() {
           >
             {session.status}
           </span>
-          <span className="px-3 py-1 rounded text-sm font-medium bg-orange-50 text-orange-700">
+          <span className="px-3 py-1 rounded text-sm font-medium bg-primary-50 text-primary-700">
             {session.mode === 'takeout' ? 'Order out' : 'Cook at home'}
           </span>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="family-page">
+        {error && !showConfirmModal && <p role="alert" className="text-red-800 bg-red-50 p-3 rounded-xl">{error}</p>}
         {/* Invite Section */}
         <section className="card mb-6">
           <h2 className="text-xl font-bold mb-4">Invite Link</h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
               type="text"
               readOnly
+              aria-label="Invite link"
               value={`${window.location.origin}/join/${session.inviteCode}`}
-              className="input flex-1 bg-gray-50"
+              className="input min-w-0 flex-1 bg-gray-50"
             />
             <button onClick={handleCopyLink} className="btn btn-primary">
               {copied ? 'Copied!' : 'Copy'}
@@ -181,7 +182,7 @@ export function SessionView() {
                 </p>
               </div>
               <button
-                onClick={handleCloseSession}
+                disabled={closing} onClick={handleCloseSession}
                 className="btn btn-danger"
               >
                 Close Session
@@ -288,6 +289,8 @@ export function SessionView() {
 
       <ConfirmModal
         isOpen={showConfirmModal}
+        busy={closing}
+        error={error}
         title="End Session Early?"
         message={`${session.participants.filter((p) => !p.submitted).length} participant(s) haven't finished voting. End session anyway?`}
         confirmText="End Session"

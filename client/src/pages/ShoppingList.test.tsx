@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { Link, MemoryRouter } from 'react-router-dom';
 import { ShoppingList } from './ShoppingList';
 import { planningApi, type ShoppingItem, type WeekPlan } from '../api/planning';
 
-vi.mock('../api/planning', () => ({ planningApi: { getWeek: vi.fn(), bulkItems: vi.fn(), addItem: vi.fn(), updateItem: vi.fn(), removeItem: vi.fn() } }));
+vi.mock('../api/planning', () => ({ planningApi: { getWeek: vi.fn(), bulkItems: vi.fn(), addItem: vi.fn(), updateItem: vi.fn(), removeItem: vi.fn(), recurring: vi.fn(), saveRecurring: vi.fn(), removeRecurring: vi.fn(), applyRecurring: vi.fn() } }));
 const week = '2026-10-12';
 const firstAmount = 'one generous handful, reserving a little for serving';
 const secondAmount = 'another large handful, washed and drained thoroughly';
@@ -16,6 +16,7 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
   vi.mocked(planningApi.getWeek).mockResolvedValue(initial);
+  vi.mocked(planningApi.recurring).mockResolvedValue([{ id: "usual-1", ingredient: "Tea", amount: "2 boxes" }]);
 });
 describe('compact shopping', () => {
   it('keeps compact rows and opens exact ordered contributions only on request', async () => {
@@ -101,4 +102,80 @@ describe('compact shopping', () => {
     await act(async () => fail(new Error('Purchase failed')));
     expect(checkbox).not.toBeChecked(); expect(await screen.findByRole('alert')).toHaveTextContent('Purchase failed');
   });
+  it('saves, edits and removes usual groceries without changing the selected week', async () => {
+    vi.mocked(planningApi.saveRecurring).mockResolvedValueOnce({ id: 'usual-2', ingredient: 'Bread', amount: '1 loaf' }).mockResolvedValueOnce({ id: 'usual-2', ingredient: 'Bread', amount: '2 loaves' });
+    vi.mocked(planningApi.removeRecurring).mockResolvedValue({ message: 'Removed' });
+    show(); fireEvent.click(await screen.findByRole('button', { name: 'Usual groceries' }));
+    await screen.findByLabelText('Add usual Tea');
+    fireEvent.change(screen.getByLabelText('Usual item'), { target: { value: 'Bread' } });
+    fireEvent.change(screen.getByLabelText('Usual amount (optional)'), { target: { value: '1 loaf' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save usual grocery' }));
+    await screen.findByLabelText('Add usual Bread');
+    expect(planningApi.saveRecurring).toHaveBeenCalledWith(week, { ingredient: 'Bread', amount: '1 loaf' }, undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit usual Bread' }));
+    fireEvent.change(screen.getByLabelText('Usual amount (optional)'), { target: { value: '2 loaves' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save usual changes' }));
+    await screen.findByText('2 loaves Bread');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete usual Bread' }));
+    await act(async () => {});
+    expect(screen.queryByLabelText('Add usual Bread')).toBeNull();
+    expect(planningApi.applyRecurring).not.toHaveBeenCalled();
+    expect(screen.getByRole('checkbox', { name: 'Purchased Beans' })).toBeInTheDocument();
+  });
+  it('retains selected usual groceries and the existing list after a failed apply, and retries explicitly', async () => {
+    let reject!: (error: Error) => void;
+    vi.mocked(planningApi.applyRecurring).mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; })).mockResolvedValueOnce({ ...initial, shopping: [...initial.shopping, item('5', { ingredient: 'Tea', amount: '2 boxes' })] });
+    show(); fireEvent.click(await screen.findByRole('button', { name: 'Usual groceries' }));
+    fireEvent.click(await screen.findByLabelText('Add usual Tea'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add selected to this week (1)' }));
+    expect(screen.getByRole('button', { name: 'Save usual grocery' })).toBeDisabled();
+    await act(async () => reject(new Error('Could not add groceries')));
+    expect(screen.getByRole('dialog')).toContainElement(screen.getByRole('alert'));
+    expect(screen.getByLabelText('Add usual Tea')).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Purchased Beans' })).toBeInTheDocument();
+    expect(planningApi.applyRecurring).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Add selected to this week (1)' }));
+    await screen.findByText('Usual groceries added.');
+    expect(planningApi.applyRecurring).toHaveBeenLastCalledWith(week, ['usual-1']);
+    expect(screen.getByRole('checkbox', { name: 'Purchased Tea' })).toBeVisible();
+  });
+  it('offers explicit retry when usual grocery loading fails', async () => {
+    vi.mocked(planningApi.recurring).mockRejectedValueOnce(new Error('Unavailable')).mockResolvedValueOnce([]);
+    show(); fireEvent.click(await screen.findByRole('button', { name: 'Usual groceries' }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry loading usual groceries' }));
+    await screen.findByText('No saved groceries yet.');
+    expect(planningApi.recurring).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves failed saved-grocery drafts and leaves failed deletes available for retry', async () => {
+    vi.mocked(planningApi.saveRecurring).mockRejectedValue(new Error('Save unavailable'));
+    vi.mocked(planningApi.removeRecurring).mockRejectedValue(new Error('Delete unavailable'));
+    show(); fireEvent.click(await screen.findByRole('button', { name: 'Usual groceries' }));
+    await screen.findByLabelText('Add usual Tea');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit usual Tea' }));
+    fireEvent.change(screen.getByLabelText('Usual amount (optional)'), { target: { value: '3 boxes' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save usual changes' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Save unavailable');
+    expect(screen.getByLabelText('Usual amount (optional)')).toHaveValue('3 boxes');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete usual Tea' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Delete unavailable');
+    expect(screen.getByLabelText('Add usual Tea')).toBeInTheDocument();
+  });
+  it('does not put a late recurring apply response into a newly selected week', async () => {
+    let finish!: (plan: WeekPlan) => void;
+    vi.mocked(planningApi.applyRecurring).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    vi.mocked(planningApi.getWeek).mockImplementation(async value => ({ ...initial, week: value, shopping: value === week ? initial.shopping : [] }));
+    render(<MemoryRouter initialEntries={[`/shopping?week=${week}`]}><Link to="/shopping?week=2026-10-19">Next shopping week</Link><ShoppingList /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Usual groceries' }));
+    fireEvent.click(await screen.findByLabelText('Add usual Tea'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add selected to this week (1)' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Next shopping week' }));
+    await screen.findByText(/Add recipes to your week/);
+    await act(async () => finish({ ...initial, shopping: [item('5', { ingredient: 'Tea' })] }));
+    expect(screen.queryByRole('checkbox', { name: 'Purchased Tea' })).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByText(/Add recipes to your week/)).toBeVisible();
+  });
+
 });

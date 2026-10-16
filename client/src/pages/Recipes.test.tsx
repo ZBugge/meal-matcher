@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Dashboard } from './Dashboard';
 import { mealsApi, sessionsApi, type Meal } from '../api/client';
 
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'host', email: 'household@example.com' }, logout: vi.fn() }) }));
-vi.mock('../api/client', () => ({ authApi: { updatePreferences: vi.fn() }, mealsApi: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), exportLibrary: vi.fn() }, sessionsApi: { list: vi.fn() } }));
+vi.mock('../api/client', () => ({ authApi: { updatePreferences: vi.fn() }, mealsApi: { parseRecipe: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), exportLibrary: vi.fn() }, sessionsApi: { list: vi.fn() } }));
 const meal: Meal = { id: 'recipe', title: 'Bean stew', description: 'Our favorite', type: 'meal', pickCount: 0, ingredients: [{ amount: 'one generous handful', ingredient: 'Beans' }], instructions: 'Simmer gently.', notes: 'Private family notes' };
 function show() { render(<MemoryRouter initialEntries={['/recipes?week=2026-10-19']}><Dashboard /></MemoryRouter>); }
 beforeEach(() => {
@@ -64,4 +64,76 @@ describe('dedicated Recipes destination', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByRole('checkbox', { name: 'Select Bean stew for deletion' })).toBeVisible();
   });
+});
+
+describe('recipe time and effort', () => {
+  it('combines time, exact effort, and search while retaining unknown recipes until filtered', async () => {
+    vi.mocked(mealsApi.list).mockImplementation(async type => type === 'meal' ? [
+      {...meal, id: 'quick', title: 'Quick bean soup', totalMinutes: 15, effort: 'easy'},
+      {...meal, id: 'slow', title: 'Slow bean stew', totalMinutes: 60, effort: 'easy'},
+      {...meal, id: 'medium', title: 'Quick pasta', totalMinutes: 15, effort: 'medium'},
+      {...meal, id: 'unknown', title: 'Mystery dinner'},
+    ] : []);
+    show(); await screen.findByRole('button', {name: /Mystery dinner/});
+    fireEvent.change(screen.getByLabelText('Maximum total time'), {target: {value: '15'}});
+    expect(screen.queryByRole('button', {name: /Slow bean stew/})).toBeNull();
+    expect(screen.queryByRole('button', {name: /Mystery dinner/})).toBeNull();
+    expect(screen.getByRole('button', {name: /Quick pasta/})).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Filter by effort'), {target: {value: 'easy'}});
+    expect(screen.queryByRole('button', {name: /Quick pasta/})).toBeNull();
+    fireEvent.change(screen.getByLabelText('Search your recipes'), {target: {value: 'pasta'}});
+    expect(screen.queryByRole('button', {name: /Quick bean soup/})).toBeNull();
+    fireEvent.click(screen.getByRole('button', {name: 'Clear filters'}));
+    expect(screen.getByRole('button', {name: /Mystery dinner/})).toBeVisible();
+    expect(screen.getByLabelText('Search your recipes')).toHaveValue('');
+  });
+  it('retains known values during unrelated edits and supports explicit clearing', async () => {
+    vi.mocked(mealsApi.list).mockImplementation(async type => type === 'meal' ? [{...meal, totalMinutes: 30, effort: 'medium'}] : []);
+    vi.mocked(mealsApi.update).mockResolvedValue({...meal, totalMinutes: 30, effort: 'medium'});
+    show(); fireEvent.click(await screen.findByRole('button', {name: /Bean stew/}));
+    fireEvent.click(screen.getByRole('button', {name: 'Edit recipe'}));
+    expect(screen.getByLabelText('Total time (minutes)')).toHaveValue(30);
+    expect(screen.getByLabelText('Effort')).toHaveValue('medium');
+    fireEvent.change(screen.getByLabelText('Title'), {target: {value: 'Updated stew'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Save'}));
+    await screen.findByRole('button', {name: /Bean stew/});
+    expect(mealsApi.update).toHaveBeenLastCalledWith('recipe', expect.objectContaining({title: 'Updated stew', totalMinutes: 30, effort: 'medium'}));
+    fireEvent.click(screen.getByRole('button', {name: /Bean stew/}));
+    fireEvent.click(screen.getByRole('button', {name: 'Edit recipe'}));
+    fireEvent.change(screen.getByLabelText('Total time (minutes)'), {target: {value: ''}});
+    fireEvent.change(screen.getByLabelText('Effort'), {target: {value: ''}});
+    fireEvent.click(screen.getByRole('button', {name: 'Save'}));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(mealsApi.update).toHaveBeenLastCalledWith('recipe', expect.objectContaining({totalMinutes: null, effort: null}));
+  });
+});
+
+it('keeps home time and effort filters out of takeout results and category forms', async () => {
+  vi.mocked(mealsApi.list).mockImplementation(async type => type === 'meal' ? [meal] : [{id: 'category', title: 'Thai', description: null, type: 'category', pickCount: 0}]);
+  show(); await screen.findByRole('button', {name: /Bean stew/});
+  fireEvent.change(screen.getByLabelText('Maximum total time'), {target: {value: '15'}});
+  fireEvent.change(screen.getByLabelText('Filter by effort'), {target: {value: 'involved'}});
+  fireEvent.click(screen.getByRole('button', {name: 'Takeout'}));
+  expect(screen.getByRole('button', {name: /Thai/})).toBeVisible();
+  expect(screen.queryByLabelText('Maximum total time')).toBeNull();
+  fireEvent.click(screen.getByRole('button', {name: 'Add Category'}));
+  expect(screen.queryByLabelText('Total time (minutes)')).toBeNull();
+  expect(screen.queryByLabelText('Effort')).toBeNull();
+});
+
+it('keeps time and effort drafts when a pasted recipe fills other fields', async () => {
+  vi.mocked(mealsApi.parseRecipe).mockResolvedValue({title: 'Pasted soup', description: null, instructions: 'Simmer.', ingredients: []});
+  vi.mocked(mealsApi.create).mockResolvedValue({...meal, id: 'pasted', title: 'Pasted soup', totalMinutes: 20, effort: 'easy'});
+  show(); fireEvent.click(await screen.findByRole('button', {name: 'Add recipe'}));
+  fireEvent.change(screen.getByLabelText('Total time (minutes)'), {target: {value: '20'}});
+  fireEvent.change(screen.getByLabelText('Effort'), {target: {value: 'easy'}});
+  fireEvent.click(screen.getByRole('button', {name: 'Paste a full recipe'}));
+  fireEvent.change(screen.getByLabelText('Recipe text to parse'), {target: {value: 'Title: Pasted soup'}});
+  fireEvent.click(screen.getByRole('button', {name: 'Fill recipe form'}));
+  await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Pasted soup'));
+  expect(screen.getByLabelText('Total time (minutes)')).toHaveValue(20);
+  expect(screen.getByLabelText('Effort')).toHaveValue('easy');
+  fireEvent.click(screen.getByRole('button', {name: 'Add Meal'}));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(mealsApi.create).toHaveBeenCalledWith('Pasted soup', undefined, 'meal', expect.objectContaining({totalMinutes: 20, effort: 'easy'}));
 });

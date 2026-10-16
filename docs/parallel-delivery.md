@@ -24,7 +24,7 @@ These checks validate supplied declarations, not filesystem isolation or the tru
 
 ## Short assignments
 
-Give each worker: outcome and acceptance, assigned directory/base, exact file allowlist, settled interfaces, targeted checks, forbidden shared edits, stopping condition, and concise hand-back format. Fresh context, normally under 500 words. Ask for changed files, check evidence, start/end times, material findings and blockers. Do not send the backlog or whole conversation. Skip extra scouts and test-running agents.
+Give each worker: outcome and acceptance, assigned directory/base, exact file allowlist, settled interfaces, targeted checks, forbidden shared edits, stopping condition, and concise hand-back format. Fresh context, normally under 500 words. Ask for changed files, check evidence, start/end times, material findings and blockers. For TypeScript changes require the affected package type check/build before handback as well as targeted tests; passing runtime tests cannot establish type correctness. When adding form controls, inspect existing browser locators for ambiguity and use explicit accessible names. Do not send the backlog or whole conversation. Skip extra scouts and test-running agents.
 
 ## Finish once
 

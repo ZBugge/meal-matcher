@@ -27,10 +27,13 @@ describe('Planning schema compatibility', () => {
     let database = await schema.initializeDatabase();
     for (const [table, columns] of [
       ['plan_entries', ['id', 'host_id', 'week', 'meal_id', 'kind', 'title', 'date', 'created_at']],
-      ['shopping_items', ['id', 'host_id', 'week', 'entry_id', 'source_title', 'amount', 'ingredient', 'aisle', 'state', 'display_order']],
+      ['shopping_items', ['id', 'host_id', 'week', 'entry_id', 'source_title', 'amount', 'ingredient', 'aisle', 'state', 'display_order', 'recurring_id']],
       ['dinner_staples', ['id', 'host_id', 'title']],
+      ['recurring_groceries', ['id', 'host_id', 'ingredient', 'amount']],
       ['login_sessions', ['id', 'data', 'expires']],
     ] as const) expect(database.exec(`PRAGMA table_info(${table})`)[0].values.map(row => row[1])).toEqual(columns);
+    expect(database.exec('PRAGMA index_list(shopping_items)')[0].values.map(row => ({ name: row[1], unique: row[2] })))
+      .toContainEqual({ name: 'idx_shopping_recurring_week', unique: 1 });
     database.run("INSERT INTO plan_entries(id, host_id, week, kind, title) VALUES ('entry', 'host', '2026-10-12', 'takeout', 'Pizza')");
     database.run("INSERT INTO shopping_items(id, host_id, week, entry_id, source_title, ingredient, amount, state) VALUES ('item', 'host', '2026-10-12', 'entry', 'Pizza', 'Milk', '1 carton', 'have')");
     schema.saveDatabase();

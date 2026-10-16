@@ -2,8 +2,13 @@ import { request } from './client';
 export interface PlanEntry { id: string; mealId: string | null; kind: 'home' | 'takeout'; title: string; date: string | null }
 export interface ShoppingItem { id: string; entryId: string | null; sourceTitle: string | null; amount: string; ingredient: string; state: 'needed' | 'have' | 'bought'; aisle: string | null; displayOrder: number }
 export interface WeekPlan { week: string; entries: PlanEntry[]; shopping: ShoppingItem[] }
+export interface RecurringGrocery { id: string; ingredient: string; amount: string }
 const endpoint = (week: string) => `/plans/${encodeURIComponent(week)}`;
 export const planningApi = {
+  recurring: (week: string) => request<RecurringGrocery[]>(`${endpoint(week)}/recurring`),
+  saveRecurring: (week: string, data: { ingredient: string; amount: string }, id?: string) => request<RecurringGrocery>(`${endpoint(week)}/recurring${id ? '/' + encodeURIComponent(id) : ''}`, { method: id ? 'PATCH' : 'POST', body: JSON.stringify(data) }),
+  removeRecurring: (week: string, id: string) => request<{ message: string }>(`${endpoint(week)}/recurring/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  applyRecurring: (week: string, ids: string[]) => request<WeekPlan>(`${endpoint(week)}/recurring/apply`, { method: 'POST', body: JSON.stringify({ ids }) }),
   staples: (week: string) => request<DinnerStaple[]>(`${endpoint(week)}/staples`),
   saveStaple: (week: string, title: string, id?: string) => request(`${endpoint(week)}/staples${id ? '/' + encodeURIComponent(id) : ''}`, { method: id ? 'PATCH' : 'POST', body: JSON.stringify({ title }) }),
   removeStaple: (week: string, id: string) => request(`${endpoint(week)}/staples/${encodeURIComponent(id)}`, { method: 'DELETE' }),

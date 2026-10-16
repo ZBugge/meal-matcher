@@ -16,7 +16,7 @@ Record choices and their reasons here. Pending choices belong in the latest rele
 
 - Date: 2026-10-13 (America/New_York).
 - Decision maker: Zach, authorizing the proposed setup with “ok lets get it going.”
-- Choice: Install the minimal coordination workflow described in [the proposal](../docs/agentic-pod-proposal.md).
+- Choice: Install the minimal coordination workflow described in the original local agentic-pod proposal.
 - Implementation defaults chosen by the coordinator: project-local skill and notes, existing product backlog, stable IDs, on-demand briefings, bounded subagents, and one writer for shared memory.
 - Why: Reuse the existing idea-to-PR workflow while making context recoverable across chats.
 - Boundaries: This setup request does not select or authorize a product feature, publish changes, migrate the Claude orchestrator, or configure recurring automation.

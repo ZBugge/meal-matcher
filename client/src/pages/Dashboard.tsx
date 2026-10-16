@@ -35,6 +35,16 @@ function formatLastSelectedAt(timestamp: string | null | undefined): string {
   }).format(date)}`;
 }
 
+function MetadataFields({ minutes, effort, onMinutes, onEffort }: { minutes: string; effort: string; onMinutes: (value: string) => void; onEffort: (value: string) => void }) {
+  return <div className="grid sm:grid-cols-2 gap-4">
+    <label className="block text-sm font-medium">Total time (minutes)<input className="input mt-1" type="number" min="1" max="1440" step="1" value={minutes} onChange={event => onMinutes(event.target.value)} /></label>
+    <label className="block text-sm font-medium">Effort<select aria-label="Effort" className="input mt-1" value={effort} onChange={event => onEffort(event.target.value)}><option value="">Not set</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="involved">Involved</option></select></label>
+  </div>;
+}
+function RecipeMetadata({ meal }: { meal: Meal }) {
+  return meal.type === 'meal' && (meal.totalMinutes != null || meal.effort) ? <span className="block text-sm text-muted mt-1">{[meal.totalMinutes != null ? `${meal.totalMinutes} min` : '', meal.effort ? `${meal.effort[0].toUpperCase()}${meal.effort.slice(1)} effort` : ''].filter(Boolean).join(' · ')}</span> : null;
+}
+
 export function Dashboard() {
   const { user } = useAuth();
   const recipesPage = useLocation().pathname === '/recipes';
@@ -54,6 +64,12 @@ export function Dashboard() {
   const [libraryCollapsed, setLibraryCollapsed] = useState(true);
   const [historyCollapsed, setHistoryCollapsed] = useState(true);
   const [search, setSearch] = useState('');
+  const [maxMinutes, setMaxMinutes] = useState('');
+  const [effortFilter, setEffortFilter] = useState('');
+  const [newMinutes, setNewMinutes] = useState('');
+  const [newEffort, setNewEffort] = useState('');
+  const [editMinutes, setEditMinutes] = useState('');
+  const [editEffort, setEditEffort] = useState('');
 
   // Modal states
   const [showAddMeal, setShowAddMeal] = useState(false);
@@ -101,7 +117,8 @@ export function Dashboard() {
 
   const activeType = activeMode === 'home' ? 'meal' : 'category';
   const activeMeals = meals.filter((meal) => meal.type === activeType);
-  const visibleMeals = activeMeals.filter(meal => `${meal.title} ${meal.description || ''}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const visibleMeals = activeMeals.filter(meal => `${meal.title} ${meal.description || ''}`.toLowerCase().includes(search.trim().toLowerCase())
+    && (activeMode !== 'home' || ((!maxMinutes || (meal.totalMinutes != null && meal.totalMinutes <= Number(maxMinutes))) && (!effortFilter || meal.effort === effortFilter))));
   const sessionType = sessionMode === 'home' ? 'meal' : 'category';
   const sessionMeals = meals.filter((meal) => meal.type === sessionType);
 
@@ -150,14 +167,14 @@ export function Dashboard() {
 
     if (!beginSave()) return;
     try {
-      const hasRecipe = Boolean(newMealInstructions.trim()) || newMealIngredients.length > 0;
+      const hasRecipe = Boolean(newMealInstructions.trim()) || newMealIngredients.length > 0 || Boolean(newMinutes || newEffort);
       const meal = activeMode === 'home'
         ? hasRecipe
           ? await mealsApi.create(
               newMealTitle.trim(),
               newMealDescription || undefined,
               'meal',
-              { instructions: newMealInstructions, ingredients: newMealIngredients }
+              { instructions: newMealInstructions, ingredients: newMealIngredients, ...(newMinutes ? { totalMinutes: Number(newMinutes) } : {}), ...(newEffort ? { effort: newEffort as Meal['effort'] } : {}) }
             )
           : await mealsApi.create(newMealTitle.trim(), newMealDescription || undefined)
         : await mealsApi.create(newMealTitle.trim(), undefined, 'category');
@@ -166,6 +183,8 @@ export function Dashboard() {
       setNewMealDescription('');
       setNewMealInstructions('');
       setNewMealIngredients([]);
+      setNewMinutes('');
+      setNewEffort('');
       setShowAddMeal(false);
       if (activeMode === 'takeout') {
         setTakeoutOnboardingDismissed(true);
@@ -181,6 +200,8 @@ export function Dashboard() {
     setNewMealDescription('');
     setNewMealInstructions('');
     setNewMealIngredients([]);
+    setNewMinutes('');
+    setNewEffort('');
     setShowAddMeal(true);
   };
 
@@ -189,6 +210,8 @@ export function Dashboard() {
     setNewMealDescription('');
     setNewMealInstructions('');
     setNewMealIngredients([]);
+    setNewMinutes('');
+    setNewEffort('');
     setShowAddMeal(false);
   };
 
@@ -236,6 +259,8 @@ export function Dashboard() {
     setError('');
     setEditingMeal(meal);
     setEditTitle(meal.title);
+    setEditMinutes(meal.totalMinutes == null ? '' : String(meal.totalMinutes));
+    setEditEffort(meal.effort ?? '');
     setEditDescription(meal.description || '');
     setEditInstructions(meal.instructions || '');
     setEditIngredients(meal.ingredients?.map((row) => ({ ...row })) || []);
@@ -282,7 +307,10 @@ export function Dashboard() {
       const updatedMeal = await mealsApi.update(editingMeal.id, {
         title: editTitle,
         ...(editingMeal.type === 'meal'
-          ? { description: editDescription || undefined }
+          ? { description: editDescription || undefined,
+              ...(editingMeal.totalMinutes !== undefined || editMinutes ? { totalMinutes: editMinutes ? Number(editMinutes) : null } : {}),
+              ...(editingMeal.effort !== undefined || editEffort ? { effort: (editEffort || null) as Meal['effort'] } : {}),
+            }
           : {}),
         ...(editingMeal.type === 'meal' && (hasLoadedRecipe || hasRecipeDraft)
           ? {
@@ -675,6 +703,11 @@ export function Dashboard() {
             Search your {activeMode === 'home' ? 'recipes' : 'categories'}
             <input type="search" className="input mt-2" value={search} onChange={event => setSearch(event.target.value)} placeholder="Find a favorite…" />
           </label>
+          {activeMode === 'home' && <div className="flex flex-wrap gap-3 items-end mb-4">
+            <label className="text-sm font-medium">Maximum total time<select aria-label="Maximum total time" className="input mt-1" value={maxMinutes} onChange={event => setMaxMinutes(event.target.value)}><option value="">Any time</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option></select></label>
+            <label className="text-sm font-medium">Filter by effort<select aria-label="Filter by effort" className="input mt-1" value={effortFilter} onChange={event => setEffortFilter(event.target.value)}><option value="">Any effort</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="involved">Involved</option></select></label>
+            {(search || maxMinutes || effortFilter) && <button className="btn btn-secondary" onClick={() => { setSearch(''); setMaxMinutes(''); setEffortFilter(''); }}>Clear filters</button>}
+          </div>}
           {activeMeals.length > 0 && visibleMeals.length === 0 && <p className="py-4 text-gray-500">No matching options. Try another search.</p>}
           {activeMeals.length === 0 ? (
             activeMode === 'takeout' && !takeoutOnboardingDismissed ? (
@@ -705,7 +738,7 @@ export function Dashboard() {
               </div>
             )
           ) : (
-            recipesPage ? <ul className="divide-y divide-stone-200">{visibleMeals.map(meal => <li key={meal.id} className="flex gap-3 items-center py-2">{editMode && <label className="min-h-12 min-w-12 flex items-center justify-center"><input type="checkbox" checked={selectedForDeletion.includes(meal.id)} onChange={() => toggleMealForDeletion(meal.id)} aria-label={`Select ${meal.title} for deletion`} /></label>}<button className="flex-1 min-w-0 min-h-16 text-left py-3 flex items-center justify-between gap-3" onClick={() => { setError(''); setDetailMeal(meal); }} disabled={editMode}><span className="min-w-0"><span className="dinner-title text-xl block">{meal.title}</span><span className="block text-sm text-muted mt-1">{meal.type === 'category' ? 'Takeout category' : meal.ingredients?.length ? `${meal.ingredients.length} ingredients` : 'Saved family recipe'}</span></span><span aria-hidden="true">→</span></button></li>)}</ul> :
+            recipesPage ? <ul className="divide-y divide-stone-200">{visibleMeals.map(meal => <li key={meal.id} className="flex gap-3 items-center py-2">{editMode && <label className="min-h-12 min-w-12 flex items-center justify-center"><input type="checkbox" checked={selectedForDeletion.includes(meal.id)} onChange={() => toggleMealForDeletion(meal.id)} aria-label={`Select ${meal.title} for deletion`} /></label>}<button className="flex-1 min-w-0 min-h-16 text-left py-3 flex items-center justify-between gap-3" onClick={() => { setError(''); setDetailMeal(meal); }} disabled={editMode}><span className="min-w-0"><span className="dinner-title text-xl block">{meal.title}</span><RecipeMetadata meal={meal} /><span className="block text-sm text-muted mt-1">{meal.type === 'category' ? 'Takeout category' : meal.ingredients?.length ? `${meal.ingredients.length} ingredients` : 'Saved family recipe'}</span></span><span aria-hidden="true">→</span></button></li>)}</ul> :
             <div className="grid gap-4 sm:grid-cols-2">
               <AnimatePresence mode="popLayout">
                 {visibleMeals.map((meal) => {
@@ -758,6 +791,7 @@ export function Dashboard() {
                           ) : (
                             <h3 className="font-semibold text-lg">{meal.title}</h3>
                           )}
+                          <RecipeMetadata meal={meal} />
                           {meal.description && (
                             <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
                           )}
@@ -1108,6 +1142,7 @@ export function Dashboard() {
                   placeholder="e.g., Beef tacos with all the fixings"
                 />
               </div>}
+              {activeMode === 'home' && <MetadataFields minutes={newMinutes} effort={newEffort} onMinutes={setNewMinutes} onEffort={setNewEffort} />}
               {activeMode === 'home' && (
                 <RecipeFields
                   instructions={newMealInstructions}
@@ -1168,6 +1203,7 @@ export function Dashboard() {
                   placeholder="e.g., Beef tacos with all the fixings"
                 />
               </div>}
+              {editingMeal.type === 'meal' && <MetadataFields minutes={editMinutes} effort={editEffort} onMinutes={setEditMinutes} onEffort={setEditEffort} />}
               {editingMeal.type === 'meal' && (
                 <RecipeFields
                   instructions={editInstructions}

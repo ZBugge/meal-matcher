@@ -56,6 +56,12 @@ function runMigrations(database: Database): void {
   if (!columnExists(database, 'meals', 'notes')) {
     database.run('ALTER TABLE meals ADD COLUMN notes TEXT');
   }
+  if (!columnExists(database, 'meals', 'total_minutes')) {
+    database.run('ALTER TABLE meals ADD COLUMN total_minutes INTEGER CHECK (total_minutes BETWEEN 1 AND 1440)');
+  }
+  if (!columnExists(database, 'meals', 'effort')) {
+    database.run("ALTER TABLE meals ADD COLUMN effort TEXT CHECK (effort IN ('easy', 'medium', 'involved'))");
+  }
 
   database.run(`
     CREATE TABLE IF NOT EXISTS meal_ingredients (
@@ -88,6 +94,8 @@ function runMigrations(database: Database): void {
 
   createPlanningTables(database);
   if (!columnExists(database, 'shopping_items', 'aisle')) database.run('ALTER TABLE shopping_items ADD COLUMN aisle TEXT');
+  if (!columnExists(database, 'shopping_items', 'recurring_id')) database.run('ALTER TABLE shopping_items ADD COLUMN recurring_id TEXT');
+  database.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_recurring_week ON shopping_items(host_id, week, recurring_id)');
   saveDatabase();
 }
 
@@ -104,6 +112,11 @@ function createPlanningTables(database: Database): void {
     CREATE TABLE IF NOT EXISTS dinner_staples (
       id TEXT PRIMARY KEY, host_id TEXT NOT NULL REFERENCES hosts(id), title TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS recurring_groceries (
+      id TEXT PRIMARY KEY, host_id TEXT NOT NULL REFERENCES hosts(id),
+      ingredient TEXT NOT NULL, amount TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_recurring_groceries_host ON recurring_groceries(host_id);
     CREATE TABLE IF NOT EXISTS login_sessions (
       id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL
     );
@@ -117,7 +130,8 @@ function createPlanningTables(database: Database): void {
       id TEXT PRIMARY KEY, host_id TEXT NOT NULL REFERENCES hosts(id), week TEXT NOT NULL,
       entry_id TEXT REFERENCES plan_entries(id), source_title TEXT,
       amount TEXT NOT NULL DEFAULT '', ingredient TEXT NOT NULL,
-      aisle TEXT, state TEXT NOT NULL DEFAULT 'needed', display_order INTEGER NOT NULL DEFAULT 0
+      aisle TEXT, state TEXT NOT NULL DEFAULT 'needed', display_order INTEGER NOT NULL DEFAULT 0,
+      recurring_id TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_shopping_items_host_week ON shopping_items(host_id, week);
   `);
@@ -125,6 +139,7 @@ function createPlanningTables(database: Database): void {
 
 function createTables(database: Database): void {
   createPlanningTables(database);
+  database.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_recurring_week ON shopping_items(host_id, week, recurring_id)');
   database.run(`
     -- Host accounts
     CREATE TABLE IF NOT EXISTS hosts (
@@ -143,6 +158,8 @@ function createTables(database: Database): void {
       description TEXT,
       instructions TEXT,
       notes TEXT,
+      total_minutes INTEGER CHECK (total_minutes BETWEEN 1 AND 1440),
+      effort TEXT CHECK (effort IN ('easy', 'medium', 'involved')),
       type TEXT DEFAULT 'meal',
       archived INTEGER DEFAULT 0,
       pick_count INTEGER DEFAULT 0,

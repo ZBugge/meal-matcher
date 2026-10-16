@@ -81,6 +81,7 @@ export const authApi = {
 // Meals API
 export type SessionMode = 'home' | 'takeout';
 export type MealType = 'meal' | 'category' | 'restaurant';
+export type RecipeEffort = 'easy' | 'medium' | 'involved';
 
 export interface RecipeIngredient {
   amount: string;
@@ -90,6 +91,8 @@ export interface RecipeIngredient {
 export interface RecipeInput {
   instructions?: string | null;
   ingredients?: RecipeIngredient[];
+  totalMinutes?: number | null;
+  effort?: RecipeEffort | null;
 }
 
 export interface ParsedRecipe {
@@ -106,6 +109,8 @@ export interface Meal {
   notes?: string | null;
   instructions?: string | null;
   ingredients?: RecipeIngredient[];
+  totalMinutes?: number | null;
+  effort?: RecipeEffort | null;
   type: MealType;
   pickCount: number;
   createdAt?: string;
@@ -120,6 +125,8 @@ export interface LibraryExportOption {
   notes?: string | null;
   instructions?: string | null;
   ingredients?: RecipeIngredient[];
+  totalMinutes?: number | null;
+  effort?: RecipeEffort | null;
 }
 
 export interface LibraryExportData {
@@ -183,6 +190,8 @@ export const mealsApi = {
       notes?: string | null;
       instructions?: string | null;
       ingredients?: RecipeIngredient[];
+      totalMinutes?: number | null;
+      effort?: RecipeEffort | null;
     }
   ) =>
     request<Meal>(`/meals/${id}`, {

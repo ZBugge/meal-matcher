@@ -1,6 +1,7 @@
 // Shared domain types
 export type SessionMode = 'home' | 'takeout';
 export type MealType = 'meal' | 'category' | 'restaurant';
+export type RecipeEffort = 'easy' | 'medium' | 'involved';
 
 // Database entity types
 export interface Host {
@@ -18,6 +19,8 @@ export interface Meal {
   description: string | null;
   instructions: string | null;
   notes: string | null;
+  total_minutes?: number | null;
+  effort?: RecipeEffort | null;
   type: MealType;
   archived: number; // SQLite boolean (0 or 1)
   pick_count: number;
@@ -107,6 +110,8 @@ export interface CreateMealRequest {
   type?: MealType;
   instructions?: string | null;
   ingredients?: MealIngredient[];
+  totalMinutes?: number | null;
+  effort?: RecipeEffort | null;
 }
 
 export interface LibraryExportOption {
@@ -116,6 +121,8 @@ export interface LibraryExportOption {
   notes?: string | null;
   instructions?: string | null;
   ingredients?: MealIngredient[];
+  totalMinutes?: number | null;
+  effort?: RecipeEffort | null;
 }
 
 export interface LibraryExportData {
@@ -183,3 +190,4 @@ export interface WeekPlan {
 }
 
 export interface DinnerStaple { id: string; title: string }
+export interface RecurringGrocery { id: string; ingredient: string; amount: string }

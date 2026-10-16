@@ -70,6 +70,33 @@ test('quality evidence is required and failed quality cannot pass', () => {
   assert.equal(summarizeDelivery(input).qualityPassed, false);
 });
 
+test('quality cannot pass without positive recorded review and verification intervals', () => {
+  for (const phases of [[], fixture().phases.filter(p => p.kind !== 'review'),
+    fixture().phases.filter(p => p.kind !== 'verification'),
+    [phase('review', 'review', 50, 50), phase('verify', 'verification', 50, 50)]]) {
+    assert.equal(summarizeDelivery({ ...fixture(), phases }).qualityPassed, false);
+  }
+});
+
+test('rejects repeated overlapping final gates and candidate mutation after final gates begin', () => {
+  for (const kind of ['review', 'verification']) {
+    const input = fixture();
+    input.phases.push(phase('duplicate', kind, 80, 85));
+    assert.throws(() => summarizeDelivery(input), /overlapping .* phases/);
+  }
+  for (const kind of ['integration', 'repair']) {
+    const input = fixture();
+    input.phases.push(phase('mutation', kind, 65, 80));
+    assert.throws(() => summarizeDelivery(input), /must finish before final candidate/);
+    input.phases.at(-1).startedAt = at(95);
+    input.phases.at(-1).finishedAt = at(100);
+    assert.throws(() => summarizeDelivery(input), /must finish before final candidate/);
+    input.phases.at(-1).startedAt = at(60);
+    input.phases.at(-1).finishedAt = at(70);
+    assert.equal(summarizeDelivery(input).qualityPassed, true);
+  }
+});
+
 test('separates favorable inferred timing from unfavorable or unknown usage', () => {
   const input = fixture();
   input.usage.totalTokens = 120;

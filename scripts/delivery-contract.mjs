@@ -52,8 +52,8 @@ export function validateContract(input) {
     errors.push('budget.maxDelegatedTurns must fit the builders, one reviewer, and two repair turns, and cannot exceed 5.');
   }
   if (!object(input.budget) || !Number.isInteger(input.budget.maxImplementationAttempts) ||
-      input.budget.maxImplementationAttempts < 1 || input.budget.maxImplementationAttempts > 3) {
-    errors.push('budget.maxImplementationAttempts must be an integer from 1 to 3.');
+      input.budget.maxImplementationAttempts < builders.length + 1 || input.budget.maxImplementationAttempts > 3) {
+    errors.push('budget.maxImplementationAttempts must fit every initial builder and one consolidated repair, without exceeding 3.');
   }
 
   const owners = new Set();

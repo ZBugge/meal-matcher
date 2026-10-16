@@ -60,6 +60,17 @@ export function summarizeDelivery(input) {
   }
   const lastBuilderEnd = builders.reduce((end, interval) => Math.max(end, interval[1]), start);
   requireValue(finalGates.every(([begin]) => begin >= lastBuilderEnd), 'final review and verification must start after all builders finish');
+  for (const kind of ['review', 'verification']) {
+    const intervals = phases.filter(phase => phase.kind === kind).map(phase => phase.interval);
+    const summed = intervals.reduce((sum, [begin, end]) => sum + end - begin, 0);
+    requireValue(summed === union(intervals), `overlapping ${kind} phases cannot count as independent final work`);
+  }
+  if (finalGates.length) {
+    const firstGateStart = Math.min(...finalGates.map(([begin]) => begin));
+    requireValue(phases.filter(phase => phase.kind === 'integration' || phase.kind === 'repair')
+      .every(phase => phase.interval[1] <= firstGateStart),
+    'integration and repair must finish before final candidate review and verification; record invalidated earlier gates as other');
+  }
   requireValue(object(input.quality), 'quality is required');
   for (const key of ['verificationPassed', 'reviewPassed', 'ownershipPassed']) {
     requireValue(typeof input.quality[key] === 'boolean', `quality.${key} must be boolean`);
@@ -79,7 +90,9 @@ export function summarizeDelivery(input) {
   const { totalTokens, sequentialBaselineTokens } = input.usage;
   const ratio = totalTokens !== null && sequentialBaselineTokens > 0 ? totalTokens / sequentialBaselineTokens : NaN;
   const usageRatio = Number.isFinite(ratio) ? ratio : null;
-  const qualityPassed = input.quality.verificationPassed && input.quality.reviewPassed && input.quality.ownershipPassed;
+  const recordedFinalGates = ['review', 'verification'].every(kind => phases.some(phase =>
+    phase.kind === kind && phase.interval[1] > phase.interval[0]));
+  const qualityPassed = recordedFinalGates && input.quality.verificationPassed && input.quality.reviewPassed && input.quality.ownershipPassed;
   return {
     version: 1, id: input.id,
     observed: { elapsedMs, builderUnionMs, builderSummedMs, builderOverlapMs: builderSummedMs - builderUnionMs,

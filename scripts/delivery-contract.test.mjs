@@ -88,6 +88,8 @@ test('enforces full SHA, positive finite timing and policy budgets', () => {
   for (const budget of [{ maxDelegatedTurns: 6, maxImplementationAttempts: 3 },
     { maxDelegatedTurns: 4, maxImplementationAttempts: 3 },
     { maxDelegatedTurns: 5, maxImplementationAttempts: 4 },
+    { maxDelegatedTurns: 5, maxImplementationAttempts: 1 },
+    { maxDelegatedTurns: 5, maxImplementationAttempts: 2 },
     { maxDelegatedTurns: 5, maxImplementationAttempts: 0 }]) {
     assert.match(validateContract({ ...fixture(), budget }).join('\n'), /budget/);
   }

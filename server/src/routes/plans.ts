@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { getDatabase, getAll, getOne, saveDatabase } from '../db/schema';
 import { requireAuth } from '../middleware/auth';
-import type { Meal, MealIngredient, PlanEntry, ShoppingItem, WeekPlan } from '../types';
+import type { Meal, MealIngredient, PlanEntry, ShoppingItem, WeekPlan, RecurringGrocery } from '../types';
 
 const router = Router();
 router.use(requireAuth);
@@ -31,13 +31,14 @@ function readWeek(host: string, week: string): WeekPlan {
       WHERE host_id = ? AND week = ? ORDER BY rowid`, [host, week]),
   };
 }
-// Restore only the affected week if persistence fails after sql.js commits.
+// Restore the affected week and host templates if persistence fails after sql.js commits.
 // Exporting during an open transaction would implicitly close the connection.
 function mutate(host: string, week: string, action: () => void): WeekPlan {
   const database = getDatabase();
   const entries = getAll<Record<string, string | number | null>>('SELECT * FROM plan_entries WHERE host_id = ? AND week = ?', [host, week]);
   const items = getAll<Record<string, string | number | null>>('SELECT * FROM shopping_items WHERE host_id = ? AND week = ?', [host, week]);
   const staples = getAll<Record<string, string | number | null>>('SELECT * FROM dinner_staples WHERE host_id = ?', [host]);
+  const recurring = getAll<Record<string, string | number | null>>('SELECT * FROM recurring_groceries WHERE host_id = ?', [host]);
   database.run('BEGIN TRANSACTION');
   try { action(); database.run('COMMIT'); }
   catch (error) { database.run('ROLLBACK'); throw error; }
@@ -47,7 +48,8 @@ function mutate(host: string, week: string, action: () => void): WeekPlan {
     database.run('DELETE FROM shopping_items WHERE host_id = ? AND week = ?', [host, week]);
     database.run('DELETE FROM plan_entries WHERE host_id = ? AND week = ?', [host, week]);
     database.run('DELETE FROM dinner_staples WHERE host_id = ?', [host]);
-    for (const [table, rows] of [['plan_entries', entries], ['shopping_items', items], ['dinner_staples', staples]] as const) {
+    database.run('DELETE FROM recurring_groceries WHERE host_id = ?', [host]);
+    for (const [table, rows] of [['plan_entries', entries], ['shopping_items', items], ['dinner_staples', staples], ['recurring_groceries', recurring]] as const) {
       for (const row of rows) {
         const columns = Object.keys(row);
         database.run(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`, Object.values(row));
@@ -63,6 +65,58 @@ router.use('/:week', (req, res, next) => {
   next();
 });
 router.get('/:week', (req, res) => { res.json(readWeek(req.session.hostId!, req.params.week)); });
+router.get('/:week/recurring', (req, res) => {
+  res.json(getAll<RecurringGrocery>('SELECT id, ingredient, amount FROM recurring_groceries WHERE host_id = ? ORDER BY rowid', [req.session.hostId!]));
+});
+for (const method of ['post', 'patch'] as const) {
+  router[method](method === 'post' ? '/:week/recurring' : '/:week/recurring/:id', (req, res) => {
+    const body: unknown = req.body; const host = req.session.hostId!;
+    if (!bodyObject(body) || Object.keys(body).some(key => !['ingredient', 'amount'].includes(key))
+      || !text(body.ingredient, 300) || !text(body.amount, 100, true)) {
+      res.status(400).json({ error: 'Enter an item and a free-text amount of up to 100 characters.' }); return;
+    }
+    const id = method === 'post' ? randomUUID() : req.params.id;
+    if (method === 'patch' && !getOne('SELECT id FROM recurring_groceries WHERE id = ? AND host_id = ?', [id, host])) {
+      res.status(404).json({ error: 'Usual grocery not found.' }); return;
+    }
+    const grocery = { id, ingredient: body.ingredient.trim(), amount: body.amount.trim() };
+    try {
+      mutate(host, req.params.week, () => {
+        if (method === 'post') getDatabase().run('INSERT INTO recurring_groceries (id, host_id, ingredient, amount) VALUES (?, ?, ?, ?)', [id, host, grocery.ingredient, grocery.amount]);
+        else getDatabase().run('UPDATE recurring_groceries SET ingredient = ?, amount = ? WHERE id = ? AND host_id = ?', [grocery.ingredient, grocery.amount, id, host]);
+      });
+      res.status(method === 'post' ? 201 : 200).json(grocery);
+    } catch { res.status(500).json({ error: 'Could not save the usual grocery. Try again.' }); }
+  });
+}
+router.delete('/:week/recurring/:id', (req, res) => {
+  const host = req.session.hostId!; const { id, week } = req.params;
+  if (!getOne('SELECT id FROM recurring_groceries WHERE id = ? AND host_id = ?', [id, host])) {
+    res.status(404).json({ error: 'Usual grocery not found.' }); return;
+  }
+  try {
+    mutate(host, week, () => getDatabase().run('DELETE FROM recurring_groceries WHERE id = ? AND host_id = ?', [id, host]));
+    res.json({ message: 'Usual grocery removed. Existing weekly items are unchanged.' });
+  } catch { res.status(500).json({ error: 'Could not remove the usual grocery. Try again.' }); }
+});
+router.post('/:week/recurring/apply', (req, res) => {
+  const host = req.session.hostId!; const { week } = req.params; const body: unknown = req.body;
+  if (!bodyObject(body) || Object.keys(body).length !== 1 || !Array.isArray(body.ids) || !body.ids.length || body.ids.length > 500
+    || new Set(body.ids).size !== body.ids.length || body.ids.some(id => !text(id, 100))) {
+    res.status(400).json({ error: 'Select between 1 and 500 different usual groceries.' }); return;
+  }
+  const groceries = (body.ids as string[]).map(id => getOne<RecurringGrocery>('SELECT id, ingredient, amount FROM recurring_groceries WHERE id = ? AND host_id = ?', [id, host]));
+  if (groceries.some(item => !item)) { res.status(404).json({ error: 'A selected usual grocery is no longer available.' }); return; }
+  try {
+    res.json(mutate(host, week, () => {
+      for (const item of groceries as RecurringGrocery[]) {
+        getDatabase().run(`INSERT INTO shopping_items (id, host_id, week, ingredient, amount, recurring_id)
+          SELECT ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM shopping_items WHERE host_id = ? AND week = ? AND recurring_id = ?)`,
+        [randomUUID(), host, week, item.ingredient, item.amount, item.id, host, week, item.id]);
+      }
+    }));
+  } catch { res.status(500).json({ error: 'Could not add usual groceries. Try again.' }); }
+});
 router.post('/:week/entries', (req, res) => {
   const { week } = req.params;
   const host = req.session.hostId!;

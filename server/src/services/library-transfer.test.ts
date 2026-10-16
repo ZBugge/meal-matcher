@@ -57,3 +57,17 @@ describe('library transfer validation', () => {
       .toThrow(LibraryTransferValidationError);
   });
 });
+
+it('accepts optional recipe metadata and rejects category or malformed metadata', () => {
+  const result = parseLibraryExport({version: 1, options: [
+    {title: 'Soup', type: 'meal', totalMinutes: 15, effort: 'easy'},
+    {title: 'Old', type: 'meal'},
+    {title: 'Clear', type: 'meal', totalMinutes: null, effort: null},
+    {title: 'Bad time', type: 'meal', totalMinutes: 1.2},
+    {title: 'Bad effort', type: 'meal', effort: 'hard'},
+    {title: 'Category', type: 'category', totalMinutes: 15},
+  ]});
+  expect(result.valid).toHaveLength(3); expect(result.invalid).toHaveLength(3);
+  expect(result.valid[0]).toMatchObject({totalMinutes: 15, effort: 'easy'});
+  expect(result.valid[2]).toMatchObject({totalMinutes: null, effort: null});
+});

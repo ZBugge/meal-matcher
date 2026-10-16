@@ -194,4 +194,33 @@ describe('database schema migrations', () => {
     expect(again.getAll('SELECT title FROM dinner_staples')).toEqual([{ title: 'Tofu night' }]); final.close();
   });
 
+  it('adds recipe metadata and recurring groceries to populated pre-pilot databases and reopens safely', async () => {
+    process.env.DATABASE_PATH = freshDatabasePath; vi.resetModules();
+    const schema = await import('./schema'); const database = await schema.initializeDatabase();
+    database.run("INSERT INTO hosts (id, email, password_hash) VALUES ('family', 'pilot@test', 'hash')");
+    database.run("INSERT INTO meals (id, host_id, title, instructions, notes) VALUES ('recipe', 'family', 'Tofu', 'Bake it.', 'Keep this note.')");
+    database.run("INSERT INTO shopping_items (id, host_id, week, ingredient, amount, state) VALUES ('milk', 'family', '2026-10-12', 'Milk', '1½ cartons', 'bought')");
+    database.run(`DROP INDEX idx_shopping_recurring_week;
+      ALTER TABLE shopping_items DROP COLUMN recurring_id;
+      ALTER TABLE meals DROP COLUMN total_minutes;
+      ALTER TABLE meals DROP COLUMN effort;
+      DROP TABLE recurring_groceries;`);
+    schema.saveDatabase(); database.close();
+    vi.resetModules(); const migrated = await import('./schema'); const reopened = await migrated.initializeDatabase();
+    expect(migrated.getOne('SELECT title, instructions, notes, total_minutes, effort FROM meals WHERE id = ?', ['recipe']))
+      .toEqual({ title: 'Tofu', instructions: 'Bake it.', notes: 'Keep this note.', total_minutes: null, effort: null });
+    expect(migrated.getOne('SELECT ingredient, amount, state, recurring_id FROM shopping_items WHERE id = ?', ['milk']))
+      .toEqual({ ingredient: 'Milk', amount: '1½ cartons', state: 'bought', recurring_id: null });
+    migrated.runQuery("UPDATE meals SET total_minutes = 25, effort = 'easy' WHERE id = 'recipe'");
+    migrated.runQuery("INSERT INTO recurring_groceries VALUES ('template', 'family', 'Bread', 'one large loaf')");
+    migrated.runQuery("INSERT INTO shopping_items (id, host_id, week, ingredient, amount, recurring_id) VALUES ('bread', 'family', '2026-10-12', 'Bread', 'one large loaf', 'template')");
+    expect(() => reopened.run("INSERT INTO shopping_items (id, host_id, week, ingredient, recurring_id) VALUES ('duplicate', 'family', '2026-10-12', 'Bread', 'template')")).toThrow();
+    migrated.runQuery("INSERT INTO shopping_items (id, host_id, week, ingredient, recurring_id) VALUES ('next-week', 'family', '2026-10-19', 'Bread', 'template')");
+    reopened.close();
+    vi.resetModules(); const again = await import('./schema'); const final = await again.initializeDatabase();
+    expect(again.getOne('SELECT total_minutes, effort FROM meals WHERE id = ?', ['recipe'])).toEqual({ total_minutes: 25, effort: 'easy' });
+    expect(again.getAll('SELECT ingredient, amount FROM recurring_groceries')).toEqual([{ ingredient: 'Bread', amount: 'one large loaf' }]);
+    expect(again.getAll('SELECT id FROM shopping_items ORDER BY id')).toEqual([{ id: 'bread' }, { id: 'milk' }, { id: 'next-week' }]);
+    final.close();
+  });
 });

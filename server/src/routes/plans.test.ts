@@ -23,7 +23,7 @@ describe('Private weekly planning HTTP API', () => {
   });
   const get = () => owner.request<WeekPlan>(`/plans/${week}`);
   const add = (body: unknown = { mealId }) => owner.request<WeekPlan>(`/plans/${week}/entries`, 'POST', body);
-  const state = () => ({ entries: getAll('SELECT * FROM plan_entries ORDER BY id'), items: getAll('SELECT * FROM shopping_items ORDER BY id'), staples: getAll('SELECT * FROM dinner_staples ORDER BY id'), disk: createHash('sha256').update(fs.readFileSync(process.env.DATABASE_PATH!)).digest('hex') });
+  const state = () => ({ entries: getAll('SELECT * FROM plan_entries ORDER BY id'), items: getAll('SELECT * FROM shopping_items ORDER BY id'), staples: getAll('SELECT * FROM dinner_staples ORDER BY id'), recurring: getAll('SELECT * FROM recurring_groceries ORDER BY id'), disk: createHash('sha256').update(fs.readFileSync(process.env.DATABASE_PATH!)).digest('hex') });
 
   it('reads an empty week without writing and requires authentication', async () => {
     const initial = state();
@@ -189,6 +189,69 @@ describe('Private weekly planning HTTP API', () => {
     expect((await owner.request(`/plans/${week}/staples/${id}`, 'DELETE')).status).toBe(200);
     expect((await owner.request(`/plans/${week}/staples`)).body).toEqual([]);
     expect((await get()).body).toEqual({ week, entries: [], shopping: [] });
+  });
+
+  it('applies selected usual groceries once per week and preserves snapshots after edits, deletion and reopening', async () => {
+    const route = `/plans/${week}/recurring`;
+    const before = state();
+    expect((await owner.request(route)).body).toEqual([]);
+    expect(state()).toEqual(before);
+    const saved = await owner.request(route, 'POST', { ingredient: ' Milk ', amount: ' 1 carton ' });
+    expect(saved.status).toBe(201);
+    expect(saved.body).toEqual({ id: expect.any(String), ingredient: 'Milk', amount: '1 carton' });
+    const id = saved.body.id;
+    const apply = () => owner.request<WeekPlan>(`${route}/apply`, 'POST', { ids: [id] });
+    const first = (await apply()).body.shopping[0];
+    expect(first).toMatchObject({ ingredient: 'Milk', state: 'needed', entryId: null });
+    expect(first).not.toHaveProperty('recurring_id'); expect(first).not.toHaveProperty('host_id');
+    await owner.request(`/plans/${week}/items/${first.id}`, 'PATCH', { state: 'have' });
+    expect((await apply()).body.shopping).toEqual([expect.objectContaining({ id: first.id, state: 'have' })]);
+    await owner.request(`/plans/${week}/items/${first.id}`, 'PATCH', { amount: 'half carton', state: 'bought' });
+    await owner.request(route + '/' + id, 'PATCH', { ingredient: 'Oat milk', amount: '2 cartons' });
+    expect((await apply()).body.shopping).toEqual([expect.objectContaining({ id: first.id, ingredient: 'Milk', amount: 'half carton', state: 'bought' })]);
+    const next = await owner.request<WeekPlan>('/plans/2026-10-19/recurring/apply', 'POST', { ids: [id] });
+    expect(next.body.shopping).toEqual([expect.objectContaining({ ingredient: 'Oat milk', amount: '2 cartons', state: 'needed' })]);
+    await owner.request(`/plans/${week}/items/${first.id}`, 'DELETE');
+    const reapplied = (await apply()).body.shopping[0]; expect(reapplied.id).not.toBe(first.id);
+    await owner.request(route + '/' + id, 'DELETE');
+    expect((await owner.request(route)).body).toEqual([]);
+    expect((await get()).body.shopping).toEqual([reapplied]);
+    expect((await owner.request('/plans/2026-10-19')).body.shopping).toEqual(next.body.shopping);
+    const SQL = await initSqlJs(); const reopened = new SQL.Database(fs.readFileSync(process.env.DATABASE_PATH!));
+    try { expect(reopened.exec(`SELECT ingredient, amount, state FROM shopping_items WHERE id = '${reapplied.id}'`)[0].values).toEqual([['Oat milk', '2 cartons', 'needed']]); }
+    finally { reopened.close(); }
+  });
+  it('validates every selected source and rejects foreign IDs before any mutation', async () => {
+    const route = `/plans/${week}/recurring`;
+    const own = (await owner.request(route, 'POST', { ingredient: 'Tea', amount: '' })).body.id;
+    const foreign = (await stranger.request(route, 'POST', { ingredient: 'Coffee', amount: '' })).body.id;
+    const before = state();
+    expect((await stranger.request(route)).body).toEqual([{ id: foreign, ingredient: 'Coffee', amount: '' }]);
+    for (const method of ['PATCH', 'DELETE']) expect((await stranger.request(route + '/' + own, method, method === 'PATCH' ? { ingredient: 'Stolen', amount: '' } : undefined)).status).toBe(404);
+    for (const ids of [[own, foreign], [own, 'missing']]) expect((await owner.request(route + '/apply', 'POST', { ids })).status).toBe(404);
+    for (const body of [null, {}, { ids: [] }, { ids: [own, own] }, { ids: [2] }, { ids: [own], hostId: foreign }, { ids: Array(501).fill(own) }]) expect((await owner.request(route + '/apply', 'POST', body)).status).toBe(400);
+    for (const body of [{ ingredient: '', amount: '' }, { ingredient: 'Tea', amount: 3 }, { ingredient: 'a'.repeat(301), amount: '' }, { ingredient: 'Tea', amount: 'a'.repeat(101) }, { ingredient: 'Tea', amount: '', hostId: foreign }]) {
+      expect((await owner.request(route, 'POST', body)).status).toBe(400);
+      expect((await owner.request(route + '/' + own, 'PATCH', body)).status).toBe(400);
+    }
+    expect((await server.client().request(route)).status).toBe(401);
+    expect(state()).toEqual(before);
+  });
+  it('restores templates and all selected snapshots when disk persistence fails', async () => {
+    const route = `/plans/${week}/recurring`;
+    const first = (await owner.request(route, 'POST', { ingredient: 'Tea', amount: '2 boxes' })).body.id;
+    const second = (await owner.request(route, 'POST', { ingredient: 'Milk', amount: '1 carton' })).body.id;
+    const before = state();
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(() => { throw new Error('Synthetic disk full'); });
+    for (const [path, method, body] of [
+      [route, 'POST', { ingredient: 'Bread', amount: '' }],
+      [route + '/' + first, 'PATCH', { ingredient: 'New tea', amount: '' }],
+      [route + '/' + first, 'DELETE', undefined],
+      [route + '/apply', 'POST', { ids: [first, second] }],
+    ] as const) {
+      expect((await owner.request(path, method, body)).status).toBe(500);
+      expect(state()).toEqual(before);
+    }
   });
 
 });

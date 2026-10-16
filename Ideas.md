@@ -24,9 +24,9 @@ Keep this file lean. Add rough thoughts under `## Ungroomed ideas`; keep active 
 
 - **MM-I017 — Choosing together with less effort:** Saved ideas 9–12, 14–15: family language, week-linked voting, batch agreed-result additions, clearer Maybe meaning, preferences and tie breaking. Revisit when refining family decisions after current batch. [Catalogue](brain/briefs/family-product-review-2026-10-15.md).
 
-- **MM-I018 — Household grocery continuity:** Saved ideas 20, 21 and 23: recurring extra groceries, shared-phone freshness and use-it-up suggestions. Revisit after shopping feedback or when both partners use the list concurrently. [Catalogue](brain/briefs/family-product-review-2026-10-15.md).
+- **MM-I018 — Household grocery continuity:** Remaining saved ideas 21 and 23: shared-phone freshness and use-it-up suggestions. Recurring extra groceries (20) delivered in the parallel family pilot. Revisit remaining slices after shopping feedback or when both partners use the list concurrently. [Catalogue](brain/briefs/family-product-review-2026-10-15.md).
 
-- **MM-I019 — Recipe practicality:** Saved ideas 24, 25, 27 and 29: time/effort filters, servings, easier source-preserving capture and recipe-change review for planned groceries. Revisit after the selected week/shopping batch. [Catalogue](brain/briefs/family-product-review-2026-10-15.md).
+- **MM-I019 — Recipe practicality:** Remaining saved ideas 25, 27 and 29: servings, easier source-preserving capture and recipe-change review for planned groceries. Time/effort filters (24) delivered in the parallel family pilot. Revisit remaining slices after family feedback. [Catalogue](brain/briefs/family-product-review-2026-10-15.md).
 
 - **MM-I020 — Cooking and learning:** Saved ideas 30–35: screen awake, steps/timers, progress recovery, made/skipped/leftovers, dinner-specific notes and family verdict. Revisit when refining actual cooking use. [Catalogue](brain/briefs/family-product-review-2026-10-15.md).
 

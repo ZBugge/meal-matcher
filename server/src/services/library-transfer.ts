@@ -11,6 +11,15 @@ function normalizeOptionalText(value: unknown, field: string): string | null {
   return value.trim() || null;
 }
 
+export function validateMealMetadata(totalMinutes: unknown, effort: unknown): void {
+  if (totalMinutes != null && (typeof totalMinutes !== 'number' || !Number.isInteger(totalMinutes) || totalMinutes < 1 || totalMinutes > 1440)) {
+    throw new LibraryTransferValidationError('Total time must be a whole number from 1 to 1440 minutes');
+  }
+  if (effort != null && !['easy', 'medium', 'involved'].includes(effort as string)) {
+    throw new LibraryTransferValidationError('Effort must be easy, medium, involved, or null');
+  }
+}
+
 export function parseLibraryExport(value: unknown): {
   valid: LibraryExportOption[];
   invalid: Array<{ index: number; error: string }>;
@@ -49,13 +58,14 @@ export function parseLibraryExport(value: unknown): {
       const title = option.title.trim();
       const notes = normalizeOptionalText(option.notes, 'Notes');
       if (option.type === 'category') {
-        if (option.description != null || option.instructions != null || option.ingredients != null) {
+        if (option.description != null || option.instructions != null || option.ingredients != null || option.totalMinutes != null || option.effort != null) {
           throw new LibraryTransferValidationError('Categories cannot contain recipe fields');
         }
         valid.push({ title, type: 'category', notes });
         return;
       }
 
+      validateMealMetadata(option.totalMinutes, option.effort);
       let ingredients: MealIngredient[] = [];
       try {
         ingredients = option.ingredients === undefined ? [] : normalizeIngredients(option.ingredients);
@@ -72,6 +82,8 @@ export function parseLibraryExport(value: unknown): {
         notes,
         instructions: normalizeInstructions(option.instructions ?? null),
         ingredients,
+        ...(option.totalMinutes !== undefined ? { totalMinutes: option.totalMinutes as number | null } : {}),
+        ...(option.effort !== undefined ? { effort: option.effort as LibraryExportOption['effort'] } : {}),
       });
     } catch (error) {
       invalid.push({

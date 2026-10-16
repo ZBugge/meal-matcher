@@ -19,6 +19,7 @@ import {
 import {
   LibraryTransferValidationError,
   parseLibraryExport,
+  validateMealMetadata,
 } from '../services/library-transfer';
 
 const router = Router();
@@ -58,6 +59,8 @@ function toLibraryMealResponse(meal: Meal, includeArchived = false) {
     ? {
         ...response,
         instructions: meal.instructions ?? null,
+        totalMinutes: meal.total_minutes ?? null,
+        effort: meal.effort ?? null,
         ingredients: getMealIngredients(meal.id),
       }
     : response;
@@ -79,6 +82,11 @@ function addIngredients(
 
 function runTransaction(action: (database: ReturnType<typeof getDatabase>) => void): void {
   const database = getDatabase();
+  // Saving exports the committed database. Keep accepted rows for compensation if
+  // the atomic disk replacement fails; these handlers run synchronously.
+  const acceptedMeals = getAll<Record<string, string | number | null>>('SELECT * FROM meals');
+  const acceptedIngredients = getAll<Record<string, string | number | null>>('SELECT * FROM meal_ingredients');
+  const acceptedHosts = getAll<{id: string; takeout_onboarding_dismissed: number}>('SELECT id, takeout_onboarding_dismissed FROM hosts');
   database.run('BEGIN TRANSACTION');
   try {
     action(database);
@@ -87,7 +95,32 @@ function runTransaction(action: (database: ReturnType<typeof getDatabase>) => vo
     database.run('ROLLBACK');
     throw error;
   }
-  saveDatabase();
+  try {
+    saveDatabase();
+  } catch (error) {
+    database.run('BEGIN TRANSACTION');
+    try {
+      database.run('DELETE FROM meal_ingredients');
+      const acceptedIds = new Set(acceptedMeals.map(meal => meal.id));
+      for (const meal of getAll<{id: string}>('SELECT id FROM meals')) {
+        if (!acceptedIds.has(meal.id)) database.run('DELETE FROM meals WHERE id = ?', [meal.id]);
+      }
+      for (const meal of acceptedMeals) {
+        const columns = Object.keys(meal).filter(column => column !== 'id');
+        database.run(`UPDATE meals SET ${columns.map(column => `${column} = ?`).join(', ')} WHERE id = ?`, [...columns.map(column => meal[column]), meal.id]);
+      }
+      for (const row of acceptedIngredients) {
+        const columns = Object.keys(row);
+        database.run(`INSERT INTO meal_ingredients (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`, columns.map(column => row[column]));
+      }
+      for (const host of acceptedHosts) database.run('UPDATE hosts SET takeout_onboarding_dismissed = ? WHERE id = ?', [host.takeout_onboarding_dismissed, host.id]);
+      database.run('COMMIT');
+    } catch (restoreError) {
+      database.run('ROLLBACK');
+      throw restoreError;
+    }
+    throw error;
+  }
 }
 
 // All meal routes require authentication
@@ -122,7 +155,7 @@ router.get('/', (req, res) => {
       ? [req.session.hostId, requestedType]
       : [req.session.hostId];
     const meals = getAll<Meal>(
-      `SELECT id, title, description, instructions, notes, type, archived, pick_count, created_at,
+      `SELECT id, title, description, instructions, notes, total_minutes, effort, type, archived, pick_count, created_at,
         (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
        FROM meals
        WHERE host_id = ? AND archived = 0${typeFilter}
@@ -151,7 +184,7 @@ router.get('/all', (req, res) => {
       ? [req.session.hostId, requestedType]
       : [req.session.hostId];
     const meals = getAll<Meal>(
-      `SELECT id, title, description, instructions, notes, type, archived, pick_count, created_at,
+      `SELECT id, title, description, instructions, notes, total_minutes, effort, type, archived, pick_count, created_at,
         (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
        FROM meals
        WHERE host_id = ?${typeFilter}
@@ -170,7 +203,7 @@ router.get('/all', (req, res) => {
 router.get('/export', (req, res) => {
   try {
     const meals = getAll<Meal>(
-      `SELECT id, title, description, instructions, notes, type
+      `SELECT id, title, description, instructions, notes, total_minutes, effort, type
        FROM meals
        WHERE host_id = ? AND archived = 0 AND type IN ('meal', 'category')
        ORDER BY type, title`,
@@ -183,6 +216,8 @@ router.get('/export', (req, res) => {
           description: meal.description,
           notes: meal.notes ?? null,
           instructions: meal.instructions ?? null,
+          totalMinutes: meal.total_minutes ?? null,
+          effort: meal.effort ?? null,
           ingredients: getMealIngredients(meal.id),
         }
       : {
@@ -236,8 +271,8 @@ router.post('/import', (req, res) => {
         ready.forEach((option) => {
           const id = uuidv4();
           database.run(
-            `INSERT INTO meals (id, host_id, title, description, instructions, notes, type)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO meals (id, host_id, title, description, instructions, notes, total_minutes, effort, type)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               id,
               req.session.hostId,
@@ -245,6 +280,8 @@ router.post('/import', (req, res) => {
               option.type === 'meal' ? option.description ?? null : null,
               option.type === 'meal' ? option.instructions ?? null : null,
               option.notes ?? null,
+              option.type === 'meal' ? option.totalMinutes ?? null : null,
+              option.type === 'meal' ? option.effort ?? null : null,
               option.type,
             ]
           );
@@ -279,7 +316,7 @@ router.post('/import', (req, res) => {
 router.get('/:id', (req, res) => {
   try {
     const meal = getOne<Meal>(
-      `SELECT id, title, description, instructions, notes, type, archived, pick_count, created_at,
+      `SELECT id, title, description, instructions, notes, total_minutes, effort, type, archived, pick_count, created_at,
         (SELECT MAX(selected_at) FROM session_history WHERE selected_meal_id = meals.id) AS last_selected_at
        FROM meals
        WHERE id = ? AND host_id = ?`,
@@ -307,6 +344,8 @@ router.post('/', (req, res) => {
       type = 'meal',
       instructions,
       ingredients,
+      totalMinutes,
+      effort,
     } = req.body as CreateMealRequest;
 
     if (!title || title.trim().length === 0) {
@@ -319,7 +358,8 @@ router.post('/', (req, res) => {
       return;
     }
 
-    const hasRecipeFields = instructions !== undefined || ingredients !== undefined;
+    validateMealMetadata(req.body.totalMinutes, req.body.effort);
+    const hasRecipeFields = instructions !== undefined || ingredients !== undefined || req.body.totalMinutes != null || req.body.effort != null;
     if (type === 'category' && hasRecipeFields) {
       res.status(400).json({ error: 'Food categories do not support recipes' });
       return;
@@ -362,14 +402,16 @@ router.post('/', (req, res) => {
 
     runTransaction((database) => {
       database.run(
-        `INSERT INTO meals (id, host_id, title, description, instructions, type)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO meals (id, host_id, title, description, instructions, total_minutes, effort, type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           req.session.hostId,
           normalizedTitle,
           normalizedDescription,
           normalizedInstructions,
+          totalMinutes ?? null,
+          effort ?? null,
           type,
         ]
       );
@@ -386,6 +428,7 @@ router.post('/', (req, res) => {
     const created = getOne<Meal>('SELECT * FROM meals WHERE id = ?', [id]);
     res.status(201).json(toLibraryMealResponse(created!));
   } catch (error) {
+    if (error instanceof LibraryTransferValidationError) { res.status(400).json({ error: error.message }); return; }
     console.error('Create meal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -408,7 +451,8 @@ router.patch('/:id', (req, res) => {
       return;
     }
 
-    const hasRecipeFields = instructions !== undefined || ingredients !== undefined;
+    validateMealMetadata(req.body.totalMinutes, req.body.effort);
+    const hasRecipeFields = instructions !== undefined || ingredients !== undefined || req.body.totalMinutes != null || req.body.effort != null;
     if (meal.type === 'category' && hasRecipeFields) {
       res.status(400).json({ error: 'Food categories do not support recipes' });
       return;
@@ -458,6 +502,12 @@ router.patch('/:id', (req, res) => {
       params.push(notes?.trim() || null);
     }
 
+    for (const [field, column] of [['totalMinutes', 'total_minutes'], ['effort', 'effort']]) {
+      if (req.body[field] !== undefined) {
+        updates.push(`${column} = ?`);
+        params.push(req.body[field]);
+      }
+    }
     let normalizedIngredients: MealIngredient[] | undefined;
     try {
       if (instructions !== undefined) {
@@ -497,6 +547,7 @@ router.patch('/:id', (req, res) => {
     const updated = getOne<Meal>('SELECT * FROM meals WHERE id = ?', [id]);
     res.json(toLibraryMealResponse(updated!));
   } catch (error) {
+    if (error instanceof LibraryTransferValidationError) { res.status(400).json({ error: error.message }); return; }
     console.error('Update meal error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }

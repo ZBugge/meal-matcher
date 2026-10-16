@@ -1,11 +1,52 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { planningApi, type WeekPlan, type ShoppingItem } from '../api/planning';
+import { planningApi, type WeekPlan, type ShoppingItem, type RecurringGrocery } from '../api/planning';
 import { aisles, itemAisle, shoppingGroups, type ShoppingGroup } from '../lib/shopping';
 import { selectedWeek, dateLabel } from '../lib/week';
 import { ModalSheet } from '../components/ModalSheet';
 
 type ItemUpdate = Partial<Pick<ShoppingItem, 'ingredient' | 'amount' | 'state' | 'aisle'>>;
+function UsualGroceries({ week, busy, setBusy, applied }: { week: string; busy: boolean; setBusy: (value: boolean) => void; applied: (plan: WeekPlan) => void }) {
+  const [items, setItems] = useState<RecurringGrocery[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [reload, setReload] = useState(0);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [editing, setEditing] = useState<string>();
+  const [ingredient, setIngredient] = useState('');
+  const [amount, setAmount] = useState('');
+  useEffect(() => {
+    let active = true;
+    setLoading(true); setError('');
+    planningApi.recurring(week).then(value => { if (active) setItems(value); }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [week, reload]);
+  async function run(action: () => Promise<void>) {
+    setBusy(true); setError('');
+    try { await action(); } catch (e) { setError(e instanceof Error ? e.message : 'Could not save. Try again.'); }
+    finally { setBusy(false); }
+  }
+  function reset() { setEditing(undefined); setIngredient(''); setAmount(''); }
+  return <div className="space-y-4">
+    <p className="text-muted">Save household extras here, then select what to add to this week. Changes to saved items leave existing shopping lists unchanged.</p>
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{error}</p>}
+    {loading ? <p role="status">Loading usual groceries…</p> : <>
+      {error && !items.length && <button className="btn btn-secondary" disabled={busy} onClick={() => setReload(value => value + 1)}>Retry loading usual groceries</button>}
+      {!items.length && !error && <p>No saved groceries yet.</p>}
+      <ul>{items.map(item => <li key={item.id} className="border-b border-stone-200 py-3 space-y-2">
+        <label className="flex gap-3 items-center min-h-12"><input type="checkbox" aria-label={`Add usual ${item.ingredient}`} checked={selected.includes(item.id)} disabled={busy} onChange={e => setSelected(current => e.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))}/><span className="break-words">{item.amount} {item.ingredient}</span></label>
+        <div className="flex flex-wrap gap-3"><button className="btn btn-secondary" aria-label={`Edit usual ${item.ingredient}`} disabled={busy} onClick={() => { setEditing(item.id); setIngredient(item.ingredient); setAmount(item.amount); }}>Edit</button><button className="btn text-red-700" aria-label={`Delete usual ${item.ingredient}`} disabled={busy} onClick={() => run(async () => { await planningApi.removeRecurring(week, item.id); setItems(current => current.filter(row => row.id !== item.id)); setSelected(current => current.filter(id => id !== item.id)); if (editing === item.id) reset(); })}>Delete</button></div>
+      </li>)}</ul>
+      <button className="btn btn-primary w-full" disabled={busy || !selected.length} onClick={() => run(async () => { applied(await planningApi.applyRecurring(week, selected)); })}>Add selected to this week ({selected.length})</button>
+      <form className="space-y-3 border-t border-stone-200 pt-4" onSubmit={e => { e.preventDefault(); void run(async () => { const saved = await planningApi.saveRecurring(week, { ingredient, amount }, editing); setItems(current => editing ? current.map(item => item.id === editing ? saved : item) : [...current, saved]); reset(); }); }}>
+        <h3 className="font-semibold">{editing ? 'Edit saved grocery' : 'Save a usual grocery'}</h3>
+        <label className="block space-y-2"><span>Usual item</span><input className="input" required maxLength={300} value={ingredient} disabled={busy} onChange={e => setIngredient(e.target.value)}/></label>
+        <label className="block space-y-2"><span>Usual amount (optional)</span><input className="input" maxLength={100} value={amount} disabled={busy} onChange={e => setAmount(e.target.value)}/></label>
+        <div className="flex flex-wrap gap-3"><button className="btn btn-secondary" disabled={busy || !ingredient.trim()}>{editing ? 'Save usual changes' : 'Save usual grocery'}</button>{editing && <button type="button" className="btn btn-secondary" disabled={busy} onClick={reset}>Cancel usual edit</button>}</div>
+      </form>
+    </>}
+  </div>;
+}
 function ItemRow({ item, busy, update, remove }: { item: ShoppingItem; busy: boolean; update: (data: ItemUpdate) => Promise<boolean>; remove: () => void }) {
   const [editing, setEditing] = useState(false);
   const [ingredient, setIngredient] = useState(item.ingredient);
@@ -37,7 +78,7 @@ function ShoppingListContent({ week }: { week: string }) {
   const [pantry, setPantry] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
-  const [sheet, setSheet] = useState<'extra' | 'copy' | null>(null);
+  const [sheet, setSheet] = useState<'extra' | 'copy' | 'usual' | null>(null);
   const [detail, setDetail] = useState<{ ingredient: string; ids: string[] } | null>(null);
   const [notice, setNotice] = useState('');
   useEffect(() => {
@@ -58,7 +99,7 @@ function ShoppingListContent({ week }: { week: string }) {
   const copyText = needed.map(group => `${group.amount} ${group.ingredient}`.trim() + (group.items.length > 1 ? '\n' + group.items.map(item => `  ${item.sourceTitle ?? 'Extra items'}: ${item.amount} ${item.ingredient}`.trimEnd()).join('\n') : '')).join('\n');
   const detailItems = plan?.shopping.filter(item => detail?.ids.includes(item.id)) ?? [];
   const errorMessage = error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{error}</p>;
-  function openSheet(value: 'extra' | 'copy') { setError(''); setCopied(false); setSheet(value); }
+  function openSheet(value: 'extra' | 'copy' | 'usual') { setError(''); setCopied(false); setSheet(value); }
   function renderGroup(group: ShoppingGroup) {
     const ids = group.items.map(item => item.id);
     const checked = ids.every(id => selected.includes(id));
@@ -80,7 +121,7 @@ function ShoppingListContent({ week }: { week: string }) {
     {!plan && !loading && error && <button className="btn btn-secondary" onClick={() => setReload(value => value + 1)}>Retry loading</button>}
     {!sheet && !detail && notice && <p role="status" className="text-primary-700">{notice}</p>}
     {loading ? <p role="status">Loading your shopping list…</p> : plan && <>
-      {pantry ? <section className="rounded-2xl bg-primary-50 border border-primary-200 p-4" aria-label="Pantry review"><h2 className="font-semibold text-xl">Pantry review</h2><p className="text-muted mt-2">Select ingredients you already have at home. Apply your choices below; nothing changes until then.</p></section> : <div className="flex flex-wrap gap-3 border-y border-stone-200 py-3"><button className="btn btn-secondary" disabled={busy || !needed.length} onClick={() => { setError(''); setNotice(''); setPantry(true); setSelected([]); }}>Review pantry</button><button className="btn btn-secondary" disabled={busy || !needed.length} onClick={() => openSheet('copy')}>Copy list</button></div>}
+      {pantry ? <section className="rounded-2xl bg-primary-50 border border-primary-200 p-4" aria-label="Pantry review"><h2 className="font-semibold text-xl">Pantry review</h2><p className="text-muted mt-2">Select ingredients you already have at home. Apply your choices below; nothing changes until then.</p></section> : <div className="flex flex-wrap gap-3 border-y border-stone-200 py-3"><button className="btn btn-secondary" disabled={busy || !needed.length} onClick={() => { setError(''); setNotice(''); setPantry(true); setSelected([]); }}>Review pantry</button><button className="btn btn-secondary" disabled={busy} onClick={() => openSheet('usual')}>Usual groceries</button><button className="btn btn-secondary" disabled={busy || !needed.length} onClick={() => openSheet('copy')}>Copy list</button></div>}
       {!plan.shopping.length && <p className="py-4 text-muted">Add recipes to your week to create a shopping list, or add an extra item.</p>}
       {!!plan.shopping.length && !needed.length && <p className="py-4 text-primary-700">Everything is covered. Your completed items are below.</p>}
       {aisles.filter(aisle => needed.some(group => group.aisle === aisle)).map(aisle => <section key={aisle} aria-label={aisle}><h2 className="eyebrow pb-2 border-b border-stone-200">{aisle}</h2><ul>{needed.filter(group => group.aisle === aisle).map(renderGroup)}</ul></section>)}
@@ -88,6 +129,7 @@ function ShoppingListContent({ week }: { week: string }) {
       <Link className="btn btn-secondary w-full" to={`/week?week=${week}`}>Back to week plan</Link>
       {pantry && <section aria-label="Apply pantry review" className="fixed z-40 inset-x-0 border-t border-primary-200 bg-paper p-3" style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom))' }}><div className="max-w-3xl mx-auto flex flex-wrap gap-3 items-center">{errorMessage}<p className="w-full text-sm font-semibold">Pantry review · {selected.length} ingredients selected</p><button className="btn btn-primary flex-1" aria-label={`Already have selected (${selected.length})`} disabled={busy || !selected.length} onClick={async () => { if (await save(() => planningApi.bulkItems(week, selected, 'have'), 'Pantry review applied.')) { setSelected([]); setPantry(false); } }}>Apply ({selected.length})</button><button className="btn btn-secondary flex-1" disabled={busy} onClick={() => { setSelected([]); setPantry(false); setError(''); }}>Cancel pantry review</button></div></section>}
     </>}
+    {sheet === 'usual' && <ModalSheet title="Usual groceries" busy={busy} onClose={() => setSheet(null)}><UsualGroceries week={week} busy={busy} setBusy={setBusy} applied={value => { setPlan(value); setSheet(null); setNotice('Usual groceries added.'); }}/></ModalSheet>}
     {sheet === 'extra' && <ModalSheet title="Add an extra item" busy={busy} onClose={() => { setSheet(null); setError(''); }}><form className="space-y-4" onSubmit={async e => { e.preventDefault(); if (await save(() => planningApi.addItem(week, { ingredient, amount }), 'Extra item added.')) { setIngredient(''); setAmount(''); setSheet(null); } }}>{errorMessage}<label className="block space-y-2"><span>Item</span><input className="input" maxLength={300} required value={ingredient} onChange={e => setIngredient(e.target.value)} disabled={busy}/></label><label className="block space-y-2"><span>Amount (optional)</span><input className="input" maxLength={100} value={amount} onChange={e => setAmount(e.target.value)} disabled={busy}/></label><button className="btn btn-primary w-full" disabled={busy || !ingredient.trim()}>Add extra item</button></form></ModalSheet>}
     {sheet === 'copy' && <ModalSheet title="Copy shopping list" busy={busy} onClose={() => { setSheet(null); setError(''); }}><p className="text-muted">Only items still needed are included. Original contributions appear under combined amounts.</p>{errorMessage}<textarea className="input min-h-48" aria-label="List to copy" value={copyText} readOnly/><button className="btn btn-primary w-full" disabled={busy || !needed.length} onClick={async () => { setBusy(true); setError(''); try { await navigator.clipboard.writeText(copyText); setCopied(true); } catch { setError('Clipboard access is unavailable. Select and copy the list above.'); } finally { setBusy(false); } }}>{copied ? 'Copied!' : 'Copy shopping list'}</button>{copied && <p role="status">Shopping list copied.</p>}</ModalSheet>}
     {detail && <ModalSheet title={`${detail.ingredient} details`} busy={busy} onClose={() => { setDetail(null); setError(''); }}><p className="text-muted">Original recipe amounts stay in order below. Edit each contribution separately.</p>{errorMessage}<ul>{detailItems.map(item => <ItemRow key={item.id} item={item} busy={busy} update={data => save(() => planningApi.updateItem(week, item.id, data), 'Item saved.')} remove={async () => { if (await save(() => planningApi.removeItem(week, item.id), 'Item removed.') && detailItems.length === 1) setDetail(null); }} />)}</ul>{notice && <p role="status" className="text-primary-700">{notice}</p>}</ModalSheet>}

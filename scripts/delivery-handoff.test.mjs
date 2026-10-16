@@ -86,19 +86,52 @@ for (const mutation of ['source', 'head', 'status']) test(`${mutation} mutation 
   assert.match(result.errors.join('\n'), /changed during|does not own/);
 });
 
-for (const dirty of ['tracked', 'untracked', 'rename']) test(`rejects out-of-allowlist ${dirty} changes before building`, async t => {
+for (const dirty of ['tracked', 'untracked', 'rename', 'committed-rename']) test(`rejects out-of-allowlist ${dirty} changes before building`, async t => {
   const f = await fixture(t, 'throw new Error("must not run");');
   if (dirty === 'tracked') await writeFile(path.join(f.tree, 'other.txt'), 'changed');
   if (dirty === 'untracked') await writeFile(path.join(f.tree, 'extra.txt'), 'new');
-  if (dirty === 'rename') {
+  if (dirty === 'rename' || dirty === 'committed-rename') {
     f.contract.builders[0].files.push('client/src/renamed.ts');
     await f.save();
     git(f.tree, 'mv', 'other.txt', 'client/src/renamed.ts');
+    if (dirty === 'committed-rename') git(f.tree, 'commit', '--quiet', '-m', 'move coordinator file');
   }
   const result = await f.run();
   assert.equal(result.passed, false);
   assert.match(result.errors.join('\n'), /does not own/);
   assert.deepEqual(result.results, []);
+});
+
+test('configuration-only assignments run affected builds and cannot pass on a failed build', async t => {
+  const f = await fixture(t, 'process.exit(2);');
+  f.contract.builders[0].files = ['client/tsconfig.json', 'server/tsconfig.json'];
+  await f.save();
+  const result = await f.run();
+  assert.equal(result.passed, false);
+  assert.deepEqual(result.results.map(check => check.id), ['client-build', 'server-build']);
+  assert.ok(result.results.every(check => check.exitCode === 2));
+});
+
+test('package selection recognizes case aliases and root build inputs', async t => {
+  const f = await fixture(t);
+  for (const files of [['CLIENT/SRC/OWNED.TS', 'SERVER/SRC/OWNED.TS'], ['package.json']]) {
+    f.contract.builders[0].files = files;
+    await f.save();
+    const result = await f.run();
+    assert.equal(result.passed, true, result.errors.join('\n'));
+    assert.deepEqual(result.results.map(check => check.id), ['client-build', 'server-build']);
+  }
+});
+
+test('assignments with no applicable package builds are explicitly unsupported rather than passing', async t => {
+  const f = await fixture(t);
+  f.contract.builders[0].files = ['notes.md'];
+  await f.save();
+  const result = await f.run();
+  assert.equal(result.passed, false);
+  assert.equal(result.notApplicable, true);
+  assert.deepEqual(result.results, []);
+  assert.match(result.errors.join('\n'), /No affected.*package builds/);
 });
 
 test('rejects mismatched checkout, invalid contract, and nonancestor base', async t => {

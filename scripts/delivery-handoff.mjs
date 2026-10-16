@@ -112,16 +112,23 @@ export async function runHandoff(contractPath, owner, { cwd = process.cwd(), npm
     const snapshot = async () => {
       const head = (await git(root, 'rev-parse', 'HEAD')).trim();
       const status = await git(root, 'status', '--porcelain=v1', '-z', '--untracked-files=all');
-      const committed = (await git(root, 'diff', '--name-only', '-z', contract.baseSha, 'HEAD')).split('\0').filter(Boolean);
-      const violations = validateOwnership(contract, [{ owner, files: [...new Set([...committed, ...statusPaths(status)])] }]);
+      const committed = (await git(root, 'diff', '--no-renames', '--name-only', '-z', contract.baseSha, 'HEAD')).split('\0').filter(Boolean);
+      const actualPaths = [...new Set([...committed, ...statusPaths(status)])];
+      const violations = validateOwnership(contract, [{ owner, files: actualPaths }]);
       if (violations.length) throw new Error(violations.join('\n'));
-      return { head, sourceHash: await fingerprint(root, builder.files), status, statusHash: hash(status) };
+      return { head, sourceHash: await fingerprint(root, [...new Set([...builder.files, ...actualPaths])].sort()), status, statusHash: hash(status) };
     };
     receipt.before = await snapshot();
     receipt.head = receipt.before.head;
     receipt.sourceHash = receipt.before.sourceHash;
-    const packages = ['client', 'server'].filter(pkg => builder.files.some(file => file.replaceAll('\\', '/').startsWith(`${pkg}/src/`)));
-    const cli = packages.length ? await npmPath(npmCli) : null;
+    const ownedPaths = builder.files.map(file => file.replaceAll('\\', '/').toLowerCase());
+    const rootBuildInput = ownedPaths.some(file => ['package.json', 'package-lock.json', 'tsconfig.json'].includes(file));
+    const packages = ['client', 'server'].filter(pkg => rootBuildInput || ownedPaths.some(file => file.startsWith(`${pkg}/`)));
+    if (!packages.length) {
+      receipt.notApplicable = true;
+      throw new Error('No affected client/server package builds; this handoff guard cannot validate this assignment.');
+    }
+    const cli = await npmPath(npmCli);
     const checks = packages.map(pkg => ({ id: `${pkg}-build`, name: `${pkg} package build`, cwd: root, args: [cli, '--prefix', pkg, 'run', 'build'] }));
     const report = await runChecks(checks, { directory, budgetMs: 90_000 });
     Object.assign(receipt, report);

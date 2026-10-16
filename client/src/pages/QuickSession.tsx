@@ -148,8 +148,8 @@ export default function QuickSession() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8">
+    <div className="min-h-screen bg-paper flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full bg-white rounded-3xl border border-stone-200 p-5 sm:p-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">MealMatch</h1>
           <p className="text-gray-600">
@@ -171,7 +171,7 @@ export default function QuickSession() {
                 type="button"
                 onClick={() => setMode('takeout')}
                 className={`px-4 py-3 rounded-md font-medium ${
-                  mode === 'takeout' ? 'bg-white shadow-sm text-orange-700' : 'text-gray-600'
+                  mode === 'takeout' ? 'bg-white shadow-sm text-primary-700' : 'text-gray-600'
                 }`}
               >
                 Order out
@@ -180,7 +180,7 @@ export default function QuickSession() {
                 type="button"
                 onClick={() => setMode('home')}
                 className={`px-4 py-3 rounded-md font-medium ${
-                  mode === 'home' ? 'bg-white shadow-sm text-orange-700' : 'text-gray-600'
+                  mode === 'home' ? 'bg-white shadow-sm text-primary-700' : 'text-gray-600'
                 }`}
               >
                 Cook at home
@@ -204,7 +204,7 @@ export default function QuickSession() {
                 }
               }}
               placeholder="Enter your name"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
 
@@ -214,7 +214,7 @@ export default function QuickSession() {
             </label>
             {mode === 'takeout' && (
               <details className="mb-3">
-                <summary className="min-h-12 flex items-center cursor-pointer text-sm font-semibold text-orange-700">Quick picks (optional)</summary>
+                <summary className="min-h-12 flex items-center cursor-pointer text-sm font-semibold text-primary-700">Quick picks (optional)</summary>
                 <div className="flex flex-wrap gap-2">
                 {TAKEOUT_CATEGORY_SUGGESTIONS.map((suggestion) => {
                   const selected = meals.some(
@@ -227,8 +227,8 @@ export default function QuickSession() {
                       onClick={() => addSuggestedCategory(suggestion)}
                       className={`px-3 py-1.5 rounded-full border text-sm transition-colors ${
                         selected
-                          ? 'bg-orange-100 border-orange-300 text-orange-800'
-                          : 'bg-white border-gray-300 text-gray-700 hover:border-orange-400'
+                          ? 'bg-primary-100 border-primary-300 text-primary-800'
+                          : 'bg-white border-gray-300 text-gray-700 hover:border-primary-400'
                       }`}
                     >
                       {selected ? `✓ ${suggestion}` : suggestion}
@@ -251,7 +251,7 @@ export default function QuickSession() {
                     onChange={(e) => updateMeal(meal.id, e.target.value)}
                     onKeyDown={(e) => handleMealKeyDown(e, meal.id, index)}
                     placeholder={`Option ${index + 1}`}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    className="min-w-0 flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                   {meals.length > 1 ? (
                     <button
@@ -268,7 +268,7 @@ export default function QuickSession() {
 
             <button
               onClick={addMeal}
-              className="mt-3 text-orange-600 hover:text-orange-700 font-medium text-sm"
+              className="mt-3 text-primary-600 hover:text-primary-700 font-medium text-sm"
             >
               + Add another option
             </button>
@@ -277,7 +277,7 @@ export default function QuickSession() {
           <button
             onClick={handleCreateSession}
             disabled={loading}
-            className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-semibold py-4 rounded-lg transition-colors"
+            className="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white font-semibold py-4 rounded-lg transition-colors"
           >
             {loading ? 'Creating...' : 'Create Session'}
           </button>

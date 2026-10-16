@@ -25,7 +25,7 @@ function AddToWeekTarget({ mealId, title, week }: { mealId: string; title: strin
     }
   }
   return <div className="mt-3">
-    {state === 'added' ? <Link to={`/week?week=${week}`} className="text-sm font-semibold text-primary-700 underline">Added · View week</Link>
+    {state === 'added' ? <Link to={`/week?week=${week}`} className="inline-flex min-h-12 items-center text-sm font-semibold text-primary-700 underline">Added · View week</Link>
       : <button type="button" onClick={add} disabled={state === 'saving'} aria-label={`Add ${title} to this week`} className="btn btn-secondary text-sm">{state === 'saving' ? 'Adding…' : 'Add to this week'}</button>}
     {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
   </div>;

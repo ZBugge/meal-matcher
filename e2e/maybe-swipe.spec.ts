@@ -29,7 +29,7 @@ test.describe('Maybe Swipe Flow (#28)', () => {
     await expect(page).toHaveURL(/\/session\/.*\/share/);
 
     // When: User starts swiping
-    await page.click('text=Start Swiping');
+    await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
     await expect(page).toHaveURL(/\/session\/.*\/swipe/);
 
     await voteByTitle(page, { Pizza: 'yes', Tacos: 'maybe', Sushi: 'no' });
@@ -40,7 +40,7 @@ test.describe('Maybe Swipe Flow (#28)', () => {
     // When: Creator ends the session - click the button then confirm in modal
     await page.click('text=End Session & Show Results');
     // Handle confirmation modal
-    await page.locator('.fixed.inset-0 button:has-text("End Session")').click();
+    await page.getByRole('dialog', { name: 'End Session?', exact: true }).getByRole('button', { name: 'End Session', exact: true }).click();
 
     // Then: Results page shows
     await expect(page.locator('h1:has-text("Results")')).toBeVisible({ timeout: 5000 });
@@ -65,7 +65,7 @@ test.describe('Maybe Swipe Flow (#28)', () => {
     const inviteCode = shareUrl.split('/join/')[1];
 
     // Host swipes: Yes on both
-    await page.click('text=Start Swiping');
+    await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
     await voteByTitle(page, { 'Unanimous Choice': 'yes', 'Maybe Choice': 'yes' });
     await expect(page).toHaveURL(/\/results\//, { timeout: 5000 });
 
@@ -73,7 +73,7 @@ test.describe('Maybe Swipe Flow (#28)', () => {
     const participantPage = await browser.newPage({ baseURL: test.info().project.use.baseURL });
     await participantPage.goto(`/join/${inviteCode}`);
     await participantPage.fill('#name', 'Participant');
-    await participantPage.click('text=Start Swiping');
+    await participantPage.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
 
     await voteByTitle(participantPage, { 'Unanimous Choice': 'yes', 'Maybe Choice': 'maybe' });
 
@@ -81,7 +81,7 @@ test.describe('Maybe Swipe Flow (#28)', () => {
 
     // Host ends the session - click button then confirm in modal
     await page.click('text=End Session & Show Results');
-    await page.locator('.fixed.inset-0 button:has-text("End Session")').click();
+    await page.getByRole('dialog', { name: 'End Session?', exact: true }).getByRole('button', { name: 'End Session', exact: true }).click();
 
     // Then: Results show with the data
     await expect(page.locator('h1:has-text("Results")')).toBeVisible({ timeout: 5000 });

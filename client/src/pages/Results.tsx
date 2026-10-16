@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { participantApi, sessionsApi, ResultsResponse, MatchResult, mealsApi, ApiException, Meal } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import RecipeViewer from '../components/RecipeViewer';
+import { ModalSheet } from '../components/ModalSheet';
 import { AddToWeek } from '../components/AddToWeek';
 
 interface Participant {
@@ -79,13 +80,13 @@ export function Results() {
   }, []);
 
   const handleCloseSession = async () => {
-    if (!sessionId) return;
+    if (!sessionId || closing) return;
 
     const creatorToken = sessionStorage.getItem('creatorToken');
     const isHost = Boolean(user && results?.isHost);
     if (!isHost && !creatorToken) return;
 
-    setClosing(true);
+    setClosing(true); setError('');
     try {
       if (isHost) {
         await sessionsApi.close(sessionId);
@@ -167,7 +168,7 @@ export function Results() {
     );
   }
 
-  if (error) {
+  if (error && !results && !showCloseConfirm) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="card text-center max-w-md">
@@ -218,6 +219,7 @@ export function Results() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="card text-center max-w-md w-full">
+          {error && !showCloseConfirm && <p role="alert" className="text-red-800 mb-4">{error}</p>}
           <div className="animate-pulse text-6xl mb-4">⏳</div>
           <h1 className="text-2xl font-bold mb-2">Waiting for Votes</h1>
           <p className="text-gray-600">
@@ -229,7 +231,7 @@ export function Results() {
             <div className="mt-6">
               <button
                 onClick={handleUpdateChoices}
-                className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 rounded-lg transition-colors"
+                className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-lg transition-colors"
               >
                 Update Your Choices
               </button>
@@ -254,7 +256,7 @@ export function Results() {
                         Done
                       </span>
                     ) : (
-                      <span className="text-orange-500 text-sm flex items-center gap-1">
+                      <span className="text-primary-500 text-sm flex items-center gap-1">
                         <svg className="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
                           <circle cx="12" cy="12" r="4" />
                         </svg>
@@ -292,7 +294,8 @@ export function Results() {
                   type="text"
                   value={shareUrl}
                   readOnly
-                  className="flex-1 bg-transparent text-sm text-gray-700 outline-none truncate"
+                  aria-label="Invite link"
+              className="min-w-0 flex-1 bg-transparent text-sm text-gray-700 outline-none truncate"
                 />
                 <button
                   onClick={handleCopyLink}
@@ -317,13 +320,12 @@ export function Results() {
 
           {/* Close confirmation modal */}
           {showCloseConfirm ? (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-left">
-                <h2 className="text-xl font-bold mb-2">End Session?</h2>
+            <ModalSheet title="End Session?" onClose={() => setShowCloseConfirm(false)} busy={closing}>
+              {error && <p role="alert" className="text-red-800">{error}</p>}
                 <p className="text-gray-600 mb-6">
                   This will close voting and show results to everyone.
                   {participants.length - submittedCount > 0 && (
-                    <span className="block mt-2 text-orange-600">
+                    <span className="block mt-2 text-primary-600">
                       {participants.length - submittedCount} {participants.length - submittedCount === 1 ? 'person hasn\'t' : 'people haven\'t'} finished voting yet.
                     </span>
                   )}
@@ -344,8 +346,8 @@ export function Results() {
                     {closing ? 'Closing...' : 'End Session'}
                   </button>
                 </div>
-              </div>
-            </div>
+
+            </ModalSheet>
           ) : null}
         </div>
       </div>
@@ -357,8 +359,9 @@ export function Results() {
   const canViewRecipes = Boolean(user && results.isHost && results.mode === 'home');
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-paper py-8 px-4">
       <div className="max-w-2xl mx-auto">
+        {error && <p role="alert" className="text-red-800 bg-red-50 rounded-xl p-3 mb-4">{error}</p>}
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-primary-600">Results</h1>
@@ -370,7 +373,7 @@ export function Results() {
           <div className="card bg-green-50 border-2 border-green-500 mb-8">
             <div className="text-center">
               <span className="text-4xl">🎉</span>
-              <h2 className="text-xl font-bold mt-2 text-green-700">Tonight's Pick:</h2>
+              <h2 className="text-xl font-bold mt-2 text-green-700">Selected option:</h2>
               {canViewRecipes ? (
                 <button
                   type="button"
@@ -433,7 +436,7 @@ export function Results() {
 
         {/* Save options prompt for anonymous creators */}
         {isCreator && showSavePrompt && !user ? (
-          <div className="card bg-orange-50 border-2 border-orange-500 mt-8">
+          <div className="card bg-primary-50 border-2 border-primary-500 mt-8">
             <div className="text-center">
               <h3 className="font-bold text-lg">
                 Save these {results.mode === 'takeout' ? 'food categories' : 'meals'}?
@@ -450,7 +453,7 @@ export function Results() {
                 </button>
                 <Link
                   to="/register"
-                  className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
+                  className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
                 >
                   Create Account
                 </Link>

@@ -57,7 +57,7 @@ export function SwipeCard({ title, description, onSwipe, progress, hintStyle = '
       </div>
 
       <p className="text-center mb-2 text-sm text-gray-700 font-medium">👆 Swipe to vote</p>
-      <p className="text-center mb-3 text-xs text-gray-600">Left: Nope · Right: Yum · Tap Maybe if unsure</p>
+      <p className="text-center mb-3 text-xs text-gray-600">Left: No · Right: Yes · You can also tap a choice</p>
 
       {/* Card */}
       <motion.div
@@ -91,20 +91,20 @@ export function SwipeCard({ title, description, onSwipe, progress, hintStyle = '
             : undefined
         }
       >
-        {/* Nope indicator */}
+        {/* No indicator */}
         <motion.div
           className="absolute top-4 left-4 border-3 border-red-500 text-red-500 px-3 py-1 rounded-lg font-bold text-lg -rotate-12"
           style={{ opacity: leftIndicatorOpacity }}
         >
-          NOPE
+          NO
         </motion.div>
 
-        {/* Yum indicator */}
+        {/* Yes indicator */}
         <motion.div
           className="absolute top-4 right-4 border-3 border-green-500 text-green-500 px-3 py-1 rounded-lg font-bold text-lg rotate-12"
           style={{ opacity: rightIndicatorOpacity }}
         >
-          YUM!
+          YES
         </motion.div>
 
         {/* Content */}
@@ -120,24 +120,24 @@ export function SwipeCard({ title, description, onSwipe, progress, hintStyle = '
       <div className="flex justify-center gap-4 mt-5">
         <button
           onClick={() => onSwipe('left')}
-          className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center border border-red-400 text-red-400 hover:bg-red-50 active:bg-red-100 active:scale-95 transition-all opacity-70 hover:opacity-100"
-          aria-label="Nope"
+          className="btn btn-secondary flex-1 min-h-12 text-red-800 border-red-300 bg-white"
+          aria-label="No"
           data-testid="swipe-no"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          </svg><span>No</span>
         </button>
 
         <button
           onClick={() => onSwipe('right')}
-          className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center border border-green-400 text-green-400 hover:bg-green-50 active:bg-green-100 active:scale-95 transition-all opacity-70 hover:opacity-100"
-          aria-label="Yum"
+          className="btn btn-primary flex-1 min-h-12"
+          aria-label="Yes"
           data-testid="swipe-yes"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
+          </svg><span>Yes</span>
         </button>
       </div>
     </div>

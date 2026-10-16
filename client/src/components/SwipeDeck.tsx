@@ -121,7 +121,7 @@ export function SwipeDeck({
             const vote = swipes[meal.id] ?? 0;
             const borderColor = vote === 1 ? 'border-green-500 bg-green-50' : vote === 2 ? 'border-yellow-500 bg-yellow-50' : 'border-red-300 bg-red-50';
             const badgeColor = vote === 1 ? 'bg-green-100 text-green-700' : vote === 2 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
-            const label = vote === 1 ? 'YUM' : vote === 2 ? 'MAYBE' : 'NOPE';
+            const label = vote === 1 ? 'YES' : vote === 2 ? 'MAYBE' : 'NO';
 
             return editMode ? (
               <button
@@ -218,7 +218,7 @@ export function SwipeDeck({
             <div className="flex justify-center mt-4">
               <button
                 onClick={handleMaybe}
-                className="px-6 py-2 rounded-full bg-white shadow-lg border-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50 active:bg-yellow-100 active:scale-95 transition-all font-medium"
+                className="btn btn-secondary min-w-32 border-amber-500 bg-amber-50 text-amber-900"
               >
                 Maybe
               </button>

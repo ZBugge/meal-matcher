@@ -21,30 +21,33 @@ function show(shopping = false) { render(<MemoryRouter initialEntries={[`/${shop
 
 beforeEach(() => {
   vi.resetAllMocks();
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
   vi.mocked(planningApi.getWeek).mockImplementation(async week => plan(week));
   vi.mocked(planningApi.staples).mockResolvedValue([]);
   vi.mocked(mealsApi.list).mockResolvedValue([{ id: 'recipe', title: 'Saved recipe', type: 'meal', description: null, pickCount: 0 }]);
 });
 describe('planning week navigation', () => {
   it('closes a dated picker and clears its date/search when the query week changes', async () => {
-    show(); await screen.findByRole('heading', { name: 'Dinner a' });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Leave open or add meal' })[0]);
+    show(); await screen.findByRole('button', { name: 'Dinner a Home cooking' });
+    fireEvent.click(screen.getAllByRole('button', { name: /Open night/ })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Saved recipe' }));
     fireEvent.change(screen.getByLabelText('Search recipes'), { target: { value: 'old query' } });
     expect(screen.getByLabelText('Add meal on')).toHaveValue(first);
-    fireEvent.click(screen.getByText('External next week')); await screen.findByRole('heading', { name: 'Dinner b' });
+    fireEvent.click(screen.getByText('External next week')); await screen.findByRole('button', { name: 'Dinner b Home cooking' });
     expect(screen.queryByRole('dialog')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /^Add meal$/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add dinner' })); fireEvent.click(screen.getByRole('button', { name: 'Saved recipe' }));
     expect(screen.getByLabelText('Add meal on')).toHaveValue(''); expect(screen.getByLabelText('Search recipes')).toHaveValue('');
-    await screen.findByRole('button', { name: 'Add Saved recipe' });
+    await screen.findByRole('button', { name: 'Saved recipe' });
   });
   it('discards old repeat selections and sends only the newly reviewed week IDs', async () => {
     vi.mocked(planningApi.repeat).mockResolvedValue(plan('2026-10-26'));
-    show(); await screen.findByRole('heading', { name: 'Dinner a' });
-    fireEvent.click(screen.getByText('Repeat a week')); fireEvent.click(screen.getByRole('button', { name: 'Choose meals to repeat' }));
+    show(); await screen.findByRole('button', { name: 'Dinner a Home cooking' });
+    fireEvent.click(screen.getByRole('button', { name: 'Week tools' })); fireEvent.click(screen.getByRole('button', { name: 'Repeat a week' }));
     expect(screen.getByLabelText('Target Monday')).toHaveValue(second);
-    fireEvent.click(screen.getByText('External next week')); await screen.findByRole('heading', { name: 'Dinner b' });
+    fireEvent.click(screen.getByText('External next week')); await screen.findByRole('button', { name: 'Dinner b Home cooking' });
     expect(screen.queryByLabelText('Target Monday')).toBeNull();
-    fireEvent.click(screen.getByText('Repeat a week')); fireEvent.click(screen.getByRole('button', { name: 'Choose meals to repeat' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Week tools' })); fireEvent.click(screen.getByRole('button', { name: 'Repeat a week' }));
     expect(screen.getByRole('checkbox', { name: /Dinner b/ })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'Repeat selected meals' }));
     await screen.findByRole('link', { name: 'View repeated week' });
@@ -53,14 +56,16 @@ describe('planning week navigation', () => {
   it('does not let a pending old-week save replace the new week or its busy state', async () => {
     let finish!: (value: Plan) => void;
     vi.mocked(planningApi.addEntry).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
-    show(); await screen.findByRole('heading', { name: 'Dinner a' });
+    show(); await screen.findByRole('button', { name: 'Dinner a Home cooking' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add dinner' })); fireEvent.click(screen.getByRole('button', { name: 'Takeout night' }));
     fireEvent.change(screen.getByLabelText('What sounds good?'), { target: { value: 'Old pizza' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add takeout night' }));
-    expect(screen.getByRole('button', { name: /^Next$/ })).toBeDisabled();
-    fireEvent.click(screen.getByText('External next week')); await screen.findByRole('heading', { name: 'Dinner b' });
-    expect(screen.getByRole('button', { name: /^Next$/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Next week' })).toBeDisabled();
+    fireEvent.click(screen.getByText('External next week')); await screen.findByRole('button', { name: 'Dinner b Home cooking' });
+    expect(screen.getByRole('button', { name: 'Next week' })).toBeEnabled();
     await act(async () => finish(plan(first)));
-    expect(screen.getByRole('heading', { name: 'Dinner b' })).toBeVisible(); expect(screen.queryByRole('heading', { name: 'Dinner a' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Dinner b Home cooking' })).toBeVisible(); expect(screen.queryByRole('button', { name: 'Dinner a Home cooking' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Add dinner' })); fireEvent.click(screen.getByRole('button', { name: 'Takeout night' }));
     expect(screen.getByLabelText('What sounds good?')).toHaveValue('');
   });
   it('resets pantry selections on week navigation and isolates an old bulk failure', async () => {

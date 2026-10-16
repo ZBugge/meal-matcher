@@ -38,7 +38,7 @@ function formatLastSelectedAt(timestamp: string | null | undefined): string {
 function MetadataFields({ minutes, effort, onMinutes, onEffort }: { minutes: string; effort: string; onMinutes: (value: string) => void; onEffort: (value: string) => void }) {
   return <div className="grid sm:grid-cols-2 gap-4">
     <label className="block text-sm font-medium">Total time (minutes)<input className="input mt-1" type="number" min="1" max="1440" step="1" value={minutes} onChange={event => onMinutes(event.target.value)} /></label>
-    <label className="block text-sm font-medium">Effort<select className="input mt-1" value={effort} onChange={event => onEffort(event.target.value)}><option value="">Not set</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="involved">Involved</option></select></label>
+    <label className="block text-sm font-medium">Effort<select aria-label="Effort" className="input mt-1" value={effort} onChange={event => onEffort(event.target.value)}><option value="">Not set</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="involved">Involved</option></select></label>
   </div>;
 }
 function RecipeMetadata({ meal }: { meal: Meal }) {
@@ -704,8 +704,8 @@ export function Dashboard() {
             <input type="search" className="input mt-2" value={search} onChange={event => setSearch(event.target.value)} placeholder="Find a favorite…" />
           </label>
           {activeMode === 'home' && <div className="flex flex-wrap gap-3 items-end mb-4">
-            <label className="text-sm font-medium">Maximum total time<select className="input mt-1" value={maxMinutes} onChange={event => setMaxMinutes(event.target.value)}><option value="">Any time</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option></select></label>
-            <label className="text-sm font-medium">Filter by effort<select className="input mt-1" value={effortFilter} onChange={event => setEffortFilter(event.target.value)}><option value="">Any effort</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="involved">Involved</option></select></label>
+            <label className="text-sm font-medium">Maximum total time<select aria-label="Maximum total time" className="input mt-1" value={maxMinutes} onChange={event => setMaxMinutes(event.target.value)}><option value="">Any time</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option></select></label>
+            <label className="text-sm font-medium">Filter by effort<select aria-label="Filter by effort" className="input mt-1" value={effortFilter} onChange={event => setEffortFilter(event.target.value)}><option value="">Any effort</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="involved">Involved</option></select></label>
             {(search || maxMinutes || effortFilter) && <button className="btn btn-secondary" onClick={() => { setSearch(''); setMaxMinutes(''); setEffortFilter(''); }}>Clear filters</button>}
           </div>}
           {activeMeals.length > 0 && visibleMeals.length === 0 && <p className="py-4 text-gray-500">No matching options. Try another search.</p>}

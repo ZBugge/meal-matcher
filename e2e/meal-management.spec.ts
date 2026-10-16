@@ -18,9 +18,9 @@ test.describe('Meal Management (#17, #12)', () => {
     await page.click('text=Add Meal');
     await expect(page.getByRole('heading', { name: 'Add New Meal', exact: true })).toBeVisible();
 
-    // Fill the title input (first input in the modal)
+    // Fill the explicitly labelled title input
     const modal = page.getByRole('dialog', { name: 'Add New Meal', exact: true });
-    await modal.locator('input.input').fill(title);
+    await modal.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
 
     if (description) {
       await modal.locator('textarea[placeholder="e.g., Beef tacos with all the fixings"]').fill(description);
@@ -51,7 +51,7 @@ test.describe('Meal Management (#17, #12)', () => {
 
     // When: User changes title and description
     const editModal = page.getByRole('dialog', { name: 'Edit Meal', exact: true });
-    await editModal.locator('input.input').fill('Updated Title');
+    await editModal.getByRole('textbox', { name: 'Title', exact: true }).fill('Updated Title');
     await editModal.locator('textarea[placeholder="e.g., Beef tacos with all the fixings"]').fill('Updated description');
     await editModal.locator('button:has-text("Save")').click();
 

@@ -109,7 +109,7 @@ describe('compact shopping', () => {
     await screen.findByLabelText('Add usual Tea');
     fireEvent.change(screen.getByLabelText('Usual item'), { target: { value: 'Bread' } });
     fireEvent.change(screen.getByLabelText('Usual amount (optional)'), { target: { value: '1 loaf' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save usual grocery', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save usual grocery' }));
     await screen.findByLabelText('Add usual Bread');
     expect(planningApi.saveRecurring).toHaveBeenCalledWith(week, { ingredient: 'Bread', amount: '1 loaf' }, undefined);
     fireEvent.click(screen.getByRole('button', { name: 'Edit usual Bread' }));
@@ -128,7 +128,7 @@ describe('compact shopping', () => {
     show(); fireEvent.click(await screen.findByRole('button', { name: 'Usual groceries' }));
     fireEvent.click(await screen.findByLabelText('Add usual Tea'));
     fireEvent.click(screen.getByRole('button', { name: 'Add selected to this week (1)' }));
-    expect(screen.getByRole('button', { name: 'Save usual grocery', exact: true })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save usual grocery' })).toBeDisabled();
     await act(async () => reject(new Error('Could not add groceries')));
     expect(screen.getByRole('dialog')).toContainElement(screen.getByRole('alert'));
     expect(screen.getByLabelText('Add usual Tea')).toBeChecked();

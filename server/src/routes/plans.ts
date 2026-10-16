@@ -75,7 +75,7 @@ for (const method of ['post', 'patch'] as const) {
       || !text(body.ingredient, 300) || !text(body.amount, 100, true)) {
       res.status(400).json({ error: 'Enter an item and a free-text amount of up to 100 characters.' }); return;
     }
-    const id = method === 'post' ? randomUUID() : req.params.id;
+    const id = method === 'post' ? randomUUID() : (req.params as { week: string; id: string }).id;
     if (method === 'patch' && !getOne('SELECT id FROM recurring_groceries WHERE id = ? AND host_id = ?', [id, host])) {
       res.status(404).json({ error: 'Usual grocery not found.' }); return;
     }

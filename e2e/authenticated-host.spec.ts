@@ -16,7 +16,7 @@ test.describe('Authenticated Host Flow', () => {
     await expect(page.getByRole('heading', { name: 'Add New Meal', exact: true })).toBeVisible();
 
     const modal = page.getByRole('dialog', { name: 'Add New Meal', exact: true });
-    await modal.locator('input.input').fill(title);
+    await modal.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
 
     if (description) {
       await modal.getByPlaceholder('e.g., Beef tacos with all the fixings').fill(description);

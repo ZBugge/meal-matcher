@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "sourceBase": "e02b38d9f988b9a3cc8e70c52e894a998db2a3a5",
+  "sourceOverlay": "23fileNotion snapshot; .verification/migration/notion-baseline-source",
+  "package": "e2e",
+  "inventoryOnly": true,
+  "tests": [
+    {
+      "file": "authenticated-host.spec.ts",
+      "name": "chromium: Authenticated Host Flow › full flow: register, create meals, start session, invite participant, get results",
+      "occurrence": 0
+    },
+    {
+      "file": "authenticated-host.spec.ts",
+      "name": "chromium: Authenticated Host Flow › host can quick add meals while creating session",
+      "occurrence": 0
+    },
+    {
+      "file": "authenticated-host.spec.ts",
+      "name": "chromium: Authenticated Host Flow › host can login and access previous meals",
+      "occurrence": 0
+    },
+    {
+      "file": "authenticated-host.spec.ts",
+      "name": "chromium: Authenticated Host Flow › host sees session history on dashboard",
+      "occurrence": 0
+    },
+    {
+      "file": "family-planning.spec.ts",
+      "name": "chromium: family week survives reload and shares shopping and cooking across phones",
+      "occurrence": 0
+    },
+    {
+      "file": "family-planning.spec.ts",
+      "name": "chromium: phone plans tonight, saves dinner staples, repeats reviewed meals and shops consolidated groceries",
+      "occurrence": 0
+    },
+    {
+      "file": "family-voting.spec.ts",
+      "name": "chromium: an authenticated quick-session choice can become a planned meal",
+      "occurrence": 0
+    },
+    {
+      "file": "family-voting.spec.ts",
+      "name": "chromium: a family can search the library, collapse it, and plan several voted meals",
+      "occurrence": 0
+    },
+    {
+      "file": "family-voting.spec.ts",
+      "name": "chromium: voted quick results keep a noncurrent planning week",
+      "occurrence": 0
+    },
+    {
+      "file": "family-voting.spec.ts",
+      "name": "chromium: a signed-in host can end voting from their results tab",
+      "occurrence": 0
+    },
+    {
+      "file": "food-modes.spec.ts",
+      "name": "chromium: Home and takeout session modes › anonymous quick sessions default to takeout suggestions",
+      "occurrence": 0
+    },
+    {
+      "file": "food-modes.spec.ts",
+      "name": "chromium: Home and takeout session modes › authenticated takeout categories persist and create a takeout session",
+      "occurrence": 0
+    },
+    {
+      "file": "maybe-swipe.spec.ts",
+      "name": "chromium: Maybe Swipe Flow (#28) › user can swipe maybe and it shows in results",
+      "occurrence": 0
+    },
+    {
+      "file": "maybe-swipe.spec.ts",
+      "name": "chromium: Maybe Swipe Flow (#28) › maybe votes are ranked below unanimous yes votes",
+      "occurrence": 0
+    },
+    {
+      "file": "meal-management.spec.ts",
+      "name": "chromium: Meal Management (#17, #12) › user can edit meal title and description (#17)",
+      "occurrence": 0
+    },
+    {
+      "file": "meal-management.spec.ts",
+      "name": "chromium: Meal Management (#17, #12) › host can export, preview, and import active library data",
+      "occurrence": 0
+    },
+    {
+      "file": "meal-management.spec.ts",
+      "name": "chromium: Meal Management (#17, #12) › host can save private recipe details and notes without exposing them to session participants",
+      "occurrence": 0
+    },
+    {
+      "file": "meal-management.spec.ts",
+      "name": "chromium: Meal Management (#17, #12) › user can delete single meal with confirmation (#12)",
+      "occurrence": 0
+    },
+    {
+      "file": "meal-management.spec.ts",
+      "name": "chromium: Meal Management (#17, #12) › user can cancel meal deletion",
+      "occurrence": 0
+    },
+    {
+      "file": "meal-management.spec.ts",
+      "name": "chromium: Meal Management (#17, #12) › user can multiselect and bulk delete meals (#12)",
+      "occurrence": 0
+    },
+    {
+      "file": "meal-management.spec.ts",
+      "name": "chromium: Meal Management (#17, #12) › edit mode can be toggled on and off",
+      "occurrence": 0
+    },
+    {
+      "file": "mobile-baseline.spec.ts",
+      "name": "chromium: phone home, library, and recipe remain usable after reload",
+      "occurrence": 0
+    },
+    {
+      "file": "mobile-redesign.spec.ts",
+      "name": "chromium: redesigned kitchen preserves week and long content at 320px",
+      "occurrence": 0
+    },
+    {
+      "file": "mobile-redesign.spec.ts",
+      "name": "chromium: redesigned kitchen preserves week and long content at 390px",
+      "occurrence": 0
+    },
+    {
+      "file": "mobile-redesign.spec.ts",
+      "name": "chromium: redesigned kitchen preserves week and long content at 430px",
+      "occurrence": 0
+    },
+    {
+      "file": "mobile-redesign.spec.ts",
+      "name": "chromium: long recipe editor keeps Save visible above a shortened viewport and preserves exact private fields",
+      "occurrence": 0
+    },
+    {
+      "file": "notion-recipes.spec.ts",
+      "name": "chromium: Notion setup validates through the server and preserves regular recipes on failure",
+      "occurrence": 0
+    },
+    {
+      "file": "parallel-family-pilot.spec.ts",
+      "name": "chromium: recipe metadata and usual groceries coexist without changing saved week snapshots or household privacy",
+      "occurrence": 0
+    },
+    {
+      "file": "quick-session.spec.ts",
+      "name": "chromium: Quick Session Flow › creator can create session, swipe, and see Update Choices button",
+      "occurrence": 0
+    },
+    {
+      "file": "quick-session.spec.ts",
+      "name": "chromium: Quick Session Flow › participant can update choices while session is open",
+      "occurrence": 0
+    },
+    {
+      "file": "recipe-filters.spec.ts",
+      "name": "chromium: phone recipe metadata persists and filters compose after reopening",
+      "occurrence": 0
+    },
+    {
+      "file": "recurring-groceries.spec.ts",
+      "name": "chromium: usual groceries explicitly populate selected weeks and retain old shopping snapshots",
+      "occurrence": 0
+    },
+    {
+      "file": "session-lifecycle.spec.ts",
+      "name": "chromium: Session Lifecycle (#1) › host can end session early and participants see ended message",
+      "occurrence": 0
+    },
+    {
+      "file": "session-lifecycle.spec.ts",
+      "name": "chromium: Session Lifecycle (#1) › host sees confirmation when ending session with unsubmitted participants",
+      "occurrence": 0
+    },
+    {
+      "file": "session-lifecycle.spec.ts",
+      "name": "chromium: Session Lifecycle (#1) › waiting participant sees vote count update in real-time",
+      "occurrence": 0
+    },
+    {
+      "file": "session-lifecycle.spec.ts",
+      "name": "chromium: Session Lifecycle (#1) › participant can go home after session ends",
+      "occurrence": 0
+    },
+    {
+      "file": "swipe-recovery.spec.ts",
+      "name": "chromium: a failed submission keeps choices and waits for an explicit retry",
+      "occurrence": 0
+    },
+    {
+      "file": "swipe-recovery.spec.ts",
+      "name": "chromium: two phones preserve partial swipes, back navigation, and submitted choice edits",
+      "occurrence": 0
+    }
+  ]
+}

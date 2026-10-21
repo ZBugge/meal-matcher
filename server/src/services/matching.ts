@@ -1,26 +1,25 @@
 import { getAll } from '../db/schema';
 import { MatchResult } from '../types';
-
 interface SwipeData {
-  session_meal_id: string;
-  meal_id: string;
-  meal_title: string;
-  meal_description: string | null;
-  participant_name: string;
-  vote: number;
+    session_meal_id: string;
+    meal_id: string;
+    meal_title: string;
+    meal_description: string | null;
+    participant_name: string;
+    vote: number;
 }
-
 interface MealAggregation {
-  mealId: string;
-  title: string;
-  description: string | null;
-  votes: { name: string; vote: number }[];
+    mealId: string;
+    title: string;
+    description: string | null;
+    votes: {
+        name: string;
+        vote: number;
+    }[];
 }
-
-export function calculateResults(sessionId: string, includeVoters: boolean = false): MatchResult[] {
-  // Get all swipes for this session with meal and participant info
-  const swipes = getAll<SwipeData>(
-    `SELECT
+export async function calculateResults(sessionId: string, includeVoters: boolean = false): Promise<MatchResult[]> {
+    // Get all swipes for this session with meal and participant info
+    const swipes = await getAll<SwipeData>(`SELECT
       sm.id as session_meal_id,
       m.id as meal_id,
       m.title as meal_title,
@@ -32,74 +31,59 @@ export function calculateResults(sessionId: string, includeVoters: boolean = fal
     JOIN session_meals sm ON s.session_meal_id = sm.id
     JOIN meals m ON sm.meal_id = m.id
     WHERE sm.session_id = ? AND p.submitted = 1
-    ORDER BY m.title`,
-    [sessionId]
-  );
-
-  // Aggregate votes by meal
-  const mealMap = new Map<string, MealAggregation>();
-
-  for (const swipe of swipes) {
-    if (!mealMap.has(swipe.meal_id)) {
-      mealMap.set(swipe.meal_id, {
-        mealId: swipe.meal_id,
-        title: swipe.meal_title,
-        description: swipe.meal_description,
-        votes: [],
-      });
+    ORDER BY m.title`, [sessionId]);
+    // Aggregate votes by meal
+    const mealMap = new Map<string, MealAggregation>();
+    for (const swipe of swipes) {
+        if (!mealMap.has(swipe.meal_id)) {
+            mealMap.set(swipe.meal_id, {
+                mealId: swipe.meal_id,
+                title: swipe.meal_title,
+                description: swipe.meal_description,
+                votes: [],
+            });
+        }
+        mealMap.get(swipe.meal_id)!.votes.push({
+            name: swipe.participant_name,
+            vote: swipe.vote,
+        });
     }
-
-    mealMap.get(swipe.meal_id)!.votes.push({
-      name: swipe.participant_name,
-      vote: swipe.vote,
+    // Calculate results
+    const results: MatchResult[] = [];
+    for (const meal of mealMap.values()) {
+        const yesCount = meal.votes.filter(v => v.vote === 1).length;
+        const maybeCount = meal.votes.filter(v => v.vote === 2).length;
+        const totalVotes = meal.votes.length;
+        const percentage = totalVotes > 0 ? Math.round(((yesCount + maybeCount) / totalVotes) * 100) : 0;
+        const result: MatchResult = {
+            mealId: meal.mealId,
+            title: meal.title,
+            description: meal.description,
+            yesCount,
+            maybeCount,
+            totalVotes,
+            percentage,
+            isUnanimous: totalVotes > 0 && yesCount === totalVotes,
+        };
+        if (includeVoters) {
+            result.voters = meal.votes;
+        }
+        results.push(result);
+    }
+    // Sort by percentage descending, then by maybeCount ascending (fewer maybes = higher rank), then by title for ties
+    results.sort((a, b) => {
+        if (b.percentage !== a.percentage) {
+            return b.percentage - a.percentage;
+        }
+        if (a.maybeCount !== b.maybeCount) {
+            return a.maybeCount - b.maybeCount;
+        }
+        return a.title.localeCompare(b.title);
     });
-  }
-
-  // Calculate results
-  const results: MatchResult[] = [];
-
-  for (const meal of mealMap.values()) {
-    const yesCount = meal.votes.filter(v => v.vote === 1).length;
-    const maybeCount = meal.votes.filter(v => v.vote === 2).length;
-    const totalVotes = meal.votes.length;
-    const percentage = totalVotes > 0 ? Math.round(((yesCount + maybeCount) / totalVotes) * 100) : 0;
-
-    const result: MatchResult = {
-      mealId: meal.mealId,
-      title: meal.title,
-      description: meal.description,
-      yesCount,
-      maybeCount,
-      totalVotes,
-      percentage,
-      isUnanimous: totalVotes > 0 && yesCount === totalVotes,
-    };
-
-    if (includeVoters) {
-      result.voters = meal.votes;
-    }
-
-    results.push(result);
-  }
-
-  // Sort by percentage descending, then by maybeCount ascending (fewer maybes = higher rank), then by title for ties
-  results.sort((a, b) => {
-    if (b.percentage !== a.percentage) {
-      return b.percentage - a.percentage;
-    }
-    if (a.maybeCount !== b.maybeCount) {
-      return a.maybeCount - b.maybeCount;
-    }
-    return a.title.localeCompare(b.title);
-  });
-
-  return results;
+    return results;
 }
-
 // Generate invite code - 6 alphanumeric characters
 export function generateInviteCode(): string {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 6 }, () =>
-    chars[Math.floor(Math.random() * chars.length)]
-  ).join('');
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }

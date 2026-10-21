@@ -1,3 +1,5 @@
+import { clearPendingOperations, operationAttempt } from './idempotency';
+
 const API_BASE = '/api';
 
 interface ApiError {
@@ -22,16 +24,20 @@ export async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const operation = await operationAttempt(endpoint, options);
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
+      ...(operation ? { 'Idempotency-Key': operation.key } : {}),
     },
   });
 
   const data = await response.json();
+
+  if (response.ok) operation?.acknowledged();
 
   if (!response.ok) {
     const error = data as ApiError;
@@ -41,6 +47,8 @@ export async function request<T>(
       error.existingId
     );
   }
+
+  if (['/auth/login', '/auth/register', '/auth/logout'].includes(endpoint)) clearPendingOperations();
 
   return data as T;
 }
@@ -116,7 +124,30 @@ export interface Meal {
   createdAt?: string;
   lastSelectedAt?: string | null;
   archived?: boolean;
+  source?: 'notion';
+  notionUrl?: string;
 }
+
+export interface NotionConnectionStatus {
+  connected: boolean;
+  sourceUrl: string | null;
+  lastRefreshedAt: string | null;
+  lastError: string | null;
+  recipeCount: number;
+}
+
+export interface NotionRefreshResult extends NotionConnectionStatus {
+  added: number;
+  updated: number;
+  removed: number;
+}
+
+export const notionApi = {
+  status: () => request<NotionConnectionStatus>('/notion'),
+  connect: (token: string, source: string) => request<NotionRefreshResult>('/notion', { method: 'PUT', body: JSON.stringify({ token, source }) }),
+  refresh: () => request<NotionRefreshResult>('/notion/refresh', { method: 'POST' }),
+  disconnect: () => request<NotionConnectionStatus>('/notion', { method: 'DELETE' }),
+};
 
 export interface LibraryExportOption {
   title: string;

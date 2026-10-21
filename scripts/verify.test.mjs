@@ -3,19 +3,27 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { runChecks, validateTestReport } from './verify.mjs';
+import { runChecks, validateTestReport, validateNodeReport } from './verify.mjs';
 import { validateMutationFailure } from './adversarial-report.mjs';
 
-const browserReport = () => ({ stats: { expected: 27, unexpected: 0, skipped: 0, flaky: 0 }, suites: [{ specs: Array.from({ length: 27 }, () => ({ tests: [{ expectedStatus: 'passed', status: 'expected', results: [{ status: 'passed', retry: 0, errors: [] }] }] })) }] });
+const browserReport = () => ({ stats: { expected: 39, unexpected: 0, skipped: 0, flaky: 0 }, suites: [{ specs: Array.from({ length: 39 }, () => ({ tests: [{ expectedStatus: 'passed', status: 'expected', results: [{ status: 'passed', retry: 0, errors: [] }] }] })) }] });
 
 test('missing counts, skipped tests, and insufficient coverage cannot validate as successful reports', () => {
-  assert.equal(validateTestReport('browser', browserReport()), 27);
-  assert.equal(validateTestReport('server', { success: true, numPassedTests: 104, numTotalTests: 104, numFailedTests: 0, numPendingTests: 0, numTodoTests: 0 }), 104);
+  assert.equal(validateTestReport('browser', browserReport()), 39);
+  assert.equal(validateTestReport('server', { success: true, numPassedTests: 226, numTotalTests: 226, numFailedTests: 0, numPendingTests: 0, numTodoTests: 0 }), 226);
   assert.throws(() => validateTestReport('browser', { stats: {} }), /malformed/);
   assert.throws(() => validateTestReport('client', { success: true }), /malformed/);
   assert.throws(() => validateTestReport('browser', { stats: { expected: 22, unexpected: 0, skipped: 1, flaky: 0 } }), /skipped/);
   assert.throws(() => validateTestReport('browser', { stats: { expected: 21, unexpected: 0, skipped: 0, flaky: 0 } }), /missing/);
   assert.throws(() => validateTestReport('server', { success: true, numPassedTests: 35, numTotalTests: 35, numFailedTests: '0', numPendingTests: 0, numTodoTests: 0 }), /malformed/);
+});
+
+test('Node regression reports cannot hide skips, cancellation or missing assertions', () => {
+  const report = '# tests 48\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
+  assert.equal(validateNodeReport(report, 48), 48);
+  assert.throws(() => validateNodeReport(report.replace('# skipped 0', '# skipped 1'), 48), /skipped/);
+  assert.throws(() => validateNodeReport(report.replace('# cancelled 0', '# cancelled 1'), 48), /cancelled/);
+  assert.throws(() => validateNodeReport(report.replace('# tests 48', '# tests 0'), 48), /missing/);
 });
 
 test('a mutant setup error or unrelated mismatch cannot count as an assertion detecting the bug', () => {

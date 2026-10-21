@@ -14,7 +14,7 @@ export interface Host {
 
 export interface Meal {
   id: string;
-  host_id: string;
+  host_id: string | null;
   title: string;
   description: string | null;
   instructions: string | null;
@@ -35,6 +35,29 @@ export interface MealIngredient {
   ingredient: string;
 }
 
+export interface NotionConnection {
+  host_id: string;
+  token_ciphertext: string;
+  data_source_id: string;
+  source_url: string;
+  last_refreshed_at: string | null;
+  last_error: string | null;
+}
+
+export interface NotionConnectionStatus {
+  connected: boolean;
+  sourceUrl: string | null;
+  lastRefreshedAt: string | null;
+  lastError: string | null;
+  recipeCount: number;
+}
+
+export interface NotionRefreshResult extends NotionConnectionStatus {
+  added: number;
+  updated: number;
+  removed: number;
+}
+
 export interface ParsedRecipe {
   title: string;
   description: string | null;
@@ -44,7 +67,7 @@ export interface ParsedRecipe {
 
 export interface Session {
   id: string;
-  host_id: string;
+  host_id: string | null;
   invite_code: string;
   status: 'open' | 'closed';
   mode: SessionMode;

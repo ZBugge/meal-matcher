@@ -1,63 +1,56 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { createServer } from 'node:net';
-import { tmpdir } from 'node:os';
+import { randomUUID, randomBytes } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
-import { chromium } from '@playwright/test';
+import { createServer } from 'node:http';
+import { chromium, expect } from '@playwright/test';
+import { startLocalWorker } from './worker-local.mjs';
+import { privateDirectory } from './local-paths.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
-async function reservePort() {
-  const server = createServer();
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+// A real previous script is served at the same origin before updating to the
+// current Worker asset. Browser request interception interferes with Chromium's
+// offline navigation, so this fixture uses a loopback HTTP transport instead.
+async function previousServiceWorkerOrigin(base, script) {
+  let previous = true;
+  const server = createServer(async (request, response) => {
+    try {
+      if (request.method !== 'GET') { response.writeHead(405); response.end(); return; }
+      const url = new URL(request.url, base);
+      if (url.pathname === '/sw.js' && previous) {
+        response.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-cache' });
+        response.end(script.replace('mealmatch-public-v1', 'mealmatch-public-previous-fixture')); return;
+      }
+      const upstream = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      const headers = Object.fromEntries(upstream.headers);
+      for (const name of ['connection', 'transfer-encoding', 'content-encoding', 'content-length']) delete headers[name];
+      response.writeHead(upstream.status, headers);
+      response.end(Buffer.from(await upstream.arrayBuffer()));
+    } catch { response.writeHead(502); response.end(); }
   });
-  const port = server.address().port;
-  await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
-  return port;
-}
-
-async function stop(child, exited) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  child.kill('SIGTERM');
-  if (await Promise.race([exited.then(() => true), delay(2000, false, { ref: false })])) return;
-  child.kill('SIGKILL');
-  assert(await Promise.race([exited.then(() => true), delay(2000, false, { ref: false })]), 'Production process did not stop');
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  return { origin: `http://127.0.0.1:${server.address().port}`, update: () => { previous = false; }, close: async () => { server.closeAllConnections(); await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())); } };
 }
 
 async function smoke() {
   const started = Date.now();
-  const directory = await mkdtemp(path.join(tmpdir(), 'mealmatch-production-'));
-  let child;
-  let exited;
+  const directory = path.join(root, '.verification', `production-${randomUUID()}`);
+  await privateDirectory(root, directory);
+  const secrets = { SESSION_SECRET: randomBytes(48).toString('base64'), NOTION_ENCRYPTION_KEY: randomBytes(32).toString('base64') };
+  let active;
   try {
-    const port = await reservePort();
-    const base = `http://127.0.0.1:${port}`;
-    const environment = { ...process.env, NODE_ENV: 'production', PORT: String(port),
-      DATABASE_PATH: path.join(directory, 'database.db'), SESSION_SECRET: randomUUID() };
+    active = await startLocalWorker({ directory, secrets });
+    const base = new URL(active.url).origin;
+    const port = Number(new URL(base).port);
     const html = await readFile(path.join(root, 'client/dist/index.html'), 'utf8');
     const assets = [...html.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css)(?:\?[^"']*)?)["']/g)].map(match => match[1]);
     assert(assets.some(asset => asset.endsWith('.js')), 'Compiled client has no JavaScript asset');
-    child = spawn(process.execPath, [path.join(root, 'server/dist/index.js')], {
-      cwd: root,
-      env: environment,
-      stdio: 'ignore', windowsHide: true,
-    });
-    let spawnError;
-    exited = new Promise(resolve => {
-      child.once('exit', resolve);
-      child.once('error', error => { spawnError = error; resolve(); });
-    });
     const request = (route, options = {}) => fetch(`${base}${route}`, { ...options, signal: AbortSignal.timeout(3000) });
     const deadline = Date.now() + 15_000;
     while (true) {
-      if (spawnError) throw new Error('Could not start compiled production server');
-      assert(child.exitCode === null && child.signalCode === null, 'Compiled production server exited before readiness');
       try {
         const health = await request('/api/health');
         if (health.ok && (await health.json()).status === 'ok') break;
@@ -65,7 +58,7 @@ async function smoke() {
       assert(Date.now() < deadline, 'Compiled production server readiness timed out');
       await delay(50);
     }
-    for (const route of ['/', '/join/SMOKE2', '/results/production-smoke']) {
+    for (const route of ['/', '/week', '/shopping', '/recipes', '/join/SMOKE2', '/results/production-smoke']) {
       const response = await request(route);
       assert.equal(response.status, 200, `SPA route failed: ${route}`);
       assert.match(response.headers.get('content-type') ?? '', /text\/html/, 'SPA response must be HTML');
@@ -78,6 +71,13 @@ async function smoke() {
       assert.equal(response.status, 200, 'Compiled asset request failed');
       assert.match(response.headers.get('content-type') ?? '', asset.includes('.css') ? /text\/css/ : /javascript/, 'Wrong compiled asset content type');
       assert((await response.arrayBuffer()).byteLength > 0, 'Compiled asset is empty');
+      assert.match(response.headers.get('cache-control') ?? '', /immutable/, 'Fingerprint asset cache policy missing');
+    }
+    for (const route of ['/api', '/api/does-not-exist']) {
+      const response = await request(route, { headers: { Accept: 'text/html', 'Sec-Fetch-Mode': 'navigate' } });
+      assert.equal(response.status, 404);
+      assert.match(response.headers.get('content-type') ?? '', /application\/json/);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
     }
     const json = async (route, body, status = 200, headers = {}) => {
       const response = await request(route, body === undefined ? { headers } : {
@@ -115,10 +115,11 @@ async function smoke() {
     assert(result.results.every(option => !('voters' in option)), 'Public production results leaked voter identities');
     await json(`/api/swipes/${sessionId}`, { participantId: joined.participantId, swipes: [{ mealId: created.meals[0].id, vote: 0 }] }, 400);
 
-    // Simulate the trusted HTTPS reverse proxy, and explicitly carry its Secure
-    // cookie. The anonymous lifecycle above does not depend on HTTP cookies.
-    const registration = await request('/api/auth/register', {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-proto': 'https' },
+    // Dispatch the actual HTTPS Request URL. This proves protocol/cookie behavior,
+    // not hosted TLS; client-controlled forwarded headers must not grant trust.
+    const secureRequest = (route, options = {}) => active.runtime.dispatchFetch(`https://127.0.0.1:${port}${route}`, options);
+    const registration = await secureRequest('/api/auth/register', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-proto': 'http' },
       body: JSON.stringify({ email: 'production-smoke@example.test', password: randomUUID() }),
     });
     assert.equal(registration.status, 201, 'Production proxy registration failed');
@@ -127,21 +128,23 @@ async function smoke() {
     for (const attribute of [/;\s*Secure(?:;|$)/i, /;\s*HttpOnly(?:;|$)/i, /;\s*SameSite=Lax(?:;|$)/i]) {
       assert(attribute.test(cookie), 'Production session cookie lacks a required security attribute');
     }
-    const account = await json('/api/auth/me', undefined, 200, { cookie: cookie.split(';')[0], 'x-forwarded-proto': 'https' });
+    const accountResponse = await secureRequest('/api/auth/me', { headers: { cookie: cookie.split(';')[0] } });
+    assert.equal(accountResponse.status, 200);
+    const account = await accountResponse.json();
     assert.equal(account.email, 'production-smoke@example.test', 'Production session cookie did not authenticate');
-    await stop(child, exited);
-    child = spawn(process.execPath, [path.join(root, 'server/dist/index.js')], { cwd: root, env: environment, stdio: 'ignore', windowsHide: true });
-    let restartError;
-    exited = new Promise(resolve => { child.once('exit', resolve); child.once('error', error => { restartError = error; resolve(); }); });
+    await active.runtime.dispose();
+    active = await startLocalWorker({ directory, secrets, port, migrate: false });
     const restartDeadline = Date.now() + 15000;
     while (true) {
-      assert(!restartError && child.exitCode === null && child.signalCode === null, 'Production restart failed');
       try { const health = await request('/api/health'); if (health.ok) break; } catch { /* starting */ }
       assert(Date.now() < restartDeadline, 'Production restart timed out');
       await delay(50);
     }
-    const resumed = await json('/api/auth/me', undefined, 200, { cookie: cookie.split(';')[0], 'x-forwarded-proto': 'https' });
+    const resumedResponse = await secureRequest('/api/auth/me', { headers: { cookie: cookie.split(';')[0] } });
+    assert.equal(resumedResponse.status, 200);
+    const resumed = await resumedResponse.json();
     assert.equal(resumed.email, 'production-smoke@example.test', 'Family login was lost after server restart');
+    assert.equal((await json(`/api/results/${sessionId}`)).status, 'closed', 'Accepted voting data lost after Worker restart');
     const manifest = await (await request('/manifest.webmanifest')).json();
     assert.equal(manifest.display, 'standalone');
     assert.equal(manifest.start_url, '/week');
@@ -151,31 +154,37 @@ async function smoke() {
       assert.match(response.headers.get('content-type') ?? '', /image\/png/);
     }
     const browser = await chromium.launch({ headless: true });
+    let pwa;
     try {
       const context = await browser.newContext();
+      const serviceWorker = await readFile(path.join(root, 'client/dist/sw.js'), 'utf8');
+      assert(serviceWorker.includes('mealmatch-public-v1'));
+      pwa = await previousServiceWorkerOrigin(base, serviceWorker);
       const page = await context.newPage();
-      await page.goto(`${base}/quick`);
+      await page.goto(`${pwa.origin}/quick`);
       await page.waitForFunction(() => !!navigator.serviceWorker.controller, undefined, { timeout: 10000 });
+      assert(await page.evaluate(() => caches.has('mealmatch-public-previous-fixture')), 'Previous service worker fixture did not install');
+      pwa.update();
+      await page.evaluate(async () => { const registration = await navigator.serviceWorker.getRegistration(); await registration.update(); });
+      await expect.poll(() => page.evaluate(async () => (await caches.has('mealmatch-public-v1')) && !(await caches.has('mealmatch-public-previous-fixture'))), { timeout: 10000 }).toBe(true);
+      await expect.poll(() => page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.getRegistration();
+        return registration?.active?.state === 'activated' && navigator.serviceWorker.controller === registration.active && !!(await caches.match('/offline.html'));
+      }), { timeout: 10000 }).toBe(true);
       const privateCached = await page.evaluate(async () => {
         const keys = await caches.keys();
         const urls = (await Promise.all(keys.map(async key => (await (await caches.open(key)).keys()).map(request => request.url)))).flat();
-        return urls.some(url => new URL(url).pathname.startsWith('/api/'));
+        return urls.some(url => { const pathname = new URL(url).pathname; return pathname === '/api' || pathname.startsWith('/api/'); });
       });
       assert.equal(privateCached, false, 'Service worker cached private API data');
       await context.setOffline(true);
-      await page.goto(`${base}/week`);
+      assert(await page.evaluate(async () => { try { await fetch('/api', { headers: { Accept: 'text/html' } }); return false; } catch { return true; } }), 'Offline API navigation received HTML instead of a network failure');
+      await page.goto(`${pwa.origin}/week`);
       assert.match(await page.locator('h1').innerText(), /connection away/);
-    } finally { await browser.close(); }
-    return { success: true, elapsedMs: Date.now() - started, checks: ['compiled-spa', 'compiled-assets', 'anonymous-lifecycle', 'public-results', 'https-proxy-cookie', 'persistent-login-restart', 'pwa-installation-offline-fallback'] };
+    } finally { await browser.close(); if (pwa) await pwa.close(); }
+    return { success: true, runtime: 'Worker/StaticAssets/D1', hostedTlsVerified: false, elapsedMs: Date.now() - started, checks: ['compiled-spa', 'compiled-assets', 'anonymous-lifecycle', 'public-results', 'actual-url-secure-cookie', 'persistent-login-and-votes-restart', 'pwa-install-update-offline-private-api-exclusion'] };
   } finally {
-    try {
-      if (child && exited) await stop(child, exited);
-    } finally {
-      const resolved = path.resolve(directory);
-      assert.equal(path.dirname(resolved), path.resolve(tmpdir()), 'Refusing cleanup outside temporary directory');
-      assert(path.basename(resolved).startsWith('mealmatch-production-'), 'Refusing cleanup of unrelated directory');
-      await rm(resolved, { recursive: true, force: true });
-    }
+    if (active) await active.runtime.dispose();
   }
 }
 

@@ -1,0 +1,773 @@
+{
+  "version": 1,
+  "sourceBase": "e02b38d9f988b9a3cc8e70c52e894a998db2a3a5",
+  "sourceOverlay": "23fileNotion snapshot; .verification/migration/notion-baseline-source",
+  "package": "client",
+  "tests": [
+    {
+      "file": "src/api/client.test.ts",
+      "name": " API Client - Session Closed Handling should throw ApiException with sessionClosed flag when session is closed",
+      "occurrence": 0
+    },
+    {
+      "file": "src/api/client.test.ts",
+      "name": " API Client - Session Closed Handling should throw ApiException without sessionClosed flag for other errors",
+      "occurrence": 0
+    },
+    {
+      "file": "src/api/client.test.ts",
+      "name": " API Client - Session Closed Handling preserves the existing record ID for duplicate library options",
+      "occurrence": 0
+    },
+    {
+      "file": "src/api/client.test.ts",
+      "name": " API Client - Session Closed Handling sends recipe instructions and two-field ingredient rows for home meals",
+      "occurrence": 0
+    },
+    {
+      "file": "src/api/client.test.ts",
+      "name": " API Client - Session Closed Handling sends full recipe text to the authenticated parser",
+      "occurrence": 0
+    },
+    {
+      "file": "src/api/client.test.ts",
+      "name": " API Client - Session Closed Handling loads one host-owned meal for the read-only recipe viewer",
+      "occurrence": 0
+    },
+    {
+      "file": "src/api/client.test.ts",
+      "name": " API Client - Session Closed Handling sends private library notes only to the authenticated meal endpoint",
+      "occurrence": 0
+    },
+    {
+      "file": "src/api/client.test.ts",
+      "name": " API Client - Session Closed Handling previews and confirms versioned library imports",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/AddToWeek.test.tsx",
+      "name": " AddToWeek target identity isolates pending responses and resets added state when week or recipe changes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/ConfirmModal.test.tsx",
+      "name": " ConfirmModal should not render when isOpen is false",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/ConfirmModal.test.tsx",
+      "name": " ConfirmModal should render when isOpen is true",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/ConfirmModal.test.tsx",
+      "name": " ConfirmModal should call onConfirm when Confirm button is clicked",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/ConfirmModal.test.tsx",
+      "name": " ConfirmModal should call onCancel when cancel button is clicked",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/ConfirmModal.test.tsx",
+      "name": " ConfirmModal handles native Escape dismissal through the cancel event",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/ConfirmModal.test.tsx",
+      "name": " ConfirmModal blocks dismissal and repeat confirmation while saving",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/ConfirmModal.test.tsx",
+      "name": " ConfirmModal should display multiline messages correctly",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/NotionConnection.test.tsx",
+      "name": " Notion connection controls connects explicitly with private token input, clears it on success and reloads recipes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/NotionConnection.test.tsx",
+      "name": " Notion connection controls blocks duplicate refreshes, preserves the last successful status on failure and requires explicit retry",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/NotionConnection.test.tsx",
+      "name": " Notion connection controls disconnects access while retaining recipe copies and offers reconnect",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeCard.test.tsx",
+      "name": " SwipeCard should render card with title and description",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeCard.test.tsx",
+      "name": " SwipeCard should render progress indicator",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeCard.test.tsx",
+      "name": " SwipeCard should render without description when null",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeCard.test.tsx",
+      "name": " SwipeCard should render text hint when hintStyle is text",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeCard.test.tsx",
+      "name": " SwipeCard should keep text hint when hintStyle is bounce",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeCard.test.tsx",
+      "name": " SwipeCard should keep text hint when hintStyle is arrows",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeCard.test.tsx",
+      "name": " SwipeCard should render No and Yes indicators on the card",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeCard.test.tsx",
+      "name": " SwipeCard should apply stronger shadow and border styles to card",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeCard.test.tsx",
+      "name": " SwipeCard offers clearly labelled No and Yes tap choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeDeck.test.tsx",
+      "name": " SwipeDeck shows the intro only on the first card and keeps guidance after Back",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeDeck.test.tsx",
+      "name": " SwipeDeck does not replay an intro when restoring a later cursor and going Back",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeDeck.test.tsx",
+      "name": " SwipeDeck should auto-submit when all swipes are done (not in edit mode)",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeDeck.test.tsx",
+      "name": " SwipeDeck should show display-only review when not in edit mode",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeDeck.test.tsx",
+      "name": " SwipeDeck should show editable review when in edit mode",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeDeck.test.tsx",
+      "name": " SwipeDeck should allow vote changes in edit mode",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeDeck.test.tsx",
+      "name": " SwipeDeck should NOT allow vote changes when not in edit mode",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeDeck.test.tsx",
+      "name": " SwipeDeck should call onComplete when Submit Votes is clicked in edit mode",
+      "occurrence": 0
+    },
+    {
+      "file": "src/components/SwipeDeck.test.tsx",
+      "name": " SwipeDeck should display vote labels correctly",
+      "occurrence": 0
+    },
+    {
+      "file": "src/lib/shopping.test.ts",
+      "name": " shopping consolidation normalizes case/spacing and preserves each source contribution",
+      "occurrence": 0
+    },
+    {
+      "file": "src/lib/shopping.test.ts",
+      "name": " shopping consolidation sums only compatible understood units and keeps ambiguous text intact",
+      "occurrence": 0
+    },
+    {
+      "file": "src/lib/shopping.test.ts",
+      "name": " shopping consolidation separates states and explicit aisle choices, leaving unknown items Other",
+      "occurrence": 0
+    },
+    {
+      "file": "src/hooks/useLocalStorage.test.tsx",
+      "name": " swipe progress recovery hydrates a changed key without writing placeholder or prior participant data over it",
+      "occurrence": 0
+    },
+    {
+      "file": "src/hooks/useLocalStorage.test.tsx",
+      "name": " swipe progress recovery removes cleared drafts and does not recreate them as JSON null",
+      "occurrence": 0
+    },
+    {
+      "file": "src/hooks/useLocalStorage.test.tsx",
+      "name": " swipe progress recovery ignores a draft from a different participant or session",
+      "occurrence": 0
+    },
+    {
+      "file": "src/hooks/useLocalStorage.test.tsx",
+      "name": " swipe progress recovery persists the explicit cursor when revisiting an already voted option",
+      "occurrence": 0
+    },
+    {
+      "file": "src/hooks/useLocalStorage.test.tsx",
+      "name": " swipe progress recovery applies functional updates to the current key",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should show Edit button when meals exist",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should not show Edit button when no meals exist",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete shows each meal's last selection date or that it has never been selected",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should toggle edit mode when Edit button is clicked",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should show checkboxes in edit mode",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should hide delete buttons in edit mode",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should show bulk delete button when items are selected",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should toggle a meal once when its card or checkbox is clicked in edit mode",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should show confirmation modal for single delete",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should show confirmation modal for bulk delete",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should cancel single delete when Cancel is clicked",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should delete meal when confirmed",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should delete multiple meals in bulk",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should exit edit mode after bulk delete",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should apply red background during single meal deletion",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should apply red background during bulk deletion",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Mode and Delete should clear selection when toggling back to Done",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Meal Functionality should show edit button for each meal",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Meal Functionality should hide edit buttons in edit mode",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Meal Functionality should open edit modal when edit button is clicked",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Meal Functionality should populate form with meal data",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Meal Functionality should close modal when Cancel is clicked",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Meal Functionality should update meal when form is submitted",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Meal Functionality should update meal list after successful edit",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Meal Functionality should require title field",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Meal Functionality should handle description as optional",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Edit Meal Functionality should show error message when update fails",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Quick Add Meal in Create Session should display quick add input in create session modal",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Quick Add Meal in Create Session should add meal via quick add and auto-select it",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Quick Add Meal in Create Session should clear input after quick add",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Quick Add Meal in Create Session should submit quick add on Enter key",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Quick Add Meal in Create Session should disable Add button when input is empty",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Quick Add Meal in Create Session should trim whitespace from quick add input",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Quick Add Meal in Create Session should handle API error in quick add",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Home and takeout modes filters the library by tab and opens the session modal in the active mode",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Home and takeout modes saves and selects a missing takeout suggestion in one action",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Home and takeout modes only saves checked popular categories when onboarding is submitted",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Home and takeout modes keeps popular categories out of the normal add-category form after choosing to add its own",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Private Recipes edits instructions and ordered two-field ingredient rows",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Private Recipes creates a home meal with an optional private recipe",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Private Recipes fills the editable meal form from backend-parsed recipe text",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Private Recipes opens a readable recipe by clicking its library name",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Private Recipes opens the selected meal recipe from Recent Sessions",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Private Recipes saves notes through a deliberate action without displaying them on the library card",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Private Recipes opens the notes action for takeout categories",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Private Recipes does not show a winner heading when a closed session has no final selection",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Private Recipes previews duplicates before importing a library file",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Dashboard.test.tsx",
+      "name": " Dashboard - Private Recipes does not show recipe fields for takeout categories",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/planning-navigation.test.tsx",
+      "name": " planning week navigation closes a dated picker and clears its date/search when the query week changes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/planning-navigation.test.tsx",
+      "name": " planning week navigation discards old repeat selections and sends only the newly reviewed week IDs",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/planning-navigation.test.tsx",
+      "name": " planning week navigation does not let a pending old-week save replace the new week or its busy state",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/planning-navigation.test.tsx",
+      "name": " planning week navigation resets pantry selections on week navigation and isolates an old bulk failure",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/QuickSession.test.tsx",
+      "name": " QuickSession should render the quick session form",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/QuickSession.test.tsx",
+      "name": " QuickSession should start with one meal input",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/QuickSession.test.tsx",
+      "name": " QuickSession should add meal inputs when clicking add button",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/QuickSession.test.tsx",
+      "name": " QuickSession should remove meal inputs when clicking remove button",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/QuickSession.test.tsx",
+      "name": " QuickSession should not allow removing the last meal input",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/QuickSession.test.tsx",
+      "name": " QuickSession should show error if name is empty",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/QuickSession.test.tsx",
+      "name": " QuickSession should show error if no meal options are provided",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/QuickSession.test.tsx",
+      "name": " QuickSession should create session and navigate on success",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/QuickSession.test.tsx",
+      "name": " QuickSession should handle API errors",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/QuickSession.test.tsx",
+      "name": " QuickSession adds takeout suggestions without creating duplicate option names",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/QuickSession.test.tsx",
+      "name": " QuickSession preserves separate drafts when switching between takeout and home",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Recipes.test.tsx",
+      "name": " dedicated Recipes destination separates Notion and regular recipes, offers Notion editing and retains accepted copies after a failed refresh",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Recipes.test.tsx",
+      "name": " dedicated Recipes destination opens to searchable saved recipes and keeps management out of the list",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Recipes.test.tsx",
+      "name": " dedicated Recipes destination opens recipe actions and nested reading with exact private content and focus restoration",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Recipes.test.tsx",
+      "name": " dedicated Recipes destination retains failed recipe drafts and blocks duplicate saves",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Recipes.test.tsx",
+      "name": " dedicated Recipes destination keeps deletion failures inside the top confirmation",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Recipes.test.tsx",
+      "name": " dedicated Recipes destination offers import, export and selective deletion inside Manage library",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Recipes.test.tsx",
+      "name": " recipe time and effort combines time, exact effort, and search while retaining unknown recipes until filtered",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Recipes.test.tsx",
+      "name": " recipe time and effort retains known values during unrelated edits and supports explicit clearing",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Recipes.test.tsx",
+      "name": " keeps home time and effort filters out of takeout results and category forms",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Recipes.test.tsx",
+      "name": " keeps time and effort drafts when a pasted recipe fills other fields",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Results.recipe.test.tsx",
+      "name": " Results - Host recipe viewer opens a private recipe when the authenticated host clicks a result name",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Results.recipe.test.tsx",
+      "name": " Results - Host recipe viewer keeps result names non-interactive when the logged-in user is not the host",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Results.test.tsx",
+      "name": " Results - Update Choices should show \"Update Your Choices\" button when session is waiting and user has session data",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Results.test.tsx",
+      "name": " Results - Update Choices should NOT show \"Update Your Choices\" button when session data is missing",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Results.test.tsx",
+      "name": " Results - Update Choices should navigate to SwipeSession with editMode when Update Your Choices is clicked",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Results.test.tsx",
+      "name": " Results - Update Choices should NOT show \"Update Your Choices\" button when session is closed",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/Results.test.tsx",
+      "name": " Results - Update Choices keeps failed anonymous closure inside its native confirmation for retry",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping keeps compact rows and opens exact ordered contributions only on request",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping preserves exact amounts and a visible manual-copy fallback when clipboard access fails",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping applies pantry selections as have, disables completed purchases during review, and cancels without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping preserves extra-item fields on failure and reports the error inside the sheet",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping edits only one contribution, preserves failed drafts, and keeps the sheet open after regrouping",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping keeps selections and an actionable error on failed pantry application",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping reverts a failed optimistic purchase and disables competing mutations while saving",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping saves, edits and removes usual groceries without changing the selected week",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping retains selected usual groceries and the existing list after a failed apply, and retries explicitly",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping offers explicit retry when usual grocery loading fails",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping preserves failed saved-grocery drafts and leaves failed deletes available for retry",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/ShoppingList.test.tsx",
+      "name": " compact shopping does not put a late recurring apply response into a newly selected week",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/SwipeSession.test.tsx",
+      "name": " SwipeSession - Edit Mode should pass editMode=false to SwipeDeck by default",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/SwipeSession.test.tsx",
+      "name": " SwipeSession - Edit Mode should pass editMode=true to SwipeDeck when location.state.editMode is true",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/SwipeSession.test.tsx",
+      "name": " SwipeSession - Edit Mode should set initialIndex to meals.length in edit mode",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/SwipeSession.test.tsx",
+      "name": " SwipeSession - Edit Mode stores accepted choices and cancels delayed navigation when unmounted",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/SwipeSession.test.tsx",
+      "name": " SwipeSession - Edit Mode does not retain another session context when the route changes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/SwipeSession.test.tsx",
+      "name": " SwipeSession - Visual Improvements should render with darker gradient background",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/SwipeSession.test.tsx",
+      "name": " SwipeSession - Visual Improvements keeps the voting screen free of development hint switches",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/SwipeSession.test.tsx",
+      "name": " SwipeSession - Visual Improvements should display user greeting",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/WeekPlan.test.tsx",
+      "name": " compact week planning keeps every same-day dinner and flexible dinner independently reachable, with voting near the agenda",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/WeekPlan.test.tsx",
+      "name": " compact week planning shows Tonight only for the current week",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/WeekPlan.test.tsx",
+      "name": " compact week planning shows Tonight on the current week",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/WeekPlan.test.tsx",
+      "name": " compact week planning loads recipes in a native dialog, distinguishes errors from empty results, and retries explicitly",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/WeekPlan.test.tsx",
+      "name": " compact week planning sends the explicit selected date when adding takeout",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/WeekPlan.test.tsx",
+      "name": " compact week planning saves a dinner night explicitly, preserving its entry ID",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/WeekPlan.test.tsx",
+      "name": " compact week planning keeps the dinner dialog and scroll lock when removal is cancelled, then restores the initiating focus",
+      "occurrence": 0
+    },
+    {
+      "file": "src/pages/WeekPlan.test.tsx",
+      "name": " compact week planning retains the selected grocery-removal choice and shows failures without closing confirmation",
+      "occurrence": 0
+    }
+  ]
+}

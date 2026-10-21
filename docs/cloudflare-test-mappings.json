@@ -1,0 +1,271 @@
+{
+  "version": 1,
+  "renames": [
+    {
+      "legacy": {
+        "file": "src/db/planning-schema.test.ts",
+        "name": " Planning schema compatibility creates identical durable planning tables (legacy database: false)"
+      },
+      "replacement": {
+        "file": "src/db/planning-schema.test.ts",
+        "name": " Planning schema compatibility keeps planning columns, indexes and records after fresh migration"
+      },
+      "reason": "The target runtime uses versioned D1 migrations after strict legacy preflight/import. This test preserves field/index/default/ordering/snapshot/restart assertions against actual D1; it does not claim to auto-upgrade unsupported partial legacy schemas. Former ignored legacy flags are replaced by distinct fresh/reopened planning checks or home/takeout populated-session checks."
+    },
+    {
+      "legacy": {
+        "file": "src/db/planning-schema.test.ts",
+        "name": " Planning schema compatibility creates identical durable planning tables (legacy database: true)"
+      },
+      "replacement": {
+        "file": "src/db/planning-schema.test.ts",
+        "name": " Planning schema compatibility keeps planning columns, indexes and records after Worker reopen"
+      },
+      "reason": "The target runtime uses versioned D1 migrations after strict legacy preflight/import. This test preserves field/index/default/ordering/snapshot/restart assertions against actual D1; it does not claim to auto-upgrade unsupported partial legacy schemas. Former ignored legacy flags are replaced by distinct fresh/reopened planning checks or home/takeout populated-session checks."
+    },
+    {
+      "legacy": {
+        "file": "src/db/schema.test.ts",
+        "name": " database schema migrations migrates existing meals and sessions to the mode-aware schema"
+      },
+      "replacement": {
+        "file": "src/db/schema.test.ts",
+        "name": " versioned D1 schema provides mode, onboarding, recipe and Notion columns and defaults"
+      },
+      "reason": "The target runtime uses versioned D1 migrations after strict legacy preflight/import. This test preserves field/index/default/ordering/snapshot/restart assertions against actual D1; it does not claim to auto-upgrade unsupported partial legacy schemas. Former ignored legacy flags are replaced by distinct fresh/reopened planning checks or home/takeout populated-session checks."
+    },
+    {
+      "legacy": {
+        "file": "src/db/schema.test.ts",
+        "name": " database schema migrations creates recipe storage in a fresh database"
+      },
+      "replacement": {
+        "file": "src/db/schema.test.ts",
+        "name": " versioned D1 schema creates recipe storage through the versioned D1 migrations"
+      },
+      "reason": "The target runtime uses versioned D1 migrations after strict legacy preflight/import. This test preserves field/index/default/ordering/snapshot/restart assertions against actual D1; it does not claim to auto-upgrade unsupported partial legacy schemas. Former ignored legacy flags are replaced by distinct fresh/reopened planning checks or home/takeout populated-session checks."
+    },
+    {
+      "legacy": {
+        "file": "src/db/schema.test.ts",
+        "name": " database schema migrations preserves populated durable data after reopening (legacy additions: false)"
+      },
+      "replacement": {
+        "file": "src/db/schema.test.ts",
+        "name": " versioned D1 schema preserves populated home sessions and private library data across a Worker restart"
+      },
+      "reason": "The target runtime uses versioned D1 migrations after strict legacy preflight/import. This test preserves field/index/default/ordering/snapshot/restart assertions against actual D1; it does not claim to auto-upgrade unsupported partial legacy schemas. Former ignored legacy flags are replaced by distinct fresh/reopened planning checks or home/takeout populated-session checks."
+    },
+    {
+      "legacy": {
+        "file": "src/db/schema.test.ts",
+        "name": " database schema migrations preserves populated durable data after reopening (legacy additions: true)"
+      },
+      "replacement": {
+        "file": "src/db/schema.test.ts",
+        "name": " versioned D1 schema preserves populated takeout sessions and private library data across a Worker restart"
+      },
+      "reason": "The target runtime uses versioned D1 migrations after strict legacy preflight/import. This test preserves field/index/default/ordering/snapshot/restart assertions against actual D1; it does not claim to auto-upgrade unsupported partial legacy schemas. Former ignored legacy flags are replaced by distinct fresh/reopened planning checks or home/takeout populated-session checks."
+    },
+    {
+      "legacy": {
+        "file": "src/db/schema.test.ts",
+        "name": " database schema migrations adds aisle and staple storage to existing family plans without losing progress"
+      },
+      "replacement": {
+        "file": "src/db/schema.test.ts",
+        "name": " versioned D1 schema persists aisle defaults and household staples alongside existing planning progress"
+      },
+      "reason": "The target runtime uses versioned D1 migrations after strict legacy preflight/import. This test preserves field/index/default/ordering/snapshot/restart assertions against actual D1; it does not claim to auto-upgrade unsupported partial legacy schemas. Former ignored legacy flags are replaced by distinct fresh/reopened planning checks or home/takeout populated-session checks."
+    },
+    {
+      "legacy": {
+        "file": "src/db/schema.test.ts",
+        "name": " database schema migrations adds recipe metadata and recurring groceries to populated pre-pilot databases and reopens safely"
+      },
+      "replacement": {
+        "file": "src/db/schema.test.ts",
+        "name": " versioned D1 schema persists recipe metadata, recurring groceries and unique weekly applications across a Worker restart"
+      },
+      "reason": "The target runtime uses versioned D1 migrations after strict legacy preflight/import. This test preserves field/index/default/ordering/snapshot/restart assertions against actual D1; it does not claim to auto-upgrade unsupported partial legacy schemas. Former ignored legacy flags are replaced by distinct fresh/reopened planning checks or home/takeout populated-session checks."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API rolls back an insert failure, including submitted=false and persisted bytes"
+      },
+      "replacement": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API rolls back a second-row D1 insert failure, including submitted=false and durable records"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API rolls back an insert failure, including submitted=true and persisted bytes"
+      },
+      "replacement": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API rolls back a second-row D1 insert failure, including submitted=true and durable records"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API restores memory and disk when a partial write fails with submitted=false"
+      },
+      "replacement": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API preserves accepted records when a late D1 batch fails with submitted=false"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API restores memory and disk when a partial write fails with submitted=true"
+      },
+      "replacement": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API preserves accepted records when a late D1 batch fails with submitted=true"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API preserves memory and disk when atomic file replacement fails"
+      },
+      "replacement": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API preserves the accepted ballot after a late D1 rejection and Worker restart"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API retries transient EPERM file locks and persists the complete ballot"
+      },
+      "replacement": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API allows explicit retry after rejected D1 batches and durably preserves vote 0"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API retries transient EACCES file locks and persists the complete ballot"
+      },
+      "replacement": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API allows explicit retry after rejected D1 batches and durably preserves vote 1"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API retries transient EBUSY file locks and persists the complete ballot"
+      },
+      "replacement": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API allows explicit retry after rejected D1 batches and durably preserves vote 2"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API bounds persistent file-lock retries and preserves the accepted ballot"
+      },
+      "replacement": {
+        "file": "src/routes/swipes.test.ts",
+        "name": " Swipe HTTP API preserves the accepted ballot when a D1 commit remains unavailable"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/services/notion-credentials.test.ts",
+        "name": " host-bound encrypted Notion credentials stores ciphertext and reuses a private persistent development key after restart"
+      },
+      "replacement": {
+        "file": "src/services/notion-credentials.test.ts",
+        "name": " host-bound encrypted Notion credentials encrypts without plaintext and decrypts with a stable Worker secret binding"
+      },
+      "reason": "D1 Worker credentials require an explicit stable secret binding; there is no filesystem key generation or fallback. Original encryption, owner authentication, malformed/missing-key and stability assertions remain."
+    },
+    {
+      "legacy": {
+        "file": "src/services/notion-credentials.test.ts",
+        "name": " host-bound encrypted Notion credentials requires a valid configured key in production and never falls back"
+      },
+      "replacement": {
+        "file": "src/services/notion-credentials.test.ts",
+        "name": " host-bound encrypted Notion credentials requires a valid Worker secret binding and authenticates the configured key"
+      },
+      "reason": "D1 Worker credentials require an explicit stable secret binding; there is no filesystem key generation or fallback. Original encryption, owner authentication, malformed/missing-key and stability assertions remain."
+    },
+    {
+      "legacy": {
+        "file": "src/services/notion-credentials.test.ts",
+        "name": " host-bound encrypted Notion credentials does not overwrite an existing malformed key or recreate a missing key during decryption"
+      },
+      "replacement": {
+        "file": "src/services/notion-credentials.test.ts",
+        "name": " host-bound encrypted Notion credentials rejects malformed or missing Worker keys without generating a replacement"
+      },
+      "reason": "D1 Worker credentials require an explicit stable secret binding; there is no filesystem key generation or fallback. Original encryption, owner authentication, malformed/missing-key and stability assertions remain."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/plans.test.ts",
+        "name": " Private weekly planning HTTP API reopens persisted plans, shopping states and edits from the on-disk database"
+      },
+      "replacement": {
+        "file": "src/routes/plans.test.ts",
+        "name": " Private weekly planning HTTP API reopens durable plans, shopping states and edits after a Worker restart"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/plans.test.ts",
+        "name": " Private weekly planning HTTP API restores accepted memory and persisted data on failed add, update, remove, and manual-item saves"
+      },
+      "replacement": {
+        "file": "src/routes/plans.test.ts",
+        "name": " Private weekly planning HTTP API preserves accepted D1 data when add, update, remove, and manual-item batches fail"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/plans.test.ts",
+        "name": " Private weekly planning HTTP API restores templates and all selected snapshots when disk persistence fails"
+      },
+      "replacement": {
+        "file": "src/routes/plans.test.ts",
+        "name": " Private weekly planning HTTP API preserves templates and all selected snapshots when a late D1 commit fails"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    },
+    {
+      "legacy": {
+        "file": "src/routes/notion.test.ts",
+        "name": " Account-owned Notion connection and atomic refresh retains every accepted value after remote errors, validation errors, failed replacement and disk failure"
+      },
+      "replacement": {
+        "file": "src/routes/notion.test.ts",
+        "name": " Account-owned Notion connection and atomic refresh retains every accepted value after remote errors, validation errors, failed replacement and late D1 failure"
+      },
+      "reason": "D1 owns filesystem persistence. Real late SQLite trigger failures replace Node filesystem injection; accepted record snapshots, submitted flags, explicit retry, numeric votes and actual Worker restart durability remain asserted. Former unused lock-code cases now exercise distinct votes 0, 1 and 2."
+    }
+  ],
+  "clientRenames": [],
+  "browserRenames": []
+}

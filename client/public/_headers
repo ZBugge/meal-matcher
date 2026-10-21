@@ -1,0 +1,4 @@
+# HTML, service worker and manifest use Static Assets' default revalidation.
+# Only fingerprinted Vite assets receive long-lived browser caching.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -1,0 +1,1012 @@
+{
+  "version": 1,
+  "sourceBase": "e02b38d9f988b9a3cc8e70c52e894a998db2a3a5",
+  "sourceOverlay": "23fileNotion snapshot; .verification/migration/notion-baseline-source",
+  "tests": [
+    {
+      "file": "src/db/planning-schema.test.ts",
+      "name": " Planning schema compatibility creates identical durable planning tables (legacy database: false)",
+      "occurrence": 0
+    },
+    {
+      "file": "src/db/planning-schema.test.ts",
+      "name": " Planning schema compatibility creates identical durable planning tables (legacy database: true)",
+      "occurrence": 0
+    },
+    {
+      "file": "src/db/schema.test.ts",
+      "name": " database schema migrations migrates existing meals and sessions to the mode-aware schema",
+      "occurrence": 0
+    },
+    {
+      "file": "src/db/schema.test.ts",
+      "name": " database schema migrations creates recipe storage in a fresh database",
+      "occurrence": 0
+    },
+    {
+      "file": "src/db/schema.test.ts",
+      "name": " database schema migrations preserves populated durable data after reopening (legacy additions: false)",
+      "occurrence": 0
+    },
+    {
+      "file": "src/db/schema.test.ts",
+      "name": " database schema migrations preserves populated durable data after reopening (legacy additions: true)",
+      "occurrence": 0
+    },
+    {
+      "file": "src/db/schema.test.ts",
+      "name": " database schema migrations adds aisle and staple storage to existing family plans without losing progress",
+      "occurrence": 0
+    },
+    {
+      "file": "src/db/schema.test.ts",
+      "name": " database schema migrations adds recipe metadata and recurring groceries to populated pre-pilot databases and reopens safely",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/meal-metadata.test.ts",
+      "name": " private recipe metadata retains omitted metadata, clears null, and protects ownership and public payloads",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/meal-metadata.test.ts",
+      "name": " private recipe metadata rejects invalid metadata before any write: {\"totalMinutes\":1.5}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/meal-metadata.test.ts",
+      "name": " private recipe metadata rejects invalid metadata before any write: {\"totalMinutes\":\"15\"}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/meal-metadata.test.ts",
+      "name": " private recipe metadata rejects invalid metadata before any write: {\"totalMinutes\":0}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/meal-metadata.test.ts",
+      "name": " private recipe metadata rejects invalid metadata before any write: {\"totalMinutes\":1441}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/meal-metadata.test.ts",
+      "name": " private recipe metadata rejects invalid metadata before any write: {\"totalMinutes\":true}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/meal-metadata.test.ts",
+      "name": " private recipe metadata rejects invalid metadata before any write: {\"effort\":\"hard\"}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/meal-metadata.test.ts",
+      "name": " private recipe metadata rejects invalid metadata before any write: {\"effort\":1}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/meal-metadata.test.ts",
+      "name": " private recipe metadata rejects category metadata and round-trips old and new transfer files with fresh IDs",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/meal-metadata.test.ts",
+      "name": " private recipe metadata restores accepted metadata, ingredients, and unrelated data after persistence failure",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/notion.test.ts",
+      "name": " Account-owned Notion connection and atomic refresh requires authentication on every operation and never writes on status reads",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/notion.test.ts",
+      "name": " Account-owned Notion connection and atomic refresh connects, encrypts credentials and isolates recipes and status per account",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/notion.test.ts",
+      "name": " Account-owned Notion connection and atomic refresh refreshes repeatedly without duplicates and updates ingredient-only changes and renames in place",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/notion.test.ts",
+      "name": " Account-owned Notion connection and atomic refresh preserves shopping snapshots/states when source recipes change, disappear and reappear",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/notion.test.ts",
+      "name": " Account-owned Notion connection and atomic refresh rejects local edits/archive/restore for linked recipes and protects public participant payloads",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/notion.test.ts",
+      "name": " Account-owned Notion connection and atomic refresh retains every accepted value after remote errors, validation errors, failed replacement and disk failure",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/notion.test.ts",
+      "name": " Account-owned Notion connection and atomic refresh serializes account connection changes and disconnects without deleting accepted recipe copies",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/notion.test.ts",
+      "name": " Account-owned Notion connection and atomic refresh creates the Notion tables and protects malformed connection requests",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/notion.test.ts",
+      "name": " Account-owned Notion connection and atomic refresh switches collections without overwriting regular recipes and restores original mapping IDs on return",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/notion.test.ts",
+      "name": " Account-owned Notion connection and atomic refresh restores accepted state after failed saves on initial connection and disconnection",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API reads an empty week without writing and requires authentication",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API preserves free amounts/order, dates, takeout and private shopping changes across additions and removals",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API plans owned quick-session meals and takeout without granting another host access",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API reopens persisted plans, shopping states and edits from the on-disk database",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects cross-owner reads/mutations and recipe access without exposing another family",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects malformed or missing options null without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects malformed or missing options %j without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects malformed or missing options {} without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects malformed or missing options {\"mealId\":12} without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects malformed or missing options {\"mealId\":[]} without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects malformed or missing options {\"mealId\":\"missing\"} without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects malformed or missing options {\"mealId\":\"placeholder\",\"date\":\"2026-10-19\"} without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects malformed or missing options {\"kind\":\"home\",\"title\":\"invented\"} without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects malformed or missing options {\"kind\":\"takeout\",\"title\":\"   \"} without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects malformed or missing options {\"kind\":\"takeout\",\"title\":7} without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API rejects malformed or missing options {\"kind\":\"takeout\",\"title\":\"Pizza\",\"date\":\"2026-02-30\"} without writes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API validates all entry/item fields and date boundaries before mutation",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API restores accepted memory and persisted data on failed add, update, remove, and manual-item saves",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API keeps requested groceries as editable standalone rows and always retains purchased progress",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API validates every bulk item and restores all accepted states if persistence fails",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API repeats a reviewed source selection with shifted dates, fresh groceries and IDs, appending atomically",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API persists editable/removable household dinner staples across weeks, privately and with rollback",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API applies selected usual groceries once per week and preserves snapshots after edits, deletion and reopening",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API validates every selected source and rejects foreign IDs before any mutation",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/plans.test.ts",
+      "name": " Private weekly planning HTTP API restores templates and all selected snapshots when disk persistence fails",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/quick-session.test.ts",
+      "name": " Quick session HTTP API creates a real home session, temporary options and joined creator",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/quick-session.test.ts",
+      "name": " Quick session HTTP API creates a real takeout session, temporary options and joined creator",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/quick-session.test.ts",
+      "name": " Quick session HTTP API rejects an invalid quick session before creating records: {\"meals\":[{\"title\":\"Soup\"}]}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/quick-session.test.ts",
+      "name": " Quick session HTTP API rejects an invalid quick session before creating records: {\"creatorName\":\"Creator\",\"meals\":[]}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/quick-session.test.ts",
+      "name": " Quick session HTTP API rejects an invalid quick session before creating records: {\"creatorName\":\"Creator\",\"meals\":[{\"title\":\"  \"}]}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/quick-session.test.ts",
+      "name": " Quick session HTTP API rejects an invalid quick session before creating records: {\"creatorName\":\"Creator\",\"mode\":\"invalid\",\"meals\":[{\"title\":\"Soup\"}]}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/quick-session.test.ts",
+      "name": " Quick session HTTP API rejects an invalid quick session before creating records: {\"creatorName\":\"Creator\",\"meals\":[{\"title\":\"Soup\"},{\"title\":\" soup \"}]}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/quick-session.test.ts",
+      "name": " Quick session HTTP API rejects missing, wrong and other-session creator tokens without closing or leaking votes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/quick-session.test.ts",
+      "name": " Private host data HTTP boundaries allows the owner recipe view but rejects anonymous and other-owner reads and mutations",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/quick-session.test.ts",
+      "name": " Private host data HTTP boundaries rejects other-host session reads and close/select operations without changing session state",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/quick-session.test.ts",
+      "name": " Private host data HTTP boundaries keeps voter identities and recipe fields private even with ?host=true on public or other-host results",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API identifies only the authenticated owner while results are waiting",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API preserves the complete accepted ballot when a later replacement vote is invalid",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API persists numeric vote 0 and atomically replaces all choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API persists numeric vote 1 and atomically replaces all choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API persists numeric vote 2 and atomically replaces all choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote -1 without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote 3 without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote 99 without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote 1.5 without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote 0 without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote 1 without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote 2 without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote yes without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote true without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote null without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote undefined without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote {} without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote { toString: null } without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote [] without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects invalid vote [ 1 ] without writing an initial or replacement ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects missing without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects null without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects object without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects string without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects empty without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects null row without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects string row without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects boolean row without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects array row without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects missing meal ID without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects numeric meal ID without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects unknown meal ID without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects duplicate meal ID without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects incomplete ballot without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects extra ballot row without changing initial or submitted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects malformed participant IDs and participants belonging to another session",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rejects a real option from another session without changing either ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rolls back an insert failure, including submitted=false and persisted bytes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API rolls back an insert failure, including submitted=true and persisted bytes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API restores memory and disk when a partial write fails with submitted=false",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API restores memory and disk when a partial write fails with submitted=true",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API preserves memory and disk when atomic file replacement fails",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API retries transient EPERM file locks and persists the complete ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API retries transient EACCES file locks and persists the complete ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API retries transient EBUSY file locks and persists the complete ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API bounds persistent file-lock retries and preserves the accepted ballot",
+      "occurrence": 0
+    },
+    {
+      "file": "src/routes/swipes.test.ts",
+      "name": " Swipe HTTP API returns sessionClosed for closed sessions and preserves accepted choices",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/food-options.test.ts",
+      "name": " food option domain rules recognizes only supported session modes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/food-options.test.ts",
+      "name": " food option domain rules maps each session mode to its allowed option type",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/food-options.test.ts",
+      "name": " food option domain rules detects duplicate titles case-insensitively after trimming",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/library-transfer.test.ts",
+      "name": " library transfer validation normalizes meals and categories while preserving ingredient order",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/library-transfer.test.ts",
+      "name": " library transfer validation reports invalid entries without rejecting valid entries",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/library-transfer.test.ts",
+      "name": " library transfer validation rejects unsupported export versions",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/library-transfer.test.ts",
+      "name": " accepts optional recipe metadata and rejects category or malformed metadata",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/matching.test.ts",
+      "name": " Matching Service - Maybe Vote Support should count yes votes (1) correctly",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/matching.test.ts",
+      "name": " Matching Service - Maybe Vote Support should count maybe votes (2) correctly",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/matching.test.ts",
+      "name": " Matching Service - Maybe Vote Support should count no votes (0) correctly",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/matching.test.ts",
+      "name": " Matching Service - Maybe Vote Support should calculate percentage as (yes + maybe) / total",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/matching.test.ts",
+      "name": " Matching Service - Maybe Vote Support should implement tiebreaker: fewer maybes rank higher",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/matching.test.ts",
+      "name": " Matching Service - Maybe Vote Support should include voter breakdown with vote values when requested",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/matching.test.ts",
+      "name": " Matching Service - Maybe Vote Support should handle mixed votes correctly",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/matching.test.ts",
+      "name": " Matching Service - Maybe Vote Support should sort by percentage first, then maybeCount, then title",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials stores ciphertext and reuses a private persistent development key after restart",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials uses random nonces and authenticates owner and ciphertext",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials requires a valid configured key in production and never falls back",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials does not overwrite an existing malformed key or recreate a missing key during decryption",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials rejects invalid/oversized tokens",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials rejects invalid/oversized tokens",
+      "occurrence": 1
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials rejects invalid/oversized tokens",
+      "occurrence": 2
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials rejects invalid/oversized tokens",
+      "occurrence": 3
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials rejects invalid/oversized ciphertext",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials rejects invalid/oversized ciphertext",
+      "occurrence": 1
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials rejects invalid/oversized ciphertext",
+      "occurrence": 2
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials rejects invalid/oversized ciphertext",
+      "occurrence": 3
+    },
+    {
+      "file": "src/services/notion-credentials.test.ts",
+      "name": " host-bound encrypted Notion credentials rejects an empty credential owner",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader reads all 21 ordered rows and preserves fractions, subsection steps and notes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader reads all 12 ordered rows and preserves fractions, subsection steps and notes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader reads all 11 ordered rows and preserves fractions, subsection steps and notes",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader resolves a single-source database URL https://www.notion.so/Recipes-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb?v=123",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader resolves a single-source database URL https://notion.so/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader resolves a single-source database URL https://app.notion.com/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader paginates inventory, blocks and ingredient rows on both full reads",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsafe/invalid source before making requests: https://evil.test/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsafe/invalid source before making requests: http://notion.so/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsafe/invalid source before making requests: https://notion.so.evil.test/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsafe/invalid source before making requests: https://x@notion.so/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsafe/invalid source before making requests: https://notion.so:8443/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsafe/invalid source before making requests: collection://not-an-id",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsafe/invalid source before making requests: not-an-id",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects ambiguous databases",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader accepts unchanged content with distinct response request IDs for aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader accepts unchanged content with distinct response request IDs for bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader redacts upstream access failure 401",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader redacts upstream access failure 403",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader redacts upstream access failure 404",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader honors bounded Retry-After before retrying rate limits",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader fails immediately when Retry-After exceeds the overall deadline",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader bounds hanging requests with abort timeouts and redacts network errors",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader retries transient failures only twice",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects oversized successful responses before parsing them",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects more than 100 recipes without attempting a partial import",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects incomplete ingredient lists even when has_more is false",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader accepts a stable later name update under the same page identity",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects incomplete/inconsistent query pagination {\"request_status\":{\"type\":\"incomplete\",\"incomplete_reason\":\"query_result_limit_reached\"}}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects incomplete/inconsistent query pagination {\"has_more\":true,\"next_cursor\":null}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects incomplete/inconsistent query pagination {\"has_more\":false,\"next_cursor\":\"unexpected\"}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects incomplete/inconsistent query pagination {\"has_more\":\"false\"}",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects a cursor loop",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsupported recipe: missing ingredients",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsupported recipe: missing instructions",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsupported recipe: duplicate heading",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsupported recipe: unknown block",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsupported recipe: nested steps",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsupported recipe: wrong table",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsupported recipe: empty ingredient",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsupported recipe: missing title",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader rejects unsupported recipe: duplicate pages",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader lists the first format problem in every invalid recipe with block, section, excerpt and a fix",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader identifies an unexpected heading with a bounded excerpt",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader identifies an unexpected heading with a bounded excerpt",
+      "occurrence": 1
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader fails closed when name changes during the full read",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader fails closed when removed page changes during the full read",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader fails closed when added page changes during the full read",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader fails closed when body changes during the full read",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader fails closed when row changes during the full read",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader fails closed when source changes during the full read",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader fails closed when source property named request_id changes during the full read",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/notion-reader.test.ts",
+      "name": " bounded Notion recipe reader returns a deliberate empty snapshot only after complete repeated inventory reads",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/recipe.test.ts",
+      "name": " recipe normalization preserves free-text amounts while trimming ingredient rows",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/recipe.test.ts",
+      "name": " recipe normalization allows an empty amount but requires an ingredient name",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/recipe.test.ts",
+      "name": " recipe normalization normalizes blank instructions to null",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/recipe.test.ts",
+      "name": " recipe normalization parses the deterministic full-recipe paste format",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/recipe.test.ts",
+      "name": " recipe normalization accepts an LLM code fence and an empty amount",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/recipe.test.ts",
+      "name": " recipe normalization reports malformed ingredient rows with their line number",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/sessionStore.test.ts",
+      "name": " persistent family sign-in keeps signed-in identity in saved bytes and a fresh store, then revokes it on logout",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/sessionStore.test.ts",
+      "name": " persistent family sign-in expires old sessions and never resurrects a deleted session while touching it",
+      "occurrence": 0
+    },
+    {
+      "file": "src/services/sessionStore.test.ts",
+      "name": " persistent family sign-in reports corrupt stored data rather than accepting a signed-in identity",
+      "occurrence": 0
+    }
+  ]
+}

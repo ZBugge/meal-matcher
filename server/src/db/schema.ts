@@ -1,313 +1,168 @@
-import initSqlJs, { Database } from 'sql.js';
-import fs from 'fs';
-import path from 'path';
-import { randomUUID } from 'crypto';
-
-let db: Database | null = null;
-
-const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, '../../data/database.db');
-
-export async function initializeDatabase(): Promise<Database> {
-  if (db) return db;
-
-  const SQL = await initSqlJs();
-
-  // Ensure data directory exists
-  const dataDir = path.dirname(DATABASE_PATH);
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-
-  // Load existing database or create new one
-  if (fs.existsSync(DATABASE_PATH)) {
-    const buffer = fs.readFileSync(DATABASE_PATH);
-    db = new SQL.Database(buffer);
-    runMigrations(db);
-  } else {
-    db = new SQL.Database();
-    createTables(db);
-    saveDatabase();
-  }
-
-  return db;
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { createHash, randomUUID } from 'node:crypto';
+export interface D1Result<T = Record<string, unknown>> {
+    results: T[];
+    success: boolean;
+    meta: {
+        changes: number;
+    };
 }
-
-function runMigrations(database: Database): void {
-  if (!columnExists(database, 'meals', 'temporary')) {
-    database.run('ALTER TABLE meals ADD COLUMN temporary INTEGER DEFAULT 0');
-  }
-
-  if (!columnExists(database, 'meals', 'creator_token')) {
-    database.run('ALTER TABLE meals ADD COLUMN creator_token TEXT');
-  }
-
-  if (!columnExists(database, 'sessions', 'mode')) {
-    database.run("ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'home'");
-  }
-
-  if (!columnExists(database, 'hosts', 'takeout_onboarding_dismissed')) {
-    database.run('ALTER TABLE hosts ADD COLUMN takeout_onboarding_dismissed INTEGER NOT NULL DEFAULT 0');
-  }
-
-  if (!columnExists(database, 'meals', 'instructions')) {
-    database.run('ALTER TABLE meals ADD COLUMN instructions TEXT');
-  }
-
-  if (!columnExists(database, 'meals', 'notes')) {
-    database.run('ALTER TABLE meals ADD COLUMN notes TEXT');
-  }
-  if (!columnExists(database, 'meals', 'total_minutes')) {
-    database.run('ALTER TABLE meals ADD COLUMN total_minutes INTEGER CHECK (total_minutes BETWEEN 1 AND 1440)');
-  }
-  if (!columnExists(database, 'meals', 'effort')) {
-    database.run("ALTER TABLE meals ADD COLUMN effort TEXT CHECK (effort IN ('easy', 'medium', 'involved'))");
-  }
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS meal_ingredients (
-      id TEXT PRIMARY KEY,
-      meal_id TEXT NOT NULL REFERENCES meals(id),
-      amount TEXT NOT NULL DEFAULT '',
-      ingredient TEXT NOT NULL,
-      display_order INTEGER NOT NULL
-    )
-  `);
-
-  database.run("UPDATE meals SET type = 'meal' WHERE type IS NULL OR TRIM(type) = ''");
-  database.run(`
-    UPDATE hosts
-    SET takeout_onboarding_dismissed = 1
-    WHERE EXISTS (
-      SELECT 1
-      FROM meals
-      WHERE meals.host_id = hosts.id AND meals.type = 'category'
-    )
-  `);
-  database.run(`
-    CREATE INDEX IF NOT EXISTS idx_meals_host_type_archived
-    ON meals(host_id, type, archived)
-  `);
-  database.run(`
-    CREATE INDEX IF NOT EXISTS idx_meal_ingredients_meal_order
-    ON meal_ingredients(meal_id, display_order)
-  `);
-
-  createPlanningTables(database);
-  if (!columnExists(database, 'shopping_items', 'aisle')) database.run('ALTER TABLE shopping_items ADD COLUMN aisle TEXT');
-  if (!columnExists(database, 'shopping_items', 'recurring_id')) database.run('ALTER TABLE shopping_items ADD COLUMN recurring_id TEXT');
-  database.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_recurring_week ON shopping_items(host_id, week, recurring_id)');
-  saveDatabase();
+export interface D1Statement {
+    bind(...values: unknown[]): D1Statement;
+    all<T = Record<string, unknown>>(): Promise<D1Result<T>>;
+    first<T = Record<string, unknown>>(): Promise<T | null>;
+    run(): Promise<D1Result>;
 }
-
-function columnExists(database: Database, table: string, column: string): boolean {
-  const result = database.exec(`PRAGMA table_info(${table})`);
-  if (result.length === 0) return false;
-
-  const nameIndex = result[0].columns.indexOf('name');
-  return result[0].values.some((row) => row[nameIndex] === column);
+export interface D1Database {
+    prepare(sql: string): D1Statement;
+    batch<T = Record<string, unknown>>(statements: D1Statement[]): Promise<D1Result<T>[]>;
 }
-
-function createPlanningTables(database: Database): void {
-  database.run(`
-    CREATE TABLE IF NOT EXISTS dinner_staples (
-      id TEXT PRIMARY KEY, host_id TEXT NOT NULL REFERENCES hosts(id), title TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS recurring_groceries (
-      id TEXT PRIMARY KEY, host_id TEXT NOT NULL REFERENCES hosts(id),
-      ingredient TEXT NOT NULL, amount TEXT NOT NULL DEFAULT ''
-    );
-    CREATE INDEX IF NOT EXISTS idx_recurring_groceries_host ON recurring_groceries(host_id);
-    CREATE TABLE IF NOT EXISTS login_sessions (
-      id TEXT PRIMARY KEY, data TEXT NOT NULL, expires INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS plan_entries (
-      id TEXT PRIMARY KEY, host_id TEXT NOT NULL REFERENCES hosts(id),
-      week TEXT NOT NULL, meal_id TEXT REFERENCES meals(id), kind TEXT NOT NULL,
-      title TEXT NOT NULL, date TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE INDEX IF NOT EXISTS idx_plan_entries_host_week ON plan_entries(host_id, week);
-    CREATE TABLE IF NOT EXISTS shopping_items (
-      id TEXT PRIMARY KEY, host_id TEXT NOT NULL REFERENCES hosts(id), week TEXT NOT NULL,
-      entry_id TEXT REFERENCES plan_entries(id), source_title TEXT,
-      amount TEXT NOT NULL DEFAULT '', ingredient TEXT NOT NULL,
-      aisle TEXT, state TEXT NOT NULL DEFAULT 'needed', display_order INTEGER NOT NULL DEFAULT 0,
-      recurring_id TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_shopping_items_host_week ON shopping_items(host_id, week);
-  `);
+export interface RuntimeEnv {
+    DB: D1Database;
+    SESSION_SECRET: string;
+    NOTION_ENCRYPTION_KEY?: string;
 }
-
-function createTables(database: Database): void {
-  createPlanningTables(database);
-  database.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_recurring_week ON shopping_items(host_id, week, recurring_id)');
-  database.run(`
-    -- Host accounts
-    CREATE TABLE IF NOT EXISTS hosts (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      takeout_onboarding_dismissed INTEGER NOT NULL DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Meals owned by hosts
-    CREATE TABLE IF NOT EXISTS meals (
-      id TEXT PRIMARY KEY,
-      host_id TEXT NOT NULL REFERENCES hosts(id),
-      title TEXT NOT NULL,
-      description TEXT,
-      instructions TEXT,
-      notes TEXT,
-      total_minutes INTEGER CHECK (total_minutes BETWEEN 1 AND 1440),
-      effort TEXT CHECK (effort IN ('easy', 'medium', 'involved')),
-      type TEXT DEFAULT 'meal',
-      archived INTEGER DEFAULT 0,
-      pick_count INTEGER DEFAULT 0,
-      temporary INTEGER DEFAULT 0,
-      creator_token TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Private recipe ingredients for home meals
-    CREATE TABLE IF NOT EXISTS meal_ingredients (
-      id TEXT PRIMARY KEY,
-      meal_id TEXT NOT NULL REFERENCES meals(id),
-      amount TEXT NOT NULL DEFAULT '',
-      ingredient TEXT NOT NULL,
-      display_order INTEGER NOT NULL
-    );
-
-    -- Swipe sessions
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      host_id TEXT NOT NULL REFERENCES hosts(id),
-      invite_code TEXT UNIQUE NOT NULL,
-      status TEXT DEFAULT 'open',
-      mode TEXT NOT NULL DEFAULT 'home',
-      selected_meal_id TEXT REFERENCES meals(id),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      closed_at DATETIME
-    );
-
-    -- Junction table: which meals are in which session
-    CREATE TABLE IF NOT EXISTS session_meals (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL REFERENCES sessions(id),
-      meal_id TEXT NOT NULL REFERENCES meals(id),
-      display_order INTEGER
-    );
-
-    -- Participants in a session
-    CREATE TABLE IF NOT EXISTS participants (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL REFERENCES sessions(id),
-      display_name TEXT NOT NULL,
-      host_id TEXT REFERENCES hosts(id),
-      submitted INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Individual swipes
-    CREATE TABLE IF NOT EXISTS swipes (
-      id TEXT PRIMARY KEY,
-      participant_id TEXT NOT NULL REFERENCES participants(id),
-      session_meal_id TEXT NOT NULL REFERENCES session_meals(id),
-      vote INTEGER NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(participant_id, session_meal_id)
-    );
-
-    -- Session history (what was selected)
-    CREATE TABLE IF NOT EXISTS session_history (
-      id TEXT PRIMARY KEY,
-      session_id TEXT UNIQUE NOT NULL REFERENCES sessions(id),
-      selected_meal_id TEXT NOT NULL REFERENCES meals(id),
-      selected_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Create indexes for better query performance
-    CREATE INDEX IF NOT EXISTS idx_meals_host_id ON meals(host_id);
-    CREATE INDEX IF NOT EXISTS idx_meals_host_type_archived ON meals(host_id, type, archived);
-    CREATE INDEX IF NOT EXISTS idx_meal_ingredients_meal_order ON meal_ingredients(meal_id, display_order);
-    CREATE INDEX IF NOT EXISTS idx_sessions_host_id ON sessions(host_id);
-    CREATE INDEX IF NOT EXISTS idx_sessions_invite_code ON sessions(invite_code);
-    CREATE INDEX IF NOT EXISTS idx_session_meals_session_id ON session_meals(session_id);
-    CREATE INDEX IF NOT EXISTS idx_participants_session_id ON participants(session_id);
-    CREATE INDEX IF NOT EXISTS idx_swipes_participant_id ON swipes(participant_id);
-  `);
-}
-
-export function getDatabase(): Database {
-  if (!db) {
-    throw new Error('Database not initialized. Call initializeDatabase() first.');
-  }
-  return db;
-}
-
-export function saveDatabase(): void {
-  if (!db) return;
-
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  // Write beside the database, then replace it atomically. A failed/partial
-  // write must never truncate the last successfully persisted database.
-  const temporaryPath = `${DATABASE_PATH}.${randomUUID()}.tmp`;
-  try {
-    fs.writeFileSync(temporaryPath, buffer);
-    for (let attempt = 0; ; attempt++) {
-      try {
-        fs.renameSync(temporaryPath, DATABASE_PATH);
-        break;
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code;
-        // Windows scanners can briefly lock either file. Preserve atomic replacement
-        // and bound the total sharing-violation retry delay to 150 milliseconds.
-        if (attempt >= 4 || !['EPERM', 'EACCES', 'EBUSY'].includes(code || '')) throw error;
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10 * 2 ** attempt);
-      }
+const context = new AsyncLocalStorage<RuntimeEnv>();
+export function withRuntime<T>(env: RuntimeEnv, action: () => T): T { return context.run(env, action); }
+export function runtime(): RuntimeEnv { const env = context.getStore(); if (!env)
+    throw new Error('Missing request database context'); return env; }
+export function getDatabase(): D1Database { return runtime().DB; }
+export async function initializeDatabase(): Promise<D1Database> { return getDatabase(); }
+export function statement(sql: string, params: unknown[] = []): D1Statement { return getDatabase().prepare(sql).bind(...params.map(value => value === undefined ? null : value)); }
+// Immutable references survive library, result and planning projections. Hydration
+// runs only after SQL selected the columns permitted for that response.
+const PREFIX = '\u001fmealmatch:text:';
+export async function storedText(value: string | null | undefined, owner: string): Promise<string | null> {
+    if (value == null)
+        return null;
+    if (Buffer.byteLength(value, 'utf8') <= 32768 && !value.startsWith(PREFIX))
+        return value;
+    const ref = randomUUID();
+    const chunks: string[] = [];
+    let part = '';
+    let bytes = 0;
+    for (const point of value) {
+        const size = Buffer.byteLength(point);
+        if (bytes + size > 65536) {
+            chunks.push(part);
+            part = '';
+            bytes = 0;
+        }
+        part += point;
+        bytes += size;
     }
-  } catch (error) {
-    try {
-      fs.rmSync(temporaryPath, { force: true });
-    } catch {
-      // Preserve the original persistence error if temporary-file cleanup fails.
+    chunks.push(part);
+    const digest = createHash('sha256').update(value).digest('hex');
+    for (let offset = 0; offset < chunks.length; offset += 30)
+        await getDatabase().batch(chunks.slice(offset, offset + 30).map((chunk, index) => statement('INSERT INTO text_chunks(ref, owner, ordinal, value, digest, chunk_count) VALUES (?, ?, ?, ?, ?, ?)', [ref, owner, offset + index, chunk, digest, chunks.length])));
+    return PREFIX + ref + ':' + digest;
+}
+const storedFields = new Set(['title', 'description', 'instructions', 'notes', 'amount', 'ingredient', 'sourceTitle', 'source_title', 'selected_meal_title', 'meal_title', 'meal_description']);
+const reference = (value: unknown): value is string => typeof value === 'string' && /^\u001fmealmatch:text:[a-f0-9-]{36}:[a-f0-9]{64}$/.test(value);
+async function hydrate<T>(rows: T[]): Promise<T[]> {
+    const pointers = rows.flatMap(row => Object.entries(row as object).filter(([key, value]) => storedFields.has(key) && reference(value)).map(([, value]) => value as string));
+    const refs = [...new Set(pointers.map(value => value.slice(PREFIX.length).split(':')[0]))];
+    if (!refs.length)
+        return rows;
+    const chunks = (await statement('SELECT ref, ordinal, value, digest, chunk_count FROM text_chunks WHERE ref IN (SELECT value FROM json_each(?)) ORDER BY ref, ordinal', [JSON.stringify(refs)]).all<{
+        ref: string;
+        ordinal: number;
+        value: string;
+        digest: string;
+        chunk_count: number;
+    }>()).results;
+    const values = new Map<string, string>();
+    for (const ref of refs) {
+        const found = chunks.filter(row => row.ref === ref);
+        const value = found.map(row => row.value).join('');
+        if (!found.length || pointers.filter(pointer => pointer.slice(PREFIX.length).split(':')[0] === ref).some(pointer => pointer.split(':').at(-1) !== found[0].digest) || found.length !== found[0].chunk_count || found.some((row, index) => row.ordinal !== index || row.digest !== found[0].digest) || createHash('sha256').update(value).digest('hex') !== found[0].digest)
+            throw new Error('Incomplete immutable text');
+        values.set(ref, value);
     }
-    throw error;
-  }
+    return rows.map(row => Object.fromEntries(Object.entries(row as object).map(([key, value]) => [key, storedFields.has(key) && reference(value) ? values.get(value.slice(PREFIX.length).split(':')[0]) : value])) as T);
 }
-
-// Helper to run queries and save automatically
-export function runQuery(sql: string, params: unknown[] = []): void {
-  const database = getDatabase();
-  database.run(sql, params);
-  saveDatabase();
+export async function getAll<T>(sql: string, params: unknown[] = []): Promise<T[]> { return hydrate((await statement(sql, params).all<T>()).results); }
+export async function getOne<T>(sql: string, params: unknown[] = []): Promise<T | undefined> { return (await getAll<T>(sql, params))[0]; }
+export async function runQuery(sql: string, params: unknown[] = []): Promise<D1Result> { return statement(sql, params).run(); }
+export class ConflictError extends Error {
+    status = 409;
 }
-
-export function getOne<T>(sql: string, params: unknown[] = []): T | undefined {
-  const database = getDatabase();
-  const stmt = database.prepare(sql);
-  stmt.bind(params);
-
-  if (stmt.step()) {
-    const row = stmt.getAsObject() as T;
-    stmt.free();
-    return row;
-  }
-
-  stmt.free();
-  return undefined;
+// Describes one D1 batch transaction; no reads, awaits or interactive BEGIN.
+export class Mutation {
+    readonly statements: D1Statement[] = [];
+    readonly receipt = randomUUID();
+    run(sql: string, params: unknown[] = []): void { this.statements.push(statement(sql, params)); }
+    assert(sql: string, params: unknown[] = []): void { const id = randomUUID(); this.run(`INSERT INTO mutation_assertions(id, ok) SELECT ?, CASE WHEN (${sql}) THEN 1 ELSE 0 END`, [id, ...params]); this.run('DELETE FROM mutation_assertions WHERE id = ?', [id]); }
+    library(host: string, revision: number): void { this.run('UPDATE hosts SET library_revision = library_revision + 1 WHERE id = ? AND library_revision = ?', [host, revision]); this.assert('changes() = 1'); }
+    open(session: string): void { this.assert("EXISTS(SELECT 1 FROM sessions WHERE id = ? AND status = 'open')", [session]); }
+    async commit(): Promise<void> { if (!this.statements.length)
+        return; try {
+        await getDatabase().batch([...this.statements, statement('INSERT INTO mutation_receipts(id,created_at) VALUES (?,?)', [this.receipt, Date.now()])]);
+    }
+    catch (error) {
+        // Resolve a lost acknowledgement using the receipt written in the same
+        // transaction. Accepted state is never compensated or replayed.
+        try {
+            if (await statement('SELECT id FROM mutation_receipts WHERE id = ?', [this.receipt]).first()) return;
+        } catch { /* Preserve the original error when confirmation is unavailable. */ }
+        if (String(error).includes('mutation_assertions') || String(error).includes('CHECK constraint failed: ok'))
+            throw new ConflictError('The data changed. Reload and try again.');
+        throw error;
+    } }
 }
-
-export function getAll<T>(sql: string, params: unknown[] = []): T[] {
-  const database = getDatabase();
-  const stmt = database.prepare(sql);
-  stmt.bind(params);
-
-  const results: T[] = [];
-  while (stmt.step()) {
-    results.push(stmt.getAsObject() as T);
-  }
-
-  stmt.free();
-  return results;
+export async function libraryRevision(host: string): Promise<number> { const row = await getOne<{
+    library_revision: number;
+}>('SELECT library_revision FROM hosts WHERE id = ?', [host]); if (!row)
+    throw new Error('Missing host'); return row.library_revision; }
+export interface Stage {
+    id: string;
+    owner: string;
+    chunks: number;
+    rows: number;
+    digest: string;
+}
+export async function stageRows(owner: string, rows: Iterable<Record<string, unknown>> | AsyncIterable<Record<string, unknown>>): Promise<Stage> {
+    const id = randomUUID();
+    const hash = createHash('sha256');
+    let rowCount = 0;
+    let chunkCount = 0;
+    let current: Record<string, unknown>[] = [];
+    let size = 2;
+    let pending: D1Statement[] = [];
+    await runQuery("INSERT INTO mutation_stages(id,owner,expected_chunks,expected_rows,digest,expires,sealed) VALUES (?,?,-1,-1,'',?,0)", [id, owner, Date.now() + 600000]);
+    const flush = async () => {
+        if (!current.length)
+            return;
+        const value = JSON.stringify(current);
+        hash.update(value);
+        pending.push(statement(`INSERT INTO mutation_chunks(stage_id,ordinal,value) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM mutation_stages WHERE id=? AND owner=? AND sealed=0 AND expires>CAST((julianday('now')-2440587.5)*86400000 AS INTEGER))`, [id, chunkCount++, value, id, owner]));
+        current = [];
+        size = 2;
+        if (pending.length === 30) {
+            await getDatabase().batch(pending);
+            pending = [];
+        }
+    };
+    for await (const row of rows) {
+        const bytes = Buffer.byteLength(JSON.stringify(row));
+        if (current.length && size + bytes + 1 > 131072)
+            await flush();
+        current.push(row);
+        size += bytes + 1;
+        rowCount++;
+    }
+    await flush();
+    if (pending.length)
+        await getDatabase().batch(pending);
+    const digest = hash.digest('hex');
+    const sealed = await runQuery(`UPDATE mutation_stages SET expected_chunks=?,expected_rows=?,digest=?,sealed=1 WHERE id=? AND owner=? AND sealed=0 AND expires>CAST((julianday('now')-2440587.5)*86400000 AS INTEGER)`, [chunkCount, rowCount, digest, id, owner]);
+    if (!sealed.meta.changes)
+        throw new ConflictError('The staged operation expired. Try again.');
+    return { id, owner, chunks: chunkCount, rows: rowCount, digest };
+}
+export function publishRows(batch: Mutation, stage: Stage, sql: string, params: unknown[] = []): void {
+    batch.assert(`EXISTS(SELECT 1 FROM mutation_stages s WHERE id = ? AND owner = ? AND digest = ? AND sealed=1 AND expires>CAST((julianday('now')-2440587.5)*86400000 AS INTEGER) AND expected_chunks = (SELECT COUNT(*) FROM mutation_chunks WHERE stage_id = s.id) AND expected_rows = (SELECT COALESCE(SUM(json_array_length(value)), 0) FROM mutation_chunks WHERE stage_id = s.id))`, [stage.id, stage.owner, stage.digest]);
+    batch.run(sql.replace('$ROWS', 'mutation_chunks c, json_each(c.value) j').replace('$STAGE', 'c.stage_id = ?'), [...params, stage.id]);
+    batch.run('DELETE FROM mutation_chunks WHERE stage_id = ?', [stage.id]);
+    batch.run('DELETE FROM mutation_stages WHERE id = ?', [stage.id]);
 }

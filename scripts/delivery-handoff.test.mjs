@@ -24,7 +24,8 @@ async function fixture(t, stub = '') {
   await writeFile(path.join(origin, 'client/src/owned.ts'), 'export const value = 1;\n');
   await writeFile(path.join(origin, 'server/src/owned.ts'), 'export const value = 1;\n');
   await writeFile(path.join(origin, 'other.txt'), 'other\n');
-  git(origin, 'init', '--quiet');
+  // Fixture repositories must not depend on machine-wide template files/hooks.
+  git(origin, 'init', '--quiet', '--template=');
   git(origin, 'config', 'user.email', 'fixture@example.invalid');
   git(origin, 'config', 'user.name', 'Handoff fixture');
   git(origin, 'config', 'core.autocrlf', 'false');
@@ -73,6 +74,18 @@ test('failed package build cannot yield a passing receipt', async t => {
   assert.equal(result.passed, false);
   assert.equal(result.results[0].exitCode, 2);
   assert.match(await readFile(result.results[0].log, 'utf8'), /typescript error/);
+});
+
+test('Worker configuration ownership requires both package builds and the shipped Worker build', async t => {
+  const f = await fixture(t, "if (process.argv[2] === 'run' && process.argv[3] === 'build:worker') process.exit(3);");
+  f.contract.builders[0].files = ['wrangler.jsonc'];
+  await f.save();
+  await writeFile(path.join(f.tree, 'wrangler.jsonc'), '{}');
+  const result = await f.run();
+  assert.deepEqual(result.results.map(check => check.id), ['client-build', 'server-build', 'worker-build']);
+  assert.ok(result.results.slice(0, 2).every(check => check.passed));
+  assert.equal(result.results[2].exitCode, 3);
+  assert.equal(result.passed, false);
 });
 
 for (const mutation of ['source', 'head', 'status']) test(`${mutation} mutation during a successful build fails the binding`, async t => {

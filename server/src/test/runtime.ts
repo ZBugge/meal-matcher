@@ -8,6 +8,10 @@ const dynamicImport = (name: string): Promise<any> => import(/* @vite-ignore */ 
 let provider: typeof readNotionRecipes | undefined;
 export function configureNotionFixture(value: typeof readNotionRecipes) { provider = value; }
 let fixture: Promise<any> | undefined;
+// A binding belongs to one emulator instance. Reuse it during that instance's
+// lifetime instead of repeatedly crossing the Node RPC bridge for every query;
+// restart creates a new key and therefore cannot reuse a poisoned old stub.
+const runtimeEnvironments = new WeakMap<object, Promise<RuntimeEnv>>();
 let dataset: Awaited<ReturnType<typeof readNotionRecipes>> | undefined;
 const networkDiagnostics: {
     endpoints: string[];
@@ -70,7 +74,15 @@ export async function testFixture() {
     })();
     return fixture;
 }
-export async function testEnv(): Promise<RuntimeEnv> { const active = await testFixture(); return { ...active.secrets, DB: await active.runtime.getD1Database('DB') } as RuntimeEnv; }
+export async function testEnv(): Promise<RuntimeEnv> {
+    const active = await testFixture();
+    let environment = runtimeEnvironments.get(active.runtime);
+    if (!environment) {
+        environment = active.runtime.getD1Database('DB').then((DB: D1Database) => ({ ...active.secrets, DB } as RuntimeEnv));
+        runtimeEnvironments.set(active.runtime, environment!);
+    }
+    return environment!;
+}
 export async function inTestRuntime<T>(action: () => T): Promise<Awaited<T>> { return await withRuntime(await testEnv(), action) as Awaited<T>; }
 export async function closeTestFixture() { if (fixture) {
     const active = await fixture;

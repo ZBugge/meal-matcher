@@ -15,7 +15,7 @@ async function assertProcessStopped(pid) {
     // its resources and cannot execute; every live process state must fail.
     const stat = await readFile(`/proc/${pid}/stat`, 'utf8');
     assert.equal(stat.match(/^\d+ \(.+\) ([A-Z])/s)?.[1], 'Z', `Process ${pid} is still running`);
-  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  } catch (error) { if (!['ENOENT', 'ESRCH'].includes(error.code)) throw error; }
 }
 
 const browserReport = () => ({ stats: { expected: 39, unexpected: 0, skipped: 0, flaky: 0 }, suites: [{ specs: Array.from({ length: 39 }, () => ({ tests: [{ expectedStatus: 'passed', status: 'expected', results: [{ status: 'passed', retry: 0, errors: [] }] }] })) }] });

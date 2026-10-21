@@ -47,7 +47,7 @@ export async function prepareEmptyTestState(directory,{root=applicationRoot}={})
   await writeFile(path.join(directory,manifestName),JSON.stringify({...payload,sha256:hash(JSON.stringify(payload))}),{flag:'wx',mode:0o600});
   return {directory,files:payload.files.length,...before};
 }
-export async function cloneEmptyTestState(root,template,directory){
+export async function cloneEmptyTestState(root,template,directory,{verifiedSourceSha256}={}){
   root=path.resolve(root);
   template=await privateDirectory(root,template,{existingOnly:true});
   const relativeTarget=path.relative(template,path.resolve(directory));
@@ -57,8 +57,15 @@ export async function cloneEmptyTestState(root,template,directory){
   if(!info.isFile()||info.isSymbolicLink()||!same(await realpath(manifestFile),manifestFile))throw new Error('Redirected test manifest refused');
   const {sha256,...manifest}=JSON.parse(await readFile(manifestFile,'utf8'));
   if(manifest.version!==1||manifest.kind!=='closed-empty-migrated-d1-test-state'||hash(JSON.stringify(manifest))!==sha256)throw new Error('Invalid test template manifest');
-  const current=await fingerprints(root);
-  if(current.sourceSha256!==manifest.sourceSha256||current.schemaSha256!==manifest.schemaSha256)throw new Error('Stale test template source/schema fingerprint');
+  // startLocalWorker's initialization callback already verified every current
+  // source/config/asset/Worker byte. Reuse that result rather than hashing all
+  // source files twice per fixture. Direct administrative callers still verify.
+  if(verifiedSourceSha256!==undefined){
+    if(verifiedSourceSha256!==manifest.sourceSha256)throw new Error('Stale test template source/schema fingerprint');
+  }else{
+    const current=await fingerprints(root);
+    if(current.sourceSha256!==manifest.sourceSha256||current.schemaSha256!==manifest.schemaSha256)throw new Error('Stale test template source/schema fingerprint');
+  }
   const state=await privateDirectory(root,path.join(template,'state'),{existingOnly:true});
   if(JSON.stringify(await stateFiles(state))!==JSON.stringify(manifest.files))throw new Error('Changed test template state');
   directory=await exclusiveDirectory(root,directory);

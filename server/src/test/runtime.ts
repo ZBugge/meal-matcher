@@ -62,11 +62,11 @@ export async function testFixture() {
         const { startLocalWorker } = await dynamicImport(pathToFileURL(path.join(root, 'scripts/worker-local.mjs')).href);
         const directory = path.join(root, '.verification', `unit-${randomUUID()}`);
         const template = process.env.MEALMATCH_TEST_EMPTY_STATE;
-        if (template) {
+        const initializeState = template ? async (candidate: { sourceSha256: string }) => {
             const { cloneEmptyTestState } = await dynamicImport(pathToFileURL(path.join(root, 'scripts/test-state.mjs')).href);
-            await cloneEmptyTestState(root, template, directory);
-        }
-        return startLocalWorker({ root, directory, migrate: !template, bundleDirectory: process.env.MEALMATCH_TEST_BUNDLE || path.join(root, '.verification/release-bundle'), secrets: { SESSION_SECRET: 'synthetic-local-unit-session-secret-over-32-characters', NOTION_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') }, outboundService: notionTransport });
+            await cloneEmptyTestState(root, template, directory, { verifiedSourceSha256: candidate.sourceSha256 });
+        } : undefined;
+        return startLocalWorker({ root, directory, migrate: !template, initializeState, bundleDirectory: process.env.MEALMATCH_TEST_BUNDLE || path.join(root, '.verification/release-bundle'), secrets: { SESSION_SECRET: 'synthetic-local-unit-session-secret-over-32-characters', NOTION_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') }, outboundService: notionTransport });
     })();
     return fixture;
 }

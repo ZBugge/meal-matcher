@@ -12,7 +12,7 @@ export default defineConfig({
   ...baseline,
   forbidOnly: true,
   retries: 0,
-  workers: 2,
+  workers: 3,
   outputDir: path.join(runDirectory, 'browser-artifacts'),
   reporter: [
     ['json', { outputFile: path.join(runDirectory, 'browser-results.json') }],

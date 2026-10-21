@@ -19,6 +19,7 @@ test('test templates reject existing targets, stale sources, changed files and r
   const payload={version:1,kind:'closed-empty-migrated-d1-test-state',sourceSha256:source.sha256,schemaSha256:hash(JSON.stringify(source.files.filter(([name])=>name.startsWith('cloudflare/migrations/')))),files:[{path:'synthetic.sqlite',sha256:hash('synthetic guard bytes only')}]};
   await writeFile(path.join(template,'empty-test-state.json'),JSON.stringify({...payload,sha256:hash(JSON.stringify(payload))}));
   const target=path.join(root,'.verification/clone');
+  await assert.rejects(cloneEmptyTestState(root,template,target,{verifiedSourceSha256:'different-verified-candidate'}),/Stale test template/);
   await cloneEmptyTestState(root,template,target);
   await assert.rejects(cloneEmptyTestState(root,template,target),/EEXIST/);
   await assert.rejects(prepareEmptyTestState(template,{root}),/EEXIST/);

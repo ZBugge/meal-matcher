@@ -46,9 +46,12 @@ async function developmentSecrets(directory) {
   }
 }
 
-export async function startLocalWorker({ directory, port = 0, root = applicationRoot, bundleDirectory = path.join(root, '.verification/release-bundle'), secrets, migrate = true, allowNotionNetwork = false, outboundService } = {}) {
+export async function startLocalWorker({ directory, port = 0, root = applicationRoot, bundleDirectory = path.join(root, '.verification/release-bundle'), secrets, migrate = true, allowNotionNetwork = false, outboundService, initializeState } = {}) {
   if (!directory) throw new Error('Explicit local state directory required');
   const candidate = await requireCandidate({ root, directory: bundleDirectory });
+  // Synthetic fixture initialization runs only after current source/assets and
+  // Worker bytes have been verified. Normal development still runs migrations.
+  await initializeState?.(candidate);
   const prepared = await prepareLocalState(directory, { root, migrate });
   const binding = prepared.binding ?? prepared.config.d1_databases.find(value => value.binding === 'DB');
   secrets ??= await developmentSecrets(prepared.directory);

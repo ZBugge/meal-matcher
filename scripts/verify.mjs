@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
+import { availableParallelism, totalmem } from 'node:os';
 import { access, mkdir, open, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -197,10 +198,10 @@ async function main() {
     const emptyUnitState = node('.verification', `t-${randomUUID().slice(0, 8)}`);
     const sourceBefore = await sourceFingerprint(root);
     const checks = [
-      { id: 'verification-tests', name: 'Verification and delivery tool tests', cwd: root, args: ['--test', node('scripts', 'verify.test.mjs'), node('scripts', 'delivery-contract.test.mjs'), node('scripts', 'delivery-metrics.test.mjs'), node('scripts', 'delivery-handoff.test.mjs'), node('scripts', 'worker-build.test.mjs'), node('scripts', 'worker-local.test.mjs'), node('scripts', 'local-paths.test.mjs'), node('scripts', 'legacy-host-guard.test.mjs'), node('scripts', 'test-coverage.test.mjs'), node('scripts', 'audit-adversarial.test.mjs'), node('scripts', 'release-target.test.mjs'), node('scripts', 'release.test.mjs')] },
-      { id: 'runtime-regressions', name: 'Worker/D1 compatibility and migration recovery', cwd: root, dependsOn: ['worker-build'], args: ['--test', '--test-concurrency=2', node('compatibility', 'proof.test.mjs'), node('migration', 'preflight.test.mjs'), node('migration', 'check-credentials.test.mjs'), node('migration', 'd1-rehearsal.test.mjs'), node('migration', 'full-backup.test.mjs'), node('migration', 'remote-backup.test.mjs'), node('scripts', 'test-state.test.mjs')] },
-      { id: 'server-tests', name: 'Server tests', cwd: server, dependsOn: ['test-state'], args: [node('server', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=3', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'server-results.json')}`], env: { MEALMATCH_TEST_ROOT: root, MEALMATCH_TEST_BUNDLE_DIRECTORY: node('.verification', 'release-bundle'), MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
-      { id: 'client-tests', name: 'Client tests', cwd: client, args: [node('client', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=3', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'client-results.json')}`] },
+      { id: 'verification-tests', name: 'Verification and delivery tool tests', cwd: root, args: ['--test', '--test-concurrency=2', node('scripts', 'verify.test.mjs'), node('scripts', 'delivery-contract.test.mjs'), node('scripts', 'delivery-metrics.test.mjs'), node('scripts', 'delivery-handoff.test.mjs'), node('scripts', 'worker-build.test.mjs'), node('scripts', 'worker-local.test.mjs'), node('scripts', 'local-paths.test.mjs'), node('scripts', 'legacy-host-guard.test.mjs'), node('scripts', 'test-coverage.test.mjs'), node('scripts', 'audit-adversarial.test.mjs'), node('scripts', 'release-target.test.mjs'), node('scripts', 'release.test.mjs')] },
+      { id: 'runtime-regressions', name: 'Worker/D1 compatibility and migration recovery', cwd: root, dependsOn: ['worker-build'], args: ['--test', '--test-concurrency=1', node('compatibility', 'proof.test.mjs'), node('migration', 'preflight.test.mjs'), node('migration', 'check-credentials.test.mjs'), node('migration', 'd1-rehearsal.test.mjs'), node('migration', 'full-backup.test.mjs'), node('migration', 'remote-backup.test.mjs'), node('scripts', 'test-state.test.mjs')] },
+      { id: 'server-tests', name: 'Server tests', cwd: server, dependsOn: ['test-state'], args: [node('server', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=2', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'server-results.json')}`], env: { MEALMATCH_TEST_ROOT: root, MEALMATCH_TEST_BUNDLE_DIRECTORY: node('.verification', 'release-bundle'), MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
+      { id: 'client-tests', name: 'Client tests', cwd: client, args: [node('client', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=2', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'client-results.json')}`] },
       { id: 'lint', name: 'Client lint', cwd: client, args: [node('client', 'node_modules', 'eslint', 'bin', 'eslint.js'), 'src'] },
       { id: 'server-build', name: 'Server build', cwd: server, args: [node('server', 'node_modules', 'typescript', 'bin', 'tsc')] },
       { id: 'client-build', name: 'Client build', cwd: root, args: [fileURLToPath(import.meta.url), '--client-build'] },
@@ -214,6 +215,7 @@ async function main() {
       } },
     ];
     console.log('Running verification with dependent production and adversarial checks (120-second budget).');
+    console.log(`Host: ${availableParallelism()} available CPUs, ${(totalmem() / 1024 ** 3).toFixed(1)} GiB memory; bounded tool/client/server/browser workers: 2, recovery: 1.`);
     const report = await runChecks(checks, { directory, budgetMs: Math.max(1, limitMs - (performance.now() - started)), onResult: result => {
       console.log(`[${result.passed ? 'PASS' : 'FAIL'}] ${result.name}: ${seconds(result.durationMs)}`);
     } });

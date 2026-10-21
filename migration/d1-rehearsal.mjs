@@ -1,5 +1,5 @@
 // Administrative local-only rehearsal. No remote capability and no data-serving routes.
-import { Miniflare } from 'miniflare';
+import { LocalMiniflare as Miniflare } from '../scripts/local-emulator.mjs';
 import { mkdir, writeFile, readFile, realpath } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';

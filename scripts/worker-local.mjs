@@ -1,4 +1,4 @@
-import { Miniflare } from 'miniflare';
+import { LocalMiniflare as Miniflare } from './local-emulator.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { execFile } from 'node:child_process';

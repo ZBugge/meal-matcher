@@ -322,7 +322,9 @@ describe('Dashboard - Edit Mode and Delete', () => {
   });
 
   it('should delete multiple meals in bulk', async () => {
-    vi.mocked(mealsApi.delete).mockResolvedValue({ message: 'Deleted' });
+    let acceptFirst!: (value: { message: string }) => void;
+    vi.mocked(mealsApi.delete).mockResolvedValue({ message: 'Deleted' })
+      .mockImplementationOnce(() => new Promise(resolve => { acceptFirst = resolve; }));
 
     render(
       <BrowserRouter>
@@ -349,10 +351,14 @@ describe('Dashboard - Edit Mode and Delete', () => {
     const confirmButton = screen.getByText('Confirm');
     fireEvent.click(confirmButton);
 
+    await waitFor(() => expect(mealsApi.delete).toHaveBeenCalledTimes(1));
+    expect(mealsApi.delete).toHaveBeenCalledWith('1');
+    acceptFirst({ message: 'Deleted' });
     await waitFor(() => {
       expect(mealsApi.delete).toHaveBeenCalledWith('1');
       expect(mealsApi.delete).toHaveBeenCalledWith('2');
     });
+    await waitFor(() => expect(screen.queryByText('Delete 2 Meals?')).toBeNull());
   });
 
   it('should exit edit mode after bulk delete', async () => {
@@ -1095,7 +1101,9 @@ describe('Dashboard - Home and takeout modes', () => {
       archived: false,
       pickCount: 0,
     };
-    vi.mocked(mealsApi.create).mockResolvedValue(barbecueCategory);
+    let acceptFirst!: (value: Meal) => void;
+    vi.mocked(mealsApi.create).mockImplementation(async title => ({ ...barbecueCategory, id: `category-${title}`, title }))
+      .mockImplementationOnce(() => new Promise(resolve => { acceptFirst = resolve; }));
     vi.mocked(mealsApi.list).mockImplementation(async (type) =>
       type === 'category' ? [] : mockMeals
     );
@@ -1122,11 +1130,17 @@ describe('Dashboard - Home and takeout modes', () => {
     expect(mealsApi.create).not.toHaveBeenCalled();
 
     fireEvent.click(barbecue);
-    fireEvent.click(screen.getByRole('button', { name: 'Add selected (1)' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Thai' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add selected (2)' }));
 
+    await waitFor(() => expect(mealsApi.create).toHaveBeenCalledTimes(1));
+    expect(mealsApi.create).toHaveBeenCalledWith('BBQ', undefined, 'category');
+    acceptFirst(barbecueCategory);
     await waitFor(() => {
       expect(mealsApi.create).toHaveBeenCalledWith('BBQ', undefined, 'category');
+      expect(mealsApi.create).toHaveBeenCalledWith('Thai', undefined, 'category');
     });
+    expect(mealsApi.create).toHaveBeenCalledTimes(2);
   });
 
   it('keeps popular categories out of the normal add-category form after choosing to add its own', async () => {

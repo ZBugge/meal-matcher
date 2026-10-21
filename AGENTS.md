@@ -29,7 +29,7 @@ MealMatch is a collaborative meal-decision app. A group creates a session, votes
 
 ## Setup and development
 
-Use npm and preserve the root, client, and server lockfiles, plus the orchestrator lockfile when its package changes. The root install command does not install orchestrator dependencies.
+Use Node.js 22 or newer and npm. Preserve the root, client, and server lockfiles, plus the orchestrator lockfile when its package changes. The root install command does not install orchestrator dependencies.
 
 ```bash
 npm run install:all

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, symlink } from 'node:fs/promises';
 import path from 'node:path';
-import { Miniflare } from 'miniflare';
+import { LocalMiniflare as Miniflare } from './local-emulator.mjs';
 import { applicationRoot, sourceFingerprint } from './worker-build.mjs';
 import { prepareEmptyTestState, cloneEmptyTestState } from './test-state.mjs';
 

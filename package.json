@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Collaborative meal decision app with swipe interface",
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "verify": "node scripts/verify.mjs",
     "audit:adversarial": "node scripts/audit-adversarial.mjs",
@@ -31,7 +34,7 @@
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "concurrently": "^8.2.2",
-    "miniflare": "4.20251008.0",
-    "wrangler": "4.43.0"
+    "miniflare": "5.20261019.1-beta",
+    "wrangler": "4.151.3"
   }
 }

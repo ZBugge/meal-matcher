@@ -239,9 +239,10 @@ export function Dashboard() {
 
     if (!beginSave()) return;
     try {
-      const categories = await Promise.all(
-        selectedStarterCategories.map((title) => mealsApi.create(title, undefined, 'category'))
-      );
+      const categories: Meal[] = [];
+      // Library writes share a revision: finish each selected change before
+      // submitting the next so this one user action cannot conflict with itself.
+      for (const title of selectedStarterCategories) categories.push(await mealsApi.create(title, undefined, 'category'));
       setMeals((current) => [...categories, ...current]);
       setShowTakeoutOnboarding(false);
       setSelectedStarterCategories([]);
@@ -468,7 +469,7 @@ export function Dashboard() {
       // Mark all selected meals as deleting to trigger animation
       setDeletingMealIds(selectedForDeletion);
 
-      await Promise.all(selectedForDeletion.map((id) => mealsApi.delete(id)));
+      for (const id of selectedForDeletion) await mealsApi.delete(id);
 
       // Wait for animation to complete before removing from state
       setTimeout(() => {

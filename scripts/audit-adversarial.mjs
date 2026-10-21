@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
+import { cp, lstat, mkdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -112,13 +112,30 @@ export function auditCasePaths(treeDirectory, mutation) {
   return { id: mutation?.id ?? 'control', copiedRoot, bundleDirectory: path.join(copiedRoot, '.verification/b'), stateDirectory: path.join(copiedRoot, '.verification/s') };
 }
 
+// A normal checkout has a .git directory; a worktree has a pointer file whose
+// relative target must be resolved before moving the pointer into a copied tree.
+export async function writeAuditGitPointer(root, copiedRoot) {
+  const gitEntry = path.join(root, '.git');
+  const info = await lstat(gitEntry);
+  let gitDirectory;
+  if (info.isDirectory()) gitDirectory = gitEntry;
+  else if (info.isFile()) {
+    const match = /^gitdir: ([^\r\n]+)\r?\n?$/.exec(await readFile(gitEntry, 'utf8'));
+    if (!match) throw new Error('Audit checkout has an invalid .git pointer');
+    gitDirectory = path.resolve(root, match[1]);
+  } else throw new Error('Audit checkout requires a .git directory or pointer file');
+  gitDirectory = await realpath(gitDirectory);
+  if (!(await lstat(gitDirectory)).isDirectory()) throw new Error('Audit Git pointer must select a directory');
+  await writeFile(path.join(copiedRoot, '.git'), `gitdir: ${gitDirectory}\n`, { flag: 'wx' });
+}
+
 export async function prepareAuditTree(root, directory, id, mutation) {
   const copiedRoot = path.join(directory, id);
   await privateDirectory(root, copiedRoot);
-  for (const name of ['server/src', 'server/package.json', 'server/tsconfig.json', 'server/tsconfig.runtime.json', 'server/vitest.config.ts', 'cloudflare', 'scripts', 'client', 'wrangler.jsonc', 'package.json', 'package-lock.json']) await cp(path.join(root, name), path.join(copiedRoot, name), { recursive: true, filter: filename => !['node_modules', '.verification', '.wrangler'].includes(path.basename(filename)) });
+  for (const name of ['server/src', 'server/package.json', 'server/tsconfig.json', 'server/tsconfig.runtime.json', 'server/vitest.config.ts', 'cloudflare', 'scripts', 'client', 'wrangler.jsonc', 'railway.json', 'build.sh', 'package.json', 'package-lock.json']) await cp(path.join(root, name), path.join(copiedRoot, name), { recursive: true, filter: filename => !['node_modules', '.verification', '.wrangler'].includes(path.basename(filename)) });
   for (const name of ['node_modules', 'server/node_modules']) await symlink(path.join(root, name), path.join(copiedRoot, name), process.platform === 'win32' ? 'junction' : 'dir');
   // Read-only pointer lets buildWorker record the original HEAD without copying Git data.
-  await writeFile(path.join(copiedRoot, '.git'), await readFile(path.join(root, '.git')));
+  await writeAuditGitPointer(root, copiedRoot);
   if (mutation) { const filename = path.join(copiedRoot, mutation.file); await writeFile(filename, applyMutation(await readFile(filename, 'utf8'), mutation)); }
   await writeFile(path.join(copiedRoot, 'scripts/audit-worker-probe.mjs'), probeSource);
   const receipt = JSON.parse(await readFile(path.join(root, '.verification/client-build.json'), 'utf8'));

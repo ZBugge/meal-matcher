@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applicationRoot, buildWorker, requireCandidate } from './worker-build.mjs';
 import { privateDirectory } from './local-paths.mjs';
+import { assertWorkerHost } from './legacy-host-guard.mjs';
 
 const execute = promisify(execFile);
 export function localAssetOptions(config, root) {
@@ -47,6 +48,7 @@ async function developmentSecrets(directory) {
 }
 
 export async function startLocalWorker({ directory, port = 0, root = applicationRoot, bundleDirectory = path.join(root, '.verification/release-bundle'), secrets, migrate = true, allowNotionNetwork = false, outboundService, initializeState } = {}) {
+  assertWorkerHost();
   if (!directory) throw new Error('Explicit local state directory required');
   const candidate = await requireCandidate({ root, directory: bundleDirectory });
   // Synthetic fixture initialization runs only after current source/assets and

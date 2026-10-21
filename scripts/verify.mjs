@@ -197,7 +197,7 @@ async function main() {
     const emptyUnitState = node('.verification', `t-${randomUUID().slice(0, 8)}`);
     const sourceBefore = await sourceFingerprint(root);
     const checks = [
-      { id: 'verification-tests', name: 'Verification and delivery tool tests', cwd: root, args: ['--test', node('scripts', 'verify.test.mjs'), node('scripts', 'delivery-contract.test.mjs'), node('scripts', 'delivery-metrics.test.mjs'), node('scripts', 'delivery-handoff.test.mjs'), node('scripts', 'worker-build.test.mjs'), node('scripts', 'worker-local.test.mjs'), node('scripts', 'local-paths.test.mjs'), node('scripts', 'test-coverage.test.mjs'), node('scripts', 'audit-adversarial.test.mjs'), node('scripts', 'release-target.test.mjs'), node('scripts', 'release.test.mjs')] },
+      { id: 'verification-tests', name: 'Verification and delivery tool tests', cwd: root, args: ['--test', node('scripts', 'verify.test.mjs'), node('scripts', 'delivery-contract.test.mjs'), node('scripts', 'delivery-metrics.test.mjs'), node('scripts', 'delivery-handoff.test.mjs'), node('scripts', 'worker-build.test.mjs'), node('scripts', 'worker-local.test.mjs'), node('scripts', 'local-paths.test.mjs'), node('scripts', 'legacy-host-guard.test.mjs'), node('scripts', 'test-coverage.test.mjs'), node('scripts', 'audit-adversarial.test.mjs'), node('scripts', 'release-target.test.mjs'), node('scripts', 'release.test.mjs')] },
       { id: 'runtime-regressions', name: 'Worker/D1 compatibility and migration recovery', cwd: root, dependsOn: ['worker-build'], args: ['--test', '--test-concurrency=2', node('compatibility', 'proof.test.mjs'), node('migration', 'preflight.test.mjs'), node('migration', 'check-credentials.test.mjs'), node('migration', 'd1-rehearsal.test.mjs'), node('migration', 'full-backup.test.mjs'), node('migration', 'remote-backup.test.mjs'), node('scripts', 'test-state.test.mjs')] },
       { id: 'server-tests', name: 'Server tests', cwd: server, dependsOn: ['test-state'], args: [node('server', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=3', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'server-results.json')}`], env: { MEALMATCH_TEST_ROOT: root, MEALMATCH_TEST_BUNDLE_DIRECTORY: node('.verification', 'release-bundle'), MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
       { id: 'client-tests', name: 'Client tests', cwd: client, args: [node('client', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=3', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'client-results.json')}`] },
@@ -229,7 +229,7 @@ async function main() {
       if (!Array.isArray(renames)) throw new Error(`Missing ${label} historical mappings`);
       counts[label === 'server' ? 'historical' : `${label}Historical`] = validateHistoricalCoverage(label === 'browser' ? browserCoverageReport(data) : data, JSON.parse(await readFile(node('docs', inventory), 'utf8')), { version: mappings.version, renames }).historicalAssertions;
     }
-    for (const [id, minimum] of [['verification-tests', 63], ['runtime-regressions', 35]]) {
+    for (const [id, minimum] of [['verification-tests', 66], ['runtime-regressions', 35]]) {
       const result = report.results.find(result => result.id === id);
       if (result?.passed) counts[id] = validateNodeReport(await readFile(result.log, 'utf8'), minimum);
     }
@@ -239,6 +239,14 @@ async function main() {
     summary = { ...report, sourceSha256: sourceBefore.sha256, workerSha256: candidate?.workerSha256, assetSha256: candidate?.assetSha256, commit: candidate?.commit, passed: false, gatesPassed: passed, status: 'finishing', budgetMs: limitMs, counts, directory };
     await writeFile(path.join(directory, 'summary.json'), JSON.stringify(summary, null, 2));
     for (const result of report.results.filter(result => !result.passed)) {
+      if (['server-tests', 'client-tests'].includes(result.id)) {
+        try {
+          const data = JSON.parse(await readFile(path.join(directory, result.id.replace('-tests', '-results.json')), 'utf8'));
+          for (const file of data.testResults ?? []) for (const assertion of file.assertionResults ?? []) if (assertion.status !== 'passed') {
+            console.error(`${assertion.fullName}: ${String(assertion.failureMessages?.[0] ?? assertion.status).split('\n')[0].slice(0, 500)}`);
+          }
+        } catch (error) { if (error.code !== 'ENOENT') console.error(`Cannot read failure diagnostics: ${error.message}`); }
+      }
       console.error(`\n${result.name}:\n${(await readFile(result.log, 'utf8')).split('\n').slice(-35).join('\n')}`);
     }
   } catch (error) {

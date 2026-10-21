@@ -20,6 +20,12 @@ test('candidate guard rejects changed source, migrations, assets and Worker byte
   await writeFile(path.join(root, 'wrangler.jsonc'), '{"changed":true}');
   await assert.rejects(requireCandidate({ root, directory }), /stale/);
   await save();
+  await writeFile(path.join(root, 'railway.json'), '{"build":{"buildCommand":"changed"}}');
+  await assert.rejects(requireCandidate({ root, directory }), /stale/);
+  await save();
+  await writeFile(path.join(root, 'build.sh'), 'exit 1\n');
+  await assert.rejects(requireCandidate({ root, directory }), /stale/);
+  await save();
   await writeFile(path.join(root, 'cloudflare/migrations/0001.sql'), 'CREATE TABLE changed(id TEXT);');
   await assert.rejects(requireCandidate({ root, directory }), /stale/);
   await save();

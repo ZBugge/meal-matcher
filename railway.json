@@ -1,7 +1,7 @@
 {
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install && bash build.sh"
+    "buildCommand": "node scripts/legacy-host-guard.mjs --legacy-entrypoint && npm install && bash build.sh"
   },
   "deploy": {
     "startCommand": "npm start",

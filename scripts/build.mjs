@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applicationRoot, buildWorker, buildClient } from './worker-build.mjs';
+import { assertWorkerHost } from './legacy-host-guard.mjs';
 
 async function command(cwd, args) {
   const env = { ...process.env };
@@ -13,6 +14,7 @@ async function command(cwd, args) {
   });
 }
 export async function buildAll() {
+  assertWorkerHost();
   await Promise.all([
     buildClient(),
     command(path.join(applicationRoot, 'server'), ['node_modules/typescript/bin/tsc']),

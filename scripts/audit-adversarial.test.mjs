@@ -1,9 +1,41 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMutation, mutations, probeSource, runAuditCases, auditCasePaths } from './audit-adversarial.mjs';
+import { applyMutation, mutations, probeSource, runAuditCases, auditCasePaths, writeAuditGitPointer } from './audit-adversarial.mjs';
 import path from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { validateMutationFailure } from './adversarial-report.mjs';
+
+test('copied audit Git metadata supports ordinary checkouts and absolute or relative worktree pointers', async () => {
+  const fixture = await mkdtemp(path.join(tmpdir(), 'mealmatch-audit-git-'));
+  try {
+    const checkout = path.join(fixture, 'checkout');
+    const metadata = path.join(checkout, '.git');
+    await mkdir(metadata, { recursive: true });
+    await writeFile(path.join(metadata, 'HEAD'), 'synthetic head\n');
+    const worktreeMetadata = path.join(metadata, 'worktrees', 'example');
+    await mkdir(worktreeMetadata, { recursive: true });
+    for (const kind of ['directory', 'absolute', 'relative']) {
+      const root = kind === 'directory' ? checkout : path.join(fixture, kind);
+      const copy = path.join(fixture, 'copy-' + kind);
+      await mkdir(copy);
+      if (kind !== 'directory') {
+        await mkdir(root);
+        const target = kind === 'relative' ? path.relative(root, worktreeMetadata) : worktreeMetadata;
+        await writeFile(path.join(root, '.git'), `gitdir: ${target}\n`);
+      }
+      await writeAuditGitPointer(root, copy);
+      assert.equal((await lstat(path.join(copy, '.git'))).isFile(), true);
+      assert.equal(await readFile(path.join(copy, '.git'), 'utf8'), `gitdir: ${await realpath(kind === 'directory' ? metadata : worktreeMetadata)}\n`);
+      await assert.rejects(writeAuditGitPointer(root, copy), { code: 'EEXIST' });
+    }
+    assert.equal(await readFile(path.join(metadata, 'HEAD'), 'utf8'), 'synthetic head\n');
+    const malformed = path.join(fixture, 'malformed');
+    await mkdir(malformed);
+    await writeFile(path.join(malformed, '.git'), 'unexpected metadata\n');
+    await assert.rejects(writeAuditGitPointer(malformed, fixture), /invalid .git pointer/);
+  } finally { await rm(fixture, { recursive: true, force: true }); }
+});
 
 test('six distinct Worker regressions require exact source anchors', () => {
   assert.equal(mutations.length, 6); assert.equal(new Set(mutations.map(value => value.id)).size, 6);

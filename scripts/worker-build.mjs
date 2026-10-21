@@ -5,13 +5,14 @@ import { readdir, readFile, writeFile, lstat, realpath } from 'node:fs/promises'
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { privateDirectory } from './local-paths.mjs';
+import { assertWorkerHost } from './legacy-host-guard.mjs';
 
 const execute = promisify(execFile);
 export const applicationRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const same = (a, b) => process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
 const inputs = ['client/src', 'client/public', 'server/src', 'cloudflare', 'scripts', 'e2e', 'migration', 'compatibility', '.github/workflows'];
-const topLevel = ['package.json', 'package-lock.json', 'wrangler.jsonc', 'playwright.config.ts', 'playwright.verify.config.ts', 'client/package.json', 'client/package-lock.json', 'client/vite.config.ts', 'client/vite.config.js', 'client/vitest.config.ts', 'client/eslint.config.js', 'client/tsconfig.json', 'client/tsconfig.node.json', 'client/index.html', 'client/tailwind.config.js', 'client/postcss.config.js', 'server/package.json', 'server/package-lock.json', 'server/tsconfig.json', 'server/tsconfig.runtime.json', 'server/vitest.config.ts', 'docs/cloudflare-test-baseline.json', 'docs/cloudflare-test-mappings.json', 'docs/cloudflare-client-test-baseline.json', 'docs/cloudflare-browser-test-baseline.json'];
+const topLevel = ['package.json', 'package-lock.json', 'railway.json', 'build.sh', 'wrangler.jsonc', 'playwright.config.ts', 'playwright.verify.config.ts', 'client/package.json', 'client/package-lock.json', 'client/vite.config.ts', 'client/vite.config.js', 'client/vitest.config.ts', 'client/eslint.config.js', 'client/tsconfig.json', 'client/tsconfig.node.json', 'client/index.html', 'client/tailwind.config.js', 'client/postcss.config.js', 'server/package.json', 'server/package-lock.json', 'server/tsconfig.json', 'server/tsconfig.runtime.json', 'server/vitest.config.ts', 'docs/cloudflare-test-baseline.json', 'docs/cloudflare-test-mappings.json', 'docs/cloudflare-client-test-baseline.json', 'docs/cloudflare-browser-test-baseline.json'];
 async function rejectImplicitBuildEnvironment(root) {
   for (const directory of [root, path.join(root, 'client'), path.join(root, 'server')]) {
     const files = await readdir(directory);
@@ -103,6 +104,7 @@ async function ensureClientBuild(root) {
 }
 
 export async function buildWorker({ root = applicationRoot, directory = path.join(root, '.verification/release-bundle') } = {}) {
+  assertWorkerHost();
   await rejectImplicitBuildEnvironment(root);
   const clientBuild = await ensureClientBuild(root);
   directory = path.resolve(directory);

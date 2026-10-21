@@ -35,6 +35,20 @@ jobs:
         working-directory: server
       - run: npx playwright install --with-deps chromium
       - run: npm run verify
+      - name: Retain synthetic verification failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-diagnostics-${{ github.sha }}
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: warn
+          path: |
+            .verification/run-*/summary.json
+            .verification/run-*/server-results.json
+            .verification/run-*/client-results.json
+            .verification/run-*/browser-results.json
+            .verification/run-*/*.log
       - name: Copy verified summary for the exact artifact set
         run: node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('.verification/latest.json'));fs.copyFileSync(p.summary,'.verification/release-summary.json')"
       - uses: actions/upload-artifact@v4

@@ -6,6 +6,18 @@ import test from 'node:test';
 import { runChecks, validateTestReport, validateNodeReport } from './verify.mjs';
 import { validateMutationFailure } from './adversarial-report.mjs';
 
+async function assertProcessStopped(pid) {
+  try { process.kill(pid, 0); }
+  catch (error) { assert.equal(error.code, 'ESRCH'); return; }
+  if (process.platform !== 'linux') assert.fail(`Process ${pid} is still running`);
+  try {
+    // A killed orphan can briefly await init's reaper. Z has already released
+    // its resources and cannot execute; every live process state must fail.
+    const stat = await readFile(`/proc/${pid}/stat`, 'utf8');
+    assert.equal(stat.match(/^\d+ \(.+\) ([A-Z])/s)?.[1], 'Z', `Process ${pid} is still running`);
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+}
+
 const browserReport = () => ({ stats: { expected: 39, unexpected: 0, skipped: 0, flaky: 0 }, suites: [{ specs: Array.from({ length: 39 }, () => ({ tests: [{ expectedStatus: 'passed', status: 'expected', results: [{ status: 'passed', retry: 0, errors: [] }] }] })) }] });
 
 test('missing counts, skipped tests, and insufficient coverage cannot validate as successful reports', () => {
@@ -101,5 +113,6 @@ test('the time budget stops a stuck gate and its descendant instead of reporting
   assert.ok(report.durationMs < 5_000, 'cleanup must not hang indefinitely');
   assert.deepEqual(report.cleanupErrors, []);
   const pid = Number(await readFile(descendantPid, 'utf8'));
-  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
+  await assertProcessStopped(pid);
+  await assert.rejects(assertProcessStopped(process.pid), /still running/);
 });

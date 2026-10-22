@@ -6,6 +6,14 @@ import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { runChecks, validateTestReport, validateNodeReport, validateRuntimeReports } from './verify.mjs';
 import { validateMutationFailure } from './adversarial-report.mjs';
+import { VERIFICATION_BUDGET_MS, VERIFICATION_GOAL_MS, verificationTiming } from './verification-policy.mjs';
+
+test('verification retains a two-minute speed goal with an independent five-minute ceiling', () => {
+  assert.equal(VERIFICATION_BUDGET_MS, 300000);
+  assert.equal(VERIFICATION_GOAL_MS, 120000);
+  assert.equal(verificationTiming(119999).performanceGoalMet, true);
+  assert.deepEqual(verificationTiming(120001), { durationMs: 120001, budgetMs: 300000, performanceGoalMs: 120000, performanceGoalMet: false });
+});
 
 async function assertProcessStopped(pid, { settleMs = 1_000 } = {}) {
   const deadline = performance.now() + settleMs;

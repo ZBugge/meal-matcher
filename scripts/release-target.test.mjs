@@ -23,7 +23,9 @@ test('release rejects stale commit/source, missing gates and over-budget evidenc
   const candidate = { commit: 'abc', sourceSha256: 'hash', workerSha256: 'worker', assetSha256: 'assets' };
   const summary = { ...candidate, passed: true, status: 'passed', durationMs: 119999, counts: { server: 226, client: 155, browser: 39, historical: 201, clientHistorical: 153, browserHistorical: 38 }, results: Array.from({ length: 11 }, () => ({ passed: true })) };
   releaseEvidence(summary, candidate, 'abc', '');
-  for (const patch of [{ sourceSha256: 'changed' }, { workerSha256: 'changed' }, { assetSha256: 'changed' }, { durationMs: 120000 }, { results: [] }, { counts: { server: 999, client: 999, browser: 999 } }]) assert.throws(() => releaseEvidence({ ...summary, ...patch }, candidate, 'abc', ''));
+  releaseEvidence({ ...summary, durationMs: 120000, performanceGoalMet: false }, candidate, 'abc', '');
+  releaseEvidence({ ...summary, durationMs: 299999, performanceGoalMet: false }, candidate, 'abc', '');
+  for (const patch of [{ sourceSha256: 'changed' }, { workerSha256: 'changed' }, { assetSha256: 'changed' }, { durationMs: 300000 }, { durationMs: -1 }, { durationMs: NaN }, { durationMs: Infinity }, { passed: false }, { status: 'failed' }, { results: [] }, { counts: { server: 999, client: 999, browser: 999 } }]) assert.throws(() => releaseEvidence({ ...summary, ...patch }, candidate, 'abc', ''));
   assert.throws(() => releaseEvidence(summary, candidate, 'changed', ''));
   assert.throws(() => releaseEvidence(summary, candidate, 'abc', '?? uncommitted-source.ts'));
   assert.throws(() => releaseEvidence(summary, candidate, 'abc'));

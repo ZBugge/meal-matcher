@@ -30,10 +30,10 @@ jobs:
             package-lock.json
             client/package-lock.json
             server/package-lock.json
-      - run: npm ci
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund --foreground-scripts
+      - run: npm ci --no-audit --no-fund --foreground-scripts
         working-directory: client
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund --foreground-scripts
         working-directory: server
       - run: npx playwright install --with-deps chromium
       - run: npm run verify

@@ -105,11 +105,16 @@ export async function buildClient(root = applicationRoot) {
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const environment = { ...process.env };
   for (const name of Object.keys(environment)) if (/^(VITE_|CLOUDFLARE_|CF_|NOTION_|DATABASE_PATH$|SESSION_SECRET$)/.test(name)) delete environment[name];
-  for (const args of [['node_modules/typescript/bin/tsc'], ['node_modules/vite/bin/vite.js', 'build']]) {
-    const result = await execute(process.execPath, args, { cwd: path.join(root, 'client'), env: environment, windowsHide: true, timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
-    process.stdout.write(result.stdout);
-    process.stderr.write(result.stderr);
+  // Type checking emits no application files. Run it beside Vite, then drain
+  // both processes before accepting assets or reporting either failure.
+  const builds = await Promise.allSettled([['node_modules/typescript/bin/tsc'], ['node_modules/vite/bin/vite.js', 'build']].map(args =>
+    execute(process.execPath, args, { cwd: path.join(root, 'client'), env: environment, windowsHide: true, timeout: 60000, maxBuffer: 4 * 1024 * 1024 })));
+  for (const result of builds) if (result.status === 'fulfilled') {
+    process.stdout.write(result.value.stdout);
+    process.stderr.write(result.value.stderr);
   }
+  const failure = builds.find(result => result.status === 'rejected');
+  if (failure) throw failure.reason;
   if (before !== await clientFingerprint(root)) throw new Error('Frontend source changed during its build');
   const receipt = { version: 1, clientSourceSha256: before, assetSha256: (await assetFingerprint(root)).sha256 };
   await privateDirectory(root, path.join(root, '.verification'));

@@ -199,23 +199,24 @@ async function main() {
     const sourceBefore = await sourceFingerprint(root);
     const checks = [
       { id: 'verification-tests', name: 'Verification and delivery tool tests', cwd: root, args: ['--test', '--test-concurrency=2', node('scripts', 'verify.test.mjs'), node('scripts', 'delivery-contract.test.mjs'), node('scripts', 'delivery-metrics.test.mjs'), node('scripts', 'delivery-handoff.test.mjs'), node('scripts', 'worker-build.test.mjs'), node('scripts', 'worker-local.test.mjs'), node('scripts', 'local-paths.test.mjs'), node('scripts', 'legacy-host-guard.test.mjs'), node('scripts', 'test-coverage.test.mjs'), node('scripts', 'audit-adversarial.test.mjs'), node('scripts', 'release-target.test.mjs'), node('scripts', 'release.test.mjs')] },
-      { id: 'runtime-regressions', name: 'Worker/D1 compatibility and migration recovery', cwd: root, dependsOn: ['worker-build'], args: ['--test', '--test-concurrency=1', node('compatibility', 'proof.test.mjs'), node('migration', 'preflight.test.mjs'), node('migration', 'check-credentials.test.mjs'), node('migration', 'd1-rehearsal.test.mjs'), node('migration', 'full-backup.test.mjs'), node('migration', 'remote-backup.test.mjs'), node('scripts', 'test-state.test.mjs')] },
-      { id: 'server-tests', name: 'Server tests', cwd: server, dependsOn: ['test-state'], args: [node('server', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=2', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'server-results.json')}`], env: { MEALMATCH_TEST_ROOT: root, MEALMATCH_TEST_BUNDLE_DIRECTORY: node('.verification', 'release-bundle'), MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
+      { id: 'runtime-regressions', name: 'Worker/D1 compatibility and migration recovery', cwd: root, dependsOn: ['worker-build'], args: ['--test', '--test-concurrency=2', node('compatibility', 'proof.test.mjs'), node('migration', 'preflight.test.mjs'), node('migration', 'check-credentials.test.mjs'), node('migration', 'd1-rehearsal.test.mjs'), node('migration', 'full-backup.test.mjs'), node('migration', 'remote-backup.test.mjs'), node('scripts', 'test-state.test.mjs')] },
+      { id: 'server-tests', name: 'Server tests', cwd: server, dependsOn: ['test-state', 'worker-build'], args: [node('server', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=3', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'server-results.json')}`], env: { MEALMATCH_TEST_ROOT: root, MEALMATCH_TEST_BUNDLE_DIRECTORY: node('.verification', 'release-bundle'), MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
       { id: 'client-tests', name: 'Client tests', cwd: client, args: [node('client', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=2', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'client-results.json')}`] },
       { id: 'lint', name: 'Client lint', cwd: client, args: [node('client', 'node_modules', 'eslint', 'bin', 'eslint.js'), 'src'] },
       { id: 'server-build', name: 'Server build', cwd: server, args: [node('server', 'node_modules', 'typescript', 'bin', 'tsc')] },
       { id: 'client-build', name: 'Client build', cwd: root, args: [fileURLToPath(import.meta.url), '--client-build'] },
       { id: 'worker-build', name: 'Shipped Worker bundle', cwd: root, dependsOn: ['client-build', 'server-build'], args: [node('scripts', 'worker-build.mjs')] },
-      { id: 'test-state', name: 'Isolated migrated test template', cwd: root, dependsOn: ['worker-build'], args: [node('scripts', 'test-state.mjs'), '--prepare', emptyUnitState] },
-      { id: 'production-smoke', name: 'Built production runtime', cwd: root, dependsOn: ['worker-build'], args: [node('scripts', 'production-smoke.mjs'), '--output', path.join(directory, 'production-results.json')] },
+      { id: 'test-state', name: 'Isolated migrated test template', cwd: root, args: [node('scripts', 'test-state.mjs'), '--prepare', emptyUnitState] },
+      { id: 'production-smoke', name: 'Built production runtime', cwd: root, dependsOn: ['worker-build', 'test-state'], args: [node('scripts', 'production-smoke.mjs'), '--output', path.join(directory, 'production-results.json')], env: { MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
       { id: 'adversarial-audit', name: 'Adversarial mutation checks', cwd: root, dependsOn: ['worker-build'], args: [node('scripts', 'audit-adversarial.mjs'), '--directory', path.join(directory, 'mutations')] },
-      { id: 'browser-tests', name: 'Full browser suite + phone check', cwd: root, dependsOn: ['worker-build'], args: [node('node_modules', '@playwright', 'test', 'cli.js'), 'test', '--config=playwright.verify.config.ts'], env: {
+      { id: 'browser-tests', name: 'Full browser suite + phone check', cwd: root, dependsOn: ['worker-build', 'test-state'], args: [node('node_modules', '@playwright', 'test', 'cli.js'), 'test', '--config=playwright.verify.config.ts'], env: {
         MEALMATCH_VERIFY_CLIENT_PORT: String(clientPort),
         MEALMATCH_VERIFY_DIRECTORY: directory,
+        MEALMATCH_TEST_EMPTY_STATE: emptyUnitState,
       } },
     ];
     console.log('Running verification with dependent production and adversarial checks (120-second budget).');
-    console.log(`Host: ${availableParallelism()} available CPUs, ${(totalmem() / 1024 ** 3).toFixed(1)} GiB memory; bounded tool/client/server/browser workers: 2, recovery: 1.`);
+    console.log(`Host: ${availableParallelism()} available CPUs, ${(totalmem() / 1024 ** 3).toFixed(1)} GiB memory; bounded tool/client/recovery workers: 2, server/browser: 3; one closed migrated seed copied to independent fixtures.`);
     const report = await runChecks(checks, { directory, budgetMs: Math.max(1, limitMs - (performance.now() - started)), onResult: result => {
       console.log(`[${result.passed ? 'PASS' : 'FAIL'}] ${result.name}: ${seconds(result.durationMs)}`);
     } });

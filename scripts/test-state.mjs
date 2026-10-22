@@ -5,11 +5,21 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applicationRoot, sourceFingerprint } from './worker-build.mjs';
 import { privateDirectory } from './local-paths.mjs';
-import { prepareLocalState } from './worker-local.mjs';
+import { prepareLocalState, startLocalWorker } from './worker-local.mjs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const manifestName='empty-test-state.json';
 const same=(a,b)=>process.platform==='win32'?a.toLowerCase()===b.toLowerCase():a===b;
+// Only the full verifier supplies a freshly migrated, closed synthetic seed.
+// Ordinary standalone checks still apply their own actual Wrangler migrations.
+export async function startIsolatedTestWorker(options) {
+  const template=process.env.MEALMATCH_TEST_EMPTY_STATE;
+  if(!template||options.migrate===false)return startLocalWorker(options);
+  const root=options.root||applicationRoot;
+  return startLocalWorker({...options,migrate:false,initializeState:async candidate=>{
+    await cloneEmptyTestState(root,template,options.directory,{verifiedSourceSha256:candidate.sourceSha256});
+  }});
+}
 async function exclusiveDirectory(root,directory){
   directory=path.resolve(directory);
   await privateDirectory(root,path.dirname(directory));

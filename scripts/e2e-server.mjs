@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { startLocalWorker } from './worker-local.mjs';
+import { startIsolatedTestWorker as startLocalWorker } from './test-state.mjs';
 
 const directory = process.env.MEALMATCH_LOCAL_STATE;
 const port = Number(process.env.MEALMATCH_LOCAL_PORT);

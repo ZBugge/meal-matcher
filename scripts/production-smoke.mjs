@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createServer } from 'node:http';
 import { chromium, expect } from '@playwright/test';
-import { startLocalWorker } from './worker-local.mjs';
+import { startIsolatedTestWorker as startLocalWorker } from './test-state.mjs';
 import { privateDirectory } from './local-paths.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -38,7 +38,7 @@ async function previousServiceWorkerOrigin(base, script) {
 async function smoke() {
   const started = Date.now();
   const directory = path.join(root, '.verification', `production-${randomUUID()}`);
-  await privateDirectory(root, directory);
+  await privateDirectory(root, path.dirname(directory));
   const secrets = { SESSION_SECRET: randomBytes(48).toString('base64'), NOTION_ENCRYPTION_KEY: randomBytes(32).toString('base64') };
   let active;
   try {

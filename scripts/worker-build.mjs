@@ -10,6 +10,7 @@ import { assertWorkerHost } from './legacy-host-guard.mjs';
 const execute = promisify(execFile);
 export const applicationRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const clientHash = source => hash(JSON.stringify(source.files.filter(([name]) => name.startsWith('client/'))));
 const same = (a, b) => process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
 const inputs = ['client/src', 'client/public', 'server/src', 'cloudflare', 'scripts', 'e2e', 'migration', 'compatibility', '.github/workflows'];
 const topLevel = ['package.json', 'package-lock.json', 'railway.json', 'build.sh', 'wrangler.jsonc', 'playwright.config.ts', 'playwright.verify.config.ts', 'client/package.json', 'client/package-lock.json', 'client/vite.config.ts', 'client/vite.config.js', 'client/vitest.config.ts', 'client/eslint.config.js', 'client/tsconfig.json', 'client/tsconfig.node.json', 'client/index.html', 'client/tailwind.config.js', 'client/postcss.config.js', 'server/package.json', 'server/package-lock.json', 'server/tsconfig.json', 'server/tsconfig.runtime.json', 'server/vitest.config.ts', 'docs/cloudflare-test-baseline.json', 'docs/cloudflare-test-mappings.json', 'docs/cloudflare-client-test-baseline.json', 'docs/cloudflare-browser-test-baseline.json'];
@@ -19,9 +20,24 @@ async function rejectImplicitBuildEnvironment(root) {
     if (files.some(name => /^\.env(?:\.|$)/.test(name) && !name.endsWith('.example'))) throw new Error('Release builds refuse implicit .env files; preserve them and use an isolated checkout with Worker bindings');
   }
 }
+// Bound filesystem pressure across large scans, and drain active reads before
+// surfacing an error. Hash ordering is established only after all reads finish.
+async function readBounded(names, action) {
+  let next = 0, failed = false;
+  const results = await Promise.allSettled(Array.from({ length: Math.min(8, names.length) }, async () => {
+    while (!failed && next < names.length) {
+      const name = names[next++];
+      try { await action(name); }
+      catch (error) { failed = true; throw error; }
+    }
+  }));
+  const failure = results.find(result => result.status === 'rejected');
+  if (failure) throw failure.reason;
+}
 export async function sourceFingerprint(root = applicationRoot) {
   root = await realpath(root);
   const entries = [];
+  const filenames = [];
   const add = async name => {
     try {
       const filename = path.join(root, name);
@@ -43,35 +59,41 @@ export async function sourceFingerprint(root = applicationRoot) {
       if (child.isSymbolicLink()) throw new Error('Source inputs must not be redirected through symlinks');
       if (child.isDirectory()) {
         if (!['node_modules', 'dist', '.verification', '.wrangler', '.git'].includes(child.name)) await walk(name);
-      } else if (child.isFile()) await add(name);
+      } else if (child.isFile()) filenames.push(name);
     }
   };
   for (const input of inputs) await walk(input);
-  for (const input of topLevel) await add(input);
+  await readBounded([...filenames, ...topLevel], add);
   entries.sort(([a], [b]) => a.localeCompare(b));
   return { sha256: hash(JSON.stringify(entries)), files: entries };
 }
 export async function assetFingerprint(root = applicationRoot) {
   const entries = [];
+  const filenames = [];
   const directory = path.join(root, 'client/dist');
-  if ((await lstat(directory)).isSymbolicLink() || !same(await realpath(directory), path.join(await realpath(root), 'client/dist'))) throw new Error('Compiled assets must not be redirected');
+  const physicalDirectory = path.join(await realpath(root), 'client/dist');
+  if ((await lstat(directory)).isSymbolicLink() || !same(await realpath(directory), physicalDirectory)) throw new Error('Compiled assets must not be redirected');
   const walk = async relative => {
     for (const child of await readdir(path.join(directory, relative), { withFileTypes: true })) {
       if (child.isSymbolicLink()) throw new Error('Compiled assets must not be redirected');
       const name = path.join(relative, child.name);
       if (child.isDirectory()) await walk(name);
-      else if (child.isFile()) entries.push([name.replaceAll('\\', '/'), hash(await readFile(path.join(directory, name)))]);
+      else if (child.isFile()) filenames.push(name);
     }
   };
   await walk('');
+  await readBounded(filenames, async name => {
+    const filename = path.join(directory, name);
+    if ((await lstat(filename)).isSymbolicLink() || !same(await realpath(filename), path.join(physicalDirectory, name))) throw new Error('Compiled assets must not be redirected');
+    entries.push([name.replaceAll('\\', '/'), hash(await readFile(filename))]);
+  });
   if (!entries.some(([name]) => name === 'index.html')) throw new Error('Build the frontend before packaging the Worker');
   entries.sort(([a], [b]) => a.localeCompare(b));
   return { sha256: hash(JSON.stringify(entries)), files: entries };
 }
 
 export async function clientFingerprint(root = applicationRoot) {
-  const files = (await sourceFingerprint(root)).files.filter(([name]) => name.startsWith('client/'));
-  return hash(JSON.stringify(files));
+  return clientHash(await sourceFingerprint(root));
 }
 
 export async function buildClient(root = applicationRoot) {
@@ -127,7 +149,7 @@ export async function buildWorker({ root = applicationRoot, directory = path.joi
 export async function requireCandidate({ root = applicationRoot, directory = path.join(root, '.verification/release-bundle') } = {}) {
   const candidate = JSON.parse(await readFile(path.join(directory, 'candidate.json'), 'utf8'));
   const source = await sourceFingerprint(root);
-  if (candidate.version !== 1 || candidate.clientSourceSha256 !== await clientFingerprint(root) || candidate.sourceSha256 !== source.sha256 || candidate.assetSha256 !== (await assetFingerprint(root)).sha256 || candidate.workerSha256 !== hash(await readFile(path.join(directory, 'worker.js')))) throw new Error('Missing, modified or stale Worker candidate; build and verify the current source');
+  if (candidate.version !== 1 || candidate.clientSourceSha256 !== clientHash(source) || candidate.sourceSha256 !== source.sha256 || candidate.assetSha256 !== (await assetFingerprint(root)).sha256 || candidate.workerSha256 !== hash(await readFile(path.join(directory, 'worker.js')))) throw new Error('Missing, modified or stale Worker candidate; build and verify the current source');
   return candidate;
 }
 

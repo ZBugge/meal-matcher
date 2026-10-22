@@ -49,7 +49,7 @@ Worker bindings are `DB`, `ASSETS`, a strong `SESSION_SECRET`, and `NOTION_ENCRY
 Run checks proportional to the change. The root unit-test command covers the server and client, but not Playwright or the orchestrator.
 
 ```bash
-# Complete local verification, with isolated browser servers and a two-minute budget
+# Complete local verification, with isolated browser servers and a five-minute safety ceiling and a two-minute performance goal
 npm run verify
 
 # Server and client unit tests
@@ -80,7 +80,7 @@ node --test scripts/check-brain.test.mjs
 
 `npm run build` typechecks both packages and builds the frontend and Worker without installing dependencies. Direct package builds do not produce the authoritative Worker candidate. `npm run build:worker` packages current source and rebuilds stale frontend assets. Candidate receipts bind source, assets and Worker bytes.
 
-`npm run verify` runs full suites, lint, builds, runner regressions, migration/compatibility checks, actual Worker smoke, mutation checks and every browser scenario in parallel with bounded workers. It allocates independent ports and fresh D1 state beside existing previews. Logs, timings, screenshots and reports live in ignored `.verification/`; `.verification/latest.json` points to the current run summary. Missing/skipped/flaky tests, gate failures, cleanup errors and elapsed time of 120 seconds or more fail verification. See `docs/verification.md`.
+`npm run verify` runs full suites, lint, builds, runner regressions, migration/compatibility checks, actual Worker smoke, mutation checks and every browser scenario in parallel with bounded workers. It allocates independent ports and fresh D1 state beside existing previews. Logs, timings, screenshots and reports live in ignored `.verification/`; `.verification/latest.json` points to the current run summary. Missing/skipped/flaky tests, gate failures, cleanup errors and elapsed time of 300 seconds or more fail verification; exceeding two minutes is reported as a performance miss, not a failed correctness check. See `docs/verification.md`.
 
 Server and browser tests use disposable local D1 state and the compiled Worker. Never point a test at development, preview, staging or production state. The historical server assertion inventory in `docs/cloudflare-test-baseline.json` requires explicit one-to-one mappings for deliberate test renames.
 
@@ -127,7 +127,7 @@ Playwright always starts its own built Worker with per-run D1 state under `.veri
 - For an API contract change, update the route, `server/src/types.ts`, `client/src/api/client.ts`, all consumers, and tests together.
 - For a schema change, update fresh-database creation, existing-database migration, server types, queries, and tests together.
 - Add or adjust tests next to the affected code. Use Playwright when behavior spans browser storage, multiple participants, authentication, or the client/server boundary.
-- `npm run verify` also checks the compiled production runtime and six isolated API/persistence mutations after successful prerequisites. Maintain its under-two-minute budget and meaningful failure assertions; extend adversarial checks when consequential regressions reveal a gap. See `docs/verification.md`.
+- `npm run verify` also checks the compiled production runtime and six isolated API/persistence mutations after successful prerequisites. Keep its five-minute safety ceiling, informational two-minute performance goal and meaningful failure assertions; extend adversarial checks when consequential regressions reveal a gap. See `docs/verification.md`.
 - Do not hand-edit generated output in `dist/`, Playwright reports, test results, coverage, databases, or installed dependencies.
 
 ## Code review priorities

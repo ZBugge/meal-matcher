@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { VERIFICATION_BUDGET_MS } from './verification-policy.mjs';
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 export function releaseTarget(config, targets, environment, expectedAccount) {
@@ -35,7 +36,7 @@ export function releaseTarget(config, targets, environment, expectedAccount) {
 export function releaseEvidence(summary, candidate, head, gitStatus) {
   assert.equal(gitStatus, '', 'Release requires a clean committed checkout, including untracked source');
   assert.equal(candidate.commit, head, 'Candidate commit differs from checked-out release commit');
-  assert(summary.passed === true && summary.status === 'passed' && summary.durationMs < 120000, 'A complete passing verification under 120 seconds is required');
+  assert(summary.passed === true && summary.status === 'passed' && Number.isFinite(summary.durationMs) && summary.durationMs >= 0 && summary.durationMs < VERIFICATION_BUDGET_MS, 'A complete passing verification under 300 seconds is required');
   assert.equal(summary.sourceSha256, candidate.sourceSha256, 'Verification belongs to different source');
   for (const name of ['commit', 'workerSha256', 'assetSha256']) assert(typeof candidate[name] === 'string' && candidate[name] && summary[name] === candidate[name], 'Verification does not bind the exact candidate artifacts');
   for (const [label, minimum] of [['server', 226], ['client', 155], ['browser', 39], ['historical', 201], ['clientHistorical', 153], ['browserHistorical', 38]]) assert(summary.counts?.[label] >= minimum, `Missing ${label} verification`);

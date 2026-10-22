@@ -1,0 +1,102 @@
+name: MealMatch Worker verification and release
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Do not interrupt a release while its D1 migrations or deploy are in progress.
+concurrency:
+  group: mealmatch-cloudflare-${{ github.event_name == 'pull_request' && github.ref || 'release' }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    # Standard public-repository runner; native workerd/Chromium ARM64 binaries.
+    # Pin the image while ubuntu-latest transitions between Ubuntu releases.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+            server/package-lock.json
+      - run: npm ci --no-audit --no-fund --foreground-scripts
+      - run: npm ci --no-audit --no-fund --foreground-scripts
+        working-directory: client
+      - run: npm ci --no-audit --no-fund --foreground-scripts
+        working-directory: server
+      - run: npx playwright install --with-deps chromium
+      - run: npm run verify
+      - name: Retain synthetic verification failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-diagnostics-${{ github.sha }}
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: warn
+          path: |
+            .verification/run-*/summary.json
+            .verification/run-*/server-results.json
+            .verification/run-*/client-results.json
+            .verification/run-*/browser-results.json
+            .verification/run-*/*.log
+      - name: Copy verified summary for the exact artifact set
+        run: node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('.verification/latest.json'));fs.copyFileSync(p.summary,'.verification/release-summary.json')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worker-${{ github.sha }}
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            .verification/release-bundle/worker.js
+            .verification/release-bundle/candidate.json
+            .verification/release-summary.json
+            client/dist/
+
+  # Disabled until initial hosted authority/account/secrets/recovery are configured.
+  # Forks and pull requests never enter this job or receive deployment secrets.
+  release:
+    needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && vars.MEALMATCH_CLOUDFLARE_RELEASES == 'authorized'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: cloudflare-release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: worker-${{ github.sha }}
+          path: .
+      - name: Restore verification pointer
+        run: node -e "require('node:fs').writeFileSync('.verification/latest.json',JSON.stringify({summary:'.verification/release-summary.json'}))"
+      - name: Deploy isolated staging
+        run: npm run deploy:staging -- --execute
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          MEALMATCH_HOSTED_AUTHORITY: staging-authorized
+      # Production intentionally remains blocked until hosted acceptance and a
+      # verified current private recovery export are supplied by the setup runbook.
+      # Do not upload those private files with the public build artifacts.
+      - name: Deploy production after acceptance and recovery gates
+        run: npm run deploy:production -- --execute
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          MEALMATCH_HOSTED_AUTHORITY: production-authorized

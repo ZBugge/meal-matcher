@@ -13,6 +13,7 @@ build/
 # Database
 *.db
 *.sqlite
+*.notion-key
 
 # IDE
 .vscode/
@@ -41,3 +42,5 @@ agents/orchestrator/.env
 playwright-report/
 test-results/
 .verification/
+.wrangler/
+.dev.vars*

@@ -2,16 +2,20 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
+import { availableParallelism, totalmem } from 'node:os';
 import { access, mkdir, open, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { browserCoverageReport, validateHistoricalCoverage } from './test-coverage.mjs';
+import { buildClient, requireCandidate, sourceFingerprint } from './worker-build.mjs';
+import { privateDirectory } from './local-paths.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const limitMs = 120_000;
 const seconds = ms => `${(ms / 1000).toFixed(1)}s`;
 
 export function validateTestReport(label, data) {
-  const minimum = { server: 104, client: 110, browser: 27 }[label];
+  const minimum = { server: 226, client: 155, browser: 39 }[label];
   const count = label === 'browser' ? data?.stats?.expected : data?.numPassedTests;
   const noFailures = label === 'browser'
     ? ['unexpected', 'flaky', 'skipped'].every(field => data?.stats?.[field] === 0)
@@ -30,6 +34,19 @@ export function validateTestReport(label, data) {
     throw new Error(`${label} report is malformed or contains missing, failed, flaky, or skipped tests (at least ${minimum} required).`);
   }
   return count;
+}
+
+export function validateNodeReport(output, minimum) {
+  const value = label => [...output.matchAll(new RegExp(`^# ${label} (\\d+)$`, 'gm'))].at(-1)?.[1];
+  const tests = Number(value('tests'));
+  if (!Number.isInteger(tests) || tests < minimum || ['fail', 'cancelled', 'skipped', 'todo'].some(label => value(label) !== '0')) throw new Error('Node regression report has missing, failed, cancelled, skipped or todo tests');
+  return tests;
+}
+
+export function validateRuntimeReports(foundationOutput, recoveryOutput) {
+  const foundations = validateNodeReport(foundationOutput, 28);
+  const recovery = validateNodeReport(recoveryOutput, 7);
+  return { foundations, recovery, total: foundations + recovery };
 }
 
 async function freePort(exclude = []) {
@@ -159,7 +176,7 @@ export async function runChecks(checks, { directory, budgetMs, onResult = () => 
 async function main() {
   const started = performance.now();
   const verificationDirectory = path.join(root, '.verification');
-  await mkdir(verificationDirectory, { recursive: true });
+  await privateDirectory(root, verificationDirectory);
   const lockPath = path.join(verificationDirectory, 'verify.lock');
   let lock;
   let summary;
@@ -180,26 +197,33 @@ async function main() {
     const require = createRequire(path.join(root, 'package.json'));
     await access(require('@playwright/test').chromium.executablePath());
     const clientPort = await freePort();
-    const apiPort = await freePort([clientPort]);
     const client = path.join(root, 'client');
     const server = path.join(root, 'server');
     const node = (...parts) => path.join(root, ...parts);
+    // Keep SQLite's absolute filenames short on Windows; each run owns a new seed.
+    const emptyUnitState = node('.verification', `t-${randomUUID().slice(0, 8)}`);
+    const sourceBefore = await sourceFingerprint(root);
     const checks = [
-      { id: 'verification-tests', name: 'Verification and delivery tool tests', cwd: root, args: ['--test', node('scripts', 'verify.test.mjs'), node('scripts', 'delivery-contract.test.mjs'), node('scripts', 'delivery-metrics.test.mjs'), node('scripts', 'delivery-handoff.test.mjs')] },
-      { id: 'server-tests', name: 'Server tests', cwd: server, args: [node('server', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=2', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'server-results.json')}`] },
+      { id: 'verification-tests', name: 'Verification and delivery tool tests', cwd: root, args: ['--test', '--test-concurrency=2', node('scripts', 'verify.test.mjs'), node('scripts', 'delivery-contract.test.mjs'), node('scripts', 'delivery-metrics.test.mjs'), node('scripts', 'delivery-handoff.test.mjs'), node('scripts', 'worker-build.test.mjs'), node('scripts', 'worker-local.test.mjs'), node('scripts', 'local-paths.test.mjs'), node('scripts', 'legacy-host-guard.test.mjs'), node('scripts', 'test-coverage.test.mjs'), node('scripts', 'audit-adversarial.test.mjs'), node('scripts', 'release-target.test.mjs'), node('scripts', 'release.test.mjs')] },
+      { id: 'runtime-foundations', name: 'Worker/D1 compatibility and migration foundations', cwd: root, args: ['--test', '--test-concurrency=2', node('compatibility', 'proof.test.mjs'), node('migration', 'preflight.test.mjs'), node('migration', 'check-credentials.test.mjs'), node('migration', 'd1-rehearsal.test.mjs'), node('migration', 'remote-backup.test.mjs'), node('scripts', 'test-state.test.mjs')] },
+      { id: 'runtime-recovery', name: 'Full runtime backup and restored application', cwd: root, dependsOn: ['worker-build'], args: ['--test', node('migration', 'full-backup.test.mjs')] },
+      { id: 'server-tests', name: 'Server tests', cwd: server, dependsOn: ['test-state', 'worker-build'], args: [node('server', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=3', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'server-results.json')}`], env: { MEALMATCH_TEST_ROOT: root, MEALMATCH_TEST_BUNDLE_DIRECTORY: node('.verification', 'release-bundle'), MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
       { id: 'client-tests', name: 'Client tests', cwd: client, args: [node('client', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=2', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'client-results.json')}`] },
       { id: 'lint', name: 'Client lint', cwd: client, args: [node('client', 'node_modules', 'eslint', 'bin', 'eslint.js'), 'src'] },
       { id: 'server-build', name: 'Server build', cwd: server, args: [node('server', 'node_modules', 'typescript', 'bin', 'tsc')] },
       { id: 'client-build', name: 'Client build', cwd: root, args: [fileURLToPath(import.meta.url), '--client-build'] },
-      { id: 'production-smoke', name: 'Built production runtime', cwd: root, dependsOn: ['client-build', 'server-build'], args: [node('scripts', 'production-smoke.mjs'), '--output', path.join(directory, 'production-results.json')] },
-      { id: 'adversarial-audit', name: 'Adversarial mutation checks', cwd: root, dependsOn: ['server-tests'], args: [node('scripts', 'audit-adversarial.mjs'), '--directory', path.join(directory, 'mutations')] },
-      { id: 'browser-tests', name: 'Full browser suite + phone check', cwd: root, args: [node('node_modules', '@playwright', 'test', 'cli.js'), 'test', '--config=playwright.verify.config.ts'], env: {
+      { id: 'worker-build', name: 'Shipped Worker bundle', cwd: root, dependsOn: ['client-build', 'server-build'], args: [node('scripts', 'worker-build.mjs')] },
+      { id: 'test-state', name: 'Isolated migrated test template', cwd: root, args: [node('scripts', 'test-state.mjs'), '--prepare', emptyUnitState] },
+      { id: 'production-smoke', name: 'Built production runtime', cwd: root, dependsOn: ['worker-build', 'test-state'], args: [node('scripts', 'production-smoke.mjs'), '--output', path.join(directory, 'production-results.json')], env: { MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
+      { id: 'adversarial-audit', name: 'Adversarial mutation checks', cwd: root, dependsOn: ['worker-build', 'test-state'], args: [node('scripts', 'audit-adversarial.mjs'), '--directory', path.join(directory, 'mutations')], env: { MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
+      { id: 'browser-tests', name: 'Full browser suite + phone check', cwd: root, dependsOn: ['worker-build', 'test-state'], args: [node('node_modules', '@playwright', 'test', 'cli.js'), 'test', '--config=playwright.verify.config.ts'], env: {
         MEALMATCH_VERIFY_CLIENT_PORT: String(clientPort),
-        MEALMATCH_VERIFY_API_PORT: String(apiPort),
         MEALMATCH_VERIFY_DIRECTORY: directory,
+        MEALMATCH_TEST_EMPTY_STATE: emptyUnitState,
       } },
     ];
     console.log('Running verification with dependent production and adversarial checks (120-second budget).');
+    console.log(`Host: ${availableParallelism()} available CPUs, ${(totalmem() / 1024 ** 3).toFixed(1)} GiB memory; bounded tool/client/recovery workers: 2, server/browser: 3; one closed migrated seed copied to independent fixtures.`);
     const report = await runChecks(checks, { directory, budgetMs: Math.max(1, limitMs - (performance.now() - started)), onResult: result => {
       console.log(`[${result.passed ? 'PASS' : 'FAIL'}] ${result.name}: ${seconds(result.durationMs)}`);
     } });
@@ -209,11 +233,38 @@ async function main() {
       if (!result?.passed) continue;
       const data = JSON.parse(await readFile(path.join(directory, filename), 'utf8'));
       counts[label] = validateTestReport(label, data);
+      const inventory = label === 'server' ? 'cloudflare-test-baseline.json' : `cloudflare-${label}-test-baseline.json`;
+      const mappings = JSON.parse(await readFile(node('docs', 'cloudflare-test-mappings.json'), 'utf8'));
+      const renames = label === 'server' ? mappings.renames : mappings[`${label}Renames`];
+      if (!Array.isArray(renames)) throw new Error(`Missing ${label} historical mappings`);
+      counts[label === 'server' ? 'historical' : `${label}Historical`] = validateHistoricalCoverage(label === 'browser' ? browserCoverageReport(data) : data, JSON.parse(await readFile(node('docs', inventory), 'utf8')), { version: mappings.version, renames }).historicalAssertions;
     }
+    for (const [id, minimum] of [['verification-tests', 69]]) {
+      const result = report.results.find(result => result.id === id);
+      if (result?.passed) counts[id] = validateNodeReport(await readFile(result.log, 'utf8'), minimum);
+    }
+    const foundation = report.results.find(result => result.id === 'runtime-foundations');
+    const recovery = report.results.find(result => result.id === 'runtime-recovery');
+    if (foundation?.passed && recovery?.passed) {
+      const runtime = validateRuntimeReports(await readFile(foundation.log, 'utf8'), await readFile(recovery.log, 'utf8'));
+      counts['runtime-foundations'] = runtime.foundations;
+      counts['runtime-recovery'] = runtime.recovery;
+      counts['runtime-regressions'] = runtime.total;
+    }
+    const candidate = report.results.find(result => result.id === 'worker-build')?.passed ? await requireCandidate() : undefined;
+    if (sourceBefore.sha256 !== (await sourceFingerprint(root)).sha256) throw new Error('Source changed during verification; results are stale');
     const passed = report.results.every(result => result.passed) && !report.timedOut && !report.interrupted && report.cleanupErrors.length === 0;
-    summary = { ...report, passed: false, gatesPassed: passed, status: 'finishing', budgetMs: limitMs, counts, directory };
+    summary = { ...report, sourceSha256: sourceBefore.sha256, workerSha256: candidate?.workerSha256, assetSha256: candidate?.assetSha256, commit: candidate?.commit, passed: false, gatesPassed: passed, status: 'finishing', budgetMs: limitMs, counts, directory };
     await writeFile(path.join(directory, 'summary.json'), JSON.stringify(summary, null, 2));
     for (const result of report.results.filter(result => !result.passed)) {
+      if (['server-tests', 'client-tests'].includes(result.id)) {
+        try {
+          const data = JSON.parse(await readFile(path.join(directory, result.id.replace('-tests', '-results.json')), 'utf8'));
+          for (const file of data.testResults ?? []) for (const assertion of file.assertionResults ?? []) if (assertion.status !== 'passed') {
+            console.error(`${assertion.fullName}: ${String(assertion.failureMessages?.[0] ?? assertion.status).split('\n')[0].slice(0, 500)}`);
+          }
+        } catch (error) { if (error.code !== 'ENOENT') console.error(`Cannot read failure diagnostics: ${error.message}`); }
+      }
       console.error(`\n${result.name}:\n${(await readFile(result.log, 'utf8')).split('\n').slice(-35).join('\n')}`);
     }
   } catch (error) {
@@ -243,15 +294,7 @@ async function main() {
 }
 
 async function clientBuild() {
-  const cwd = path.join(root, 'client');
-  for (const args of [['node_modules/typescript/bin/tsc'], ['node_modules/vite/bin/vite.js', 'build']]) {
-    const code = await new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, args, { cwd, stdio: 'inherit', windowsHide: true });
-      child.once('error', reject);
-      child.once('close', resolve);
-    });
-    if (code !== 0) { process.exitCode = 1; return; }
-  }
+  await buildClient(root);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

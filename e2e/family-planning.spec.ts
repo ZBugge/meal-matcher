@@ -42,6 +42,39 @@ async function addRecipe(page: Page, title: string) {
   await page.getByRole('dialog').getByRole('button', { name: title, exact: false }).click();
 }
 
+test('a lost plan acknowledgement survives rate limiting and reload without duplicate dinners or reset groceries', async ({ page }) => {
+  const week = '2026-10-19';
+  expect((await page.request.post('/api/auth/register', { data: { email: `retry-${Date.now()}-${Math.random()}@example.test`, password: 'synthetic-password123' } })).status()).toBe(201);
+  expect((await page.request.post('/api/meals', { data: { title: 'Retry soup', ingredients: [{ amount: 'one can', ingredient: 'Beans' }] } })).status()).toBe(201);
+  await page.goto(`/dashboard?week=${week}`);
+  await page.getByRole('button', { name: 'Show library', exact: true }).click();
+  const keys: string[] = [];
+  await page.route(`**/api/plans/${week}/entries`, async route => {
+    keys.push(route.request().headers()['idempotency-key']);
+    if (keys.length === 1) {
+      expect((await route.fetch()).status()).toBe(201);
+      await route.abort('failed'); // Accepted by D1; the browser never gets the acknowledgement.
+    } else if (keys.length === 2) {
+      await route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'Too many requests. Try again shortly.' }) });
+    } else await route.continue();
+  });
+  const add = page.getByRole('button', { name: 'Add Retry soup to this week', exact: true });
+  await add.click(); await expect(page.getByRole('alert')).toBeVisible();
+  const accepted = await (await page.request.get(`/api/plans/${week}`)).json();
+  expect(accepted.entries).toHaveLength(1); expect(accepted.shopping).toHaveLength(1);
+  expect((await page.request.patch(`/api/plans/${week}/items/${accepted.shopping[0].id}`, { data: { state: 'bought' } })).ok()).toBeTruthy();
+  const beforeRetry = await (await page.request.get(`/api/plans/${week}`)).json();
+  await add.click(); await expect(page.getByRole('alert')).toHaveText('Too many requests. Try again shortly.');
+  await page.reload();
+  const show = page.getByRole('button', { name: 'Show library', exact: true });
+  await show.click();
+  await page.getByRole('button', { name: 'Add Retry soup to this week', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Added · View week' })).toHaveCount(1);
+  expect(keys).toHaveLength(3); expect(keys[0]).toMatch(/^[a-f0-9]{64}$/);
+  expect(new Set(keys).size).toBe(1);
+  expect(await (await page.request.get(`/api/plans/${week}`)).json()).toEqual(beforeRetry);
+});
+
 test('family week survives reload and shares shopping and cooking across phones', async ({ page, browser }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const email = `family-${Date.now()}-${Math.random()}@example.com`;
@@ -191,11 +224,12 @@ test('phone plans tonight, saves dinner staples, repeats reviewed meals and shop
   await page.reload(); await expect(page.getByRole('heading', { name: 'Pantry', exact: true })).toBeVisible(); await copyList(page, 'Mystery sauce');
   await testInfo.attach('shop-phone', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
   await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Plan', exact: true }).click(); await dinner(page, 'Salmon bowls'); await page.getByRole('button', { name: 'Remove Salmon bowls', exact: true }).click(); await page.getByRole('button', { name: 'Remove dinner · keep groceries', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Dinner removed; groceries kept.');
   const kept = await (await page.request.get(`/api/plans/${targetWeek}`)).json(); expect(kept.shopping.filter((row: { entryId: string | null; sourceTitle: string }) => row.entryId === null && row.sourceTitle === 'Salmon bowls')).toHaveLength(2);
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   try {
     const phone = await context.newPage(); await phone.goto('/login'); await phone.locator('#email').fill(email); await phone.locator('#password').fill(password); await phone.getByRole('button', { name: 'Sign In' }).click();
-    await dinnerIdeas(phone); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).toBeVisible(); await phone.getByRole('button', { name: 'Remove staple Asian tofu' }).click(); await phone.reload(); await dinnerIdeas(phone); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).not.toBeVisible();
+    await dinnerIdeas(phone); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).toBeVisible(); await phone.getByRole('button', { name: 'Remove staple Asian tofu' }).click(); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).not.toBeVisible(); await phone.reload(); await dinnerIdeas(phone); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).not.toBeVisible();
     await phone.goto(`/shopping?week=${targetWeek}`); await expect(phone.getByText('Completed (2) · at home & bought', { exact: true })).toBeVisible(); await expect(phone.getByRole('heading', { name: 'Pantry', exact: true })).toBeVisible();
     expect(await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   } finally { await context.close(); }

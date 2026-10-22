@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "accountId": "UNCONFIGURED",
+  "staging": {
+    "worker": "mealmatch-staging",
+    "database": "mealmatch-staging",
+    "databaseId": "UNCONFIGURED",
+    "origin": "UNCONFIGURED"
+  },
+  "production": {
+    "worker": "mealmatch-production",
+    "database": "mealmatch-production",
+    "databaseId": "UNCONFIGURED",
+    "origin": "UNCONFIGURED"
+  }
+}

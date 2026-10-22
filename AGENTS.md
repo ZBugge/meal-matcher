@@ -20,7 +20,8 @@ MealMatch is a collaborative meal-decision app. A group creates a session, votes
 ## Repository map
 
 - `client/`: React 18, TypeScript, Vite, Tailwind CSS, React Router, Framer Motion, Vitest, and Testing Library.
-- `server/`: Express, TypeScript, `sql.js` SQLite persistence, cookie sessions, and Vitest.
+- `server/`: Express, TypeScript, asynchronous D1 persistence, durable cookie sessions, and Vitest. `cloudflare/worker.ts` adapts Express; Worker Static Assets serves the frontend.
+- `cloudflare/migrations/`: numbered D1 migrations. `migration/` contains private, local administrative import/restore tools; sql.js is a development-only legacy-source reader.
 - `e2e/`: Playwright coverage for quick sessions, authenticated hosts, meal management, session lifecycle, and maybe votes.
 - `agents/orchestrator/`: a separate Node/TypeScript GitHub-issue orchestrator with its own dependencies, build, tests, state database, and Claude-oriented prompts. It is not part of the MealMatch runtime or root test command. Do not migrate or redesign it as part of an application change unless explicitly requested.
 - `SPEC.MD`: original product specification.
@@ -28,21 +29,20 @@ MealMatch is a collaborative meal-decision app. A group creates a session, votes
 
 ## Setup and development
 
-Use npm and preserve the root, client, and server lockfiles, plus the orchestrator lockfile when its package changes. The root install command does not install orchestrator dependencies.
+Use Node.js 22 or newer and npm. Preserve the root, client, and server lockfiles, plus the orchestrator lockfile when its package changes. The root install command does not install orchestrator dependencies.
 
 ```bash
 npm run install:all
 npm run dev
-npm run dev:client
-npm run dev:server
+npm run db:migrate:local
 
 # Only when working on agents/orchestrator
 npm --prefix agents/orchestrator install
 ```
 
-Development defaults are client `http://localhost:5173` and API `http://localhost:3000`; Vite proxies `/api` to the server. In production, Express serves `client/dist` and owns the SPA fallback.
+`npm run dev` builds and starts one local Worker at `http://127.0.0.1:5173` with assets and `/api` at the same origin. It uses isolated `.wrangler/dev` D1 state and generated private development secrets. Restart after source edits. It never imports or opens an existing preview database. `npm start` runs the built local Worker. Vite alone is not the complete application runtime.
 
-The normal production environment needs `SESSION_SECRET` and may set `PORT`, `NODE_ENV=production`, and `DATABASE_PATH`. Railway should mount persistent storage and set `DATABASE_PATH` to the mounted database. Never commit environment files, tokens, database files, or production data.
+Worker bindings are `DB`, `ASSETS`, a strong `SESSION_SECRET`, and `NOTION_ENCRYPTION_KEY` when Notion is used. The original Notion encryption key must be retained when importing ciphertext. There is no runtime filesystem database/key fallback. Never commit environment files, tokens, databases, or private exports. Hosted targets remain unconfigured until account identity and authority are supplied; local success does not establish deployment. See `docs/cloudflare-operations.md`.
 
 ## Verification
 
@@ -78,14 +78,14 @@ node scripts/check-brain.mjs
 node --test scripts/check-brain.test.mjs
 ```
 
-Prefer the two direct package builds during routine verification. Root `npm run build` invokes `build.sh`, which runs `npm install` inside both packages and requires a Bash-compatible shell.
+`npm run build` typechecks both packages and builds the frontend and Worker without installing dependencies. Direct package builds do not produce the authoritative Worker candidate. `npm run build:worker` packages current source and rebuilds stale frontend assets. Candidate receipts bind source, assets and Worker bytes.
 
-`npm run verify` runs full unit suites, lint, both builds, runner regression checks, and all browser scenarios (including phone layout/persistence) in parallel with bounded workers. It allocates independent browser ports and a fresh database, so it can run beside the development preview without reusing it. Logs, timings, screenshots, and reports live in ignored `.verification/`; `.verification/latest.json` points to the current run summary. Missing/skipped/flaky tests, gate failures, cleanup errors, and an elapsed time of 120 seconds or more fail verification. See `docs/verification.md` for setup and sandbox guidance. Verification adds no dependencies and leaves ordinary development defaults unchanged; Vite accepts `MEALMATCH_API_PORT` to route its isolated test proxy.
+`npm run verify` runs full suites, lint, builds, runner regressions, migration/compatibility checks, actual Worker smoke, mutation checks and every browser scenario in parallel with bounded workers. It allocates independent ports and fresh D1 state beside existing previews. Logs, timings, screenshots and reports live in ignored `.verification/`; `.verification/latest.json` points to the current run summary. Missing/skipped/flaky tests, gate failures, cleanup errors and elapsed time of 120 seconds or more fail verification. See `docs/verification.md`.
 
-Server Vitest setup allocates a fresh temporary database before each test file imports database code and removes its guarded temporary directory afterward. Do not bypass this setup or let matching tests use the developer's default database; the database module captures `DATABASE_PATH` at import time. Schema migration tests additionally use their own disposable migration fixtures.
+Server and browser tests use disposable local D1 state and the compiled Worker. Never point a test at development, preview, staging or production state. The historical server assertion inventory in `docs/cloudflare-test-baseline.json` requires explicit one-to-one mappings for deliberate test renames.
 
 Playwright writes to `playwright-report/` and `test-results/`. Those paths are ignored, but `test-results/.last-run.json` is still tracked from older history. Preserve any pre-existing change to that file and do not include generated test output in a feature diff.
-Playwright starts its server with a per-run database under `test-results/` and does not reuse an existing development server unless `PLAYWRIGHT_REUSE_SERVER=1` is explicitly set. Keep this isolation so end-to-end tests do not pollute a developer's persistent local database.
+Playwright always starts its own built Worker with per-run D1 state under `.verification/`; it never reuses a development server, including when `PLAYWRIGHT_REUSE_SERVER=1` is inherited. Keep that isolation.
 
 ## Cross-layer invariants
 
@@ -93,11 +93,12 @@ Playwright starts its server with a per-run database under `test-results/` and d
 - Keep the vote domain synchronized in server types and validation, matching logic, client API types, local-storage progress, swipe components, results UI, and tests. Search all vote usages before changing it.
 - A session has one mode: `home` or `takeout`. Stored options have a separate type: `meal`, `category`, or the reserved future `restaurant`. Home sessions currently accept only meals, takeout sessions accept only categories, and the server must reject mixed or mismatched IDs. Do not change matching behavior based on mode.
 - Host preferences stored as SQLite flags must be converted to booleans in authentication API responses. Keep their fresh-schema columns, additive migrations, API types, and client callers aligned.
-- Keep `createTables` and `runMigrations` in `server/src/db/schema.ts` aligned. The project has a small additive migration mechanism rather than a migration framework.
-- `runQuery` persists the full `sql.js` database after each write. Be conscious of write ordering and partial updates in multi-step handlers.
-- Completed ballots contain exactly one numeric vote per session option. Validate the entire ballot before mutation; replace choices and submitted state transactionally, persist once, and restore accepted state on persistence failure. `sql.js` export must occur after commit; disk saves use a sibling temporary file and atomic rename.
+- Schema changes require a new reviewed SQL migration; migrations run administratively before code release, never on a request. Keep old/new code compatible during rollout.
+- All runtime database calls are asynchronous. Dependent mutations belong in a single guarded D1 batch. Zero-row CAS updates must abort the whole operation before dependent writes; never compensate with a stale application snapshot.
+- Planning/session POST retries use scoped persistent operation receipts in the same atomic mutation. Keep the browser capability across failed responses and reload; clear it after acknowledged success. Anonymous quick-session retries require a random 256-bit capability; never expose receipt/token lookup through a public endpoint.
+- Completed ballots contain exactly one numeric vote per session option. Validate the entire ballot before mutation and atomically replace choices/submitted state with an open-session guard. Failure preserves accepted state.
 - Protect authenticated host routes with both authentication and resource ownership checks. Anonymous close operations must validate the creator token without returning or logging it.
-- Login sessions use the private SQLite login_sessions table with rolling 30-day cookies. Persistence needs the same database and SESSION_SECRET across restarts; the single-process sql.js architecture does not support multiple writers.
+- Login sessions use private D1 login_sessions with rolling 30-day cookies and revocation tombstones. Persistence needs the same database and SESSION_SECRET. A late set/touch must never revive a revoked or expired session. HTTPS cookie security derives from the actual Worker request URL.
 - Family plans and shopping lists are authenticated host-owned data under /api/plans/:week (Monday ISO date). Adding a recipe snapshots its ordered ingredients. Removing dinner always retains purchased groceries as standalone rows and may retain all its groceries when explicitly requested; unrelated items stay intact. Mutations commit and persist once, restoring accepted state on disk failure. Quick-session options may be planned only by their authenticated owner.
 - Repeating a week copies only the selected owner's dinners and their ingredient snapshots into fresh entries/items, shifts scheduled weekdays, resets grocery states to needed, and appends without replacing the destination. Bulk pantry/purchase changes validate every item before any write. Household dinner staples are private recurring ideas, distinct from shopping extras; preserve them on failed saves and across schema migrations.
 - Consolidated shopping preserves source rows and free-text amounts. Sum only understood compatible units; ambiguous amounts and different units remain explicit. Persist user aisle overrides separately from inferred grouping.
@@ -108,6 +109,7 @@ Playwright starts its server with a per-run database under `test-results/` and d
 - Recurring groceries are host-owned templates explicitly applied to a selected week. Keep application atomic and idempotent per host/week/template; later template edits or deletion must not rewrite shopping snapshots or reset bought/already-have states. Validate every selected template before mutation and restore accepted state after persistence failure.
 - Private library notes are host-only data for both meals and categories. Keep them out of public join, swipe, session, and result payloads, and expose them only through authenticated ownership-checked meal routes.
 - Library transfers are authenticated, versioned JSON for active meals and categories. Preserve private recipe data, ingredient order, and notes, assign fresh IDs on import, and never transfer ownership, tokens, counts, history, archived records, or internal IDs.
+- Notion recipes use a direct read-only REST connection per host, with encrypted server-only credentials; the app uses no AI. Keep source/page mappings private and stable across refreshes, reject local linked-recipe edits, validate a complete source before atomic updates/removals, preserve planning/shopping snapshots and freeze affected updates during open voting. See docs/notion-recipes.md for format, encryption-key and testing requirements.
 - Browser recovery uses both `sessionStorage` for join/session context and `localStorage` for in-progress swipes. Preserve the storage contracts when changing join, share, swipe, edit, or result flows.
 - Swipe drafts preserve the actual cursor, including Back navigation. Successful submissions retain accepted choices in the existing session context for later editing. Hydrate storage keys before mounting the deck, and require explicit retry after a failed submission.
 - Declare React hooks before conditional returns and keep effect dependencies accurate. Add regression coverage for async navigation, polling, and storage behavior.

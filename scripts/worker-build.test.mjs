@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { randomUUID, createHash } from 'node:crypto';
+import path from 'node:path';
+import { applicationRoot, sourceFingerprint, clientFingerprint, assetFingerprint, requireCandidate } from './worker-build.mjs';
+
+test('candidate guard rejects changed source, migrations, assets and Worker bytes', async () => {
+  const root = path.join(applicationRoot, '.verification/build-guard', randomUUID());
+  const directory = path.join(root, '.verification/release-bundle');
+  for (const relative of ['client/src', 'client/dist', 'cloudflare/migrations', '.verification/release-bundle']) await mkdir(path.join(root, relative), { recursive: true });
+  await writeFile(path.join(root, 'client/src/main.ts'), 'export const app = true;');
+  await writeFile(path.join(root, 'client/dist/index.html'), '<!doctype html>');
+  await writeFile(path.join(root, 'wrangler.jsonc'), '{}');
+  const worker = 'export default{}';
+  await writeFile(path.join(directory, 'worker.js'), worker);
+  const save = async () => writeFile(path.join(directory, 'candidate.json'), JSON.stringify({ version: 1, clientSourceSha256: await clientFingerprint(root), sourceSha256: (await sourceFingerprint(root)).sha256, assetSha256: (await assetFingerprint(root)).sha256, workerSha256: createHash('sha256').update(worker).digest('hex') }));
+  await save();
+  await requireCandidate({ root, directory });
+  await writeFile(path.join(root, 'wrangler.jsonc'), '{"changed":true}');
+  await assert.rejects(requireCandidate({ root, directory }), /stale/);
+  await save();
+  await writeFile(path.join(root, 'railway.json'), '{"build":{"buildCommand":"changed"}}');
+  await assert.rejects(requireCandidate({ root, directory }), /stale/);
+  await save();
+  await writeFile(path.join(root, 'build.sh'), 'exit 1\n');
+  await assert.rejects(requireCandidate({ root, directory }), /stale/);
+  await save();
+  await writeFile(path.join(root, 'cloudflare/migrations/0001.sql'), 'CREATE TABLE changed(id TEXT);');
+  await assert.rejects(requireCandidate({ root, directory }), /stale/);
+  await save();
+  await writeFile(path.join(root, 'client/dist/index.html'), '<!doctype html>Changed build');
+  await assert.rejects(requireCandidate({ root, directory }), /stale/);
+  await save();
+  await writeFile(path.join(directory, 'worker.js'), 'export default{changed:true}');
+  await assert.rejects(requireCandidate({ root, directory }), /stale/);
+});

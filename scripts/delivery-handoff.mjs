@@ -123,13 +123,16 @@ export async function runHandoff(contractPath, owner, { cwd = process.cwd(), npm
     receipt.sourceHash = receipt.before.sourceHash;
     const ownedPaths = builder.files.map(file => file.replaceAll('\\', '/').toLowerCase());
     const rootBuildInput = ownedPaths.some(file => ['package.json', 'package-lock.json', 'tsconfig.json'].includes(file));
-    const packages = ['client', 'server'].filter(pkg => rootBuildInput || ownedPaths.some(file => file.startsWith(`${pkg}/`)));
+    const workerInput = ownedPaths.some(file => file === 'wrangler.jsonc' || file.startsWith('cloudflare/'));
+    const packages = ['client', 'server'].filter(pkg => rootBuildInput || workerInput || ownedPaths.some(file => file.startsWith(`${pkg}/`)));
     if (!packages.length) {
       receipt.notApplicable = true;
       throw new Error('No affected client/server package builds; this handoff guard cannot validate this assignment.');
     }
     const cli = await npmPath(npmCli);
     const checks = packages.map(pkg => ({ id: `${pkg}-build`, name: `${pkg} package build`, cwd: root, args: [cli, '--prefix', pkg, 'run', 'build'] }));
+    const hasWorker = workerInput || await access(path.join(root, 'cloudflare/worker.ts')).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
+    if (hasWorker) checks.push({ id: 'worker-build', name: 'Worker and Static Assets package', cwd: root, dependsOn: packages.map(pkg => `${pkg}-build`), args: [cli, 'run', 'build:worker'] });
     const report = await runChecks(checks, { directory, budgetMs: 90_000 });
     Object.assign(receipt, report);
     receipt.after = await snapshot();

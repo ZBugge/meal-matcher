@@ -21,6 +21,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import RecipeFields from '../components/RecipeFields';
 import RecipePasteImport from '../components/RecipePasteImport';
 import RecipeViewer from '../components/RecipeViewer';
+import NotionConnection from '../components/NotionConnection';
 import { TAKEOUT_CATEGORY_SUGGESTIONS } from '../constants/takeoutCategories';
 
 function formatLastSelectedAt(timestamp: string | null | undefined): string {
@@ -61,6 +62,7 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeMode, setActiveMode] = useState<SessionMode>('home');
+  const [recipeSource, setRecipeSource] = useState<'regular' | 'notion'>('regular');
   const [libraryCollapsed, setLibraryCollapsed] = useState(true);
   const [historyCollapsed, setHistoryCollapsed] = useState(true);
   const [search, setSearch] = useState('');
@@ -116,7 +118,7 @@ export function Dashboard() {
   const [deletingMealIds, setDeletingMealIds] = useState<string[]>([]);
 
   const activeType = activeMode === 'home' ? 'meal' : 'category';
-  const activeMeals = meals.filter((meal) => meal.type === activeType);
+  const activeMeals = meals.filter((meal) => meal.type === activeType && (!editMode || meal.source !== 'notion') && (!recipesPage || activeMode !== 'home' || (recipeSource === 'notion' ? meal.source === 'notion' : meal.source !== 'notion')));
   const visibleMeals = activeMeals.filter(meal => `${meal.title} ${meal.description || ''}`.toLowerCase().includes(search.trim().toLowerCase())
     && (activeMode !== 'home' || ((!maxMinutes || (meal.totalMinutes != null && meal.totalMinutes <= Number(maxMinutes))) && (!effortFilter || meal.effort === effortFilter))));
   const sessionType = sessionMode === 'home' ? 'meal' : 'category';
@@ -237,9 +239,10 @@ export function Dashboard() {
 
     if (!beginSave()) return;
     try {
-      const categories = await Promise.all(
-        selectedStarterCategories.map((title) => mealsApi.create(title, undefined, 'category'))
-      );
+      const categories: Meal[] = [];
+      // Library writes share a revision: finish each selected change before
+      // submitting the next so this one user action cannot conflict with itself.
+      for (const title of selectedStarterCategories) categories.push(await mealsApi.create(title, undefined, 'category'));
       setMeals((current) => [...categories, ...current]);
       setShowTakeoutOnboarding(false);
       setSelectedStarterCategories([]);
@@ -466,7 +469,7 @@ export function Dashboard() {
       // Mark all selected meals as deleting to trigger animation
       setDeletingMealIds(selectedForDeletion);
 
-      await Promise.all(selectedForDeletion.map((id) => mealsApi.delete(id)));
+      for (const id of selectedForDeletion) await mealsApi.delete(id);
 
       // Wait for animation to complete before removing from state
       setTimeout(() => {
@@ -603,7 +606,7 @@ export function Dashboard() {
     <div className="min-h-screen bg-paper">
       {!recipesPage && <FamilyHeader />}
       <main className="family-page">
-        <div className="flex items-start justify-between gap-3"><div><p className="eyebrow">Your family kitchen</p><h1 className="page-title mt-1">{recipesPage ? 'Recipes' : 'Choose together'}</h1></div>{recipesPage && <button className="btn btn-primary" onClick={() => { setError(''); openAddMeal(); }}>{activeMode === 'home' ? 'Add recipe' : 'Add Category'}</button>}</div>
+        <div className="flex items-start justify-between gap-3"><div><p className="eyebrow">Your family kitchen</p><h1 className="page-title mt-1">{recipesPage ? 'Recipes' : 'Choose together'}</h1></div>{recipesPage && (activeMode === 'takeout' || recipeSource === 'regular') && <button className="btn btn-primary" onClick={() => { setError(''); openAddMeal(); }}>{activeMode === 'home' ? 'Add recipe' : 'Add Category'}</button>}</div>
         {error && !showAddMeal && !showEditMeal && !notingMeal && !showCreateSession && !showTakeoutOnboarding && !showLibraryImport && !showDeleteConfirm && !showManage && !detailMeal && (
           <div role="alert" className="bg-red-50 text-red-800 px-4 py-3 rounded-lg mb-6">
             {error}
@@ -645,12 +648,19 @@ export function Dashboard() {
             </button>
           </div>
 
+          {recipesPage && activeMode === 'home' && <>
+            <div role="tablist" aria-label="Recipe source" className="flex flex-wrap gap-2 mb-5">
+              {(['regular', 'notion'] as const).map(source => <button key={source} type="button" role="tab" aria-selected={recipeSource === source} className={`btn ${recipeSource === source ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setRecipeSource(source); setEditMode(false); setSelectedForDeletion([]); setSearch(''); setMaxMinutes(''); setEffortFilter(''); }}>{source === 'notion' ? 'Notion recipes' : 'Regular recipes'}</button>)}
+            </div>
+            {recipeSource === 'notion' && <NotionConnection onRefreshed={loadData} />}
+          </>}
+
           <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
             <div className="flex flex-wrap items-center gap-3">
               {!recipesPage && <h2 className="text-2xl font-bold">
                 {activeMode === 'home' ? 'My Meals' : 'My Food Categories'}
               </h2>}
-              {recipesPage && <button className="min-h-12 px-3 text-sm font-semibold text-primary-700 underline" onClick={() => { setError(''); setShowManage(true); }}>Manage library</button>}
+              {recipesPage && (activeMode === 'takeout' || recipeSource === 'regular') && <button className="min-h-12 px-3 text-sm font-semibold text-primary-700 underline" onClick={() => { setError(''); setShowManage(true); }}>Manage library</button>}
               {!recipesPage && <button type="button" aria-expanded={!libraryCollapsed} aria-controls="saved-library" onClick={() => setLibraryCollapsed(value => !value)} className="btn btn-secondary min-h-12 px-4">
                 {libraryCollapsed ? 'Show library' : 'Hide library'}
               </button>}
@@ -703,7 +713,7 @@ export function Dashboard() {
             Search your {activeMode === 'home' ? 'recipes' : 'categories'}
             <input type="search" className="input mt-2" value={search} onChange={event => setSearch(event.target.value)} placeholder="Find a favorite…" />
           </label>
-          {activeMode === 'home' && <div className="flex flex-wrap gap-3 items-end mb-4">
+          {activeMode === 'home' && (!recipesPage || recipeSource === 'regular') && <div className="flex flex-wrap gap-3 items-end mb-4">
             <label className="text-sm font-medium">Maximum total time<select aria-label="Maximum total time" className="input mt-1" value={maxMinutes} onChange={event => setMaxMinutes(event.target.value)}><option value="">Any time</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option></select></label>
             <label className="text-sm font-medium">Filter by effort<select aria-label="Filter by effort" className="input mt-1" value={effortFilter} onChange={event => setEffortFilter(event.target.value)}><option value="">Any effort</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="involved">Involved</option></select></label>
             {(search || maxMinutes || effortFilter) && <button className="btn btn-secondary" onClick={() => { setSearch(''); setMaxMinutes(''); setEffortFilter(''); }}>Clear filters</button>}
@@ -729,12 +739,12 @@ export function Dashboard() {
               <div className="card text-center py-12">
                 <p className="text-gray-500 mb-4">
                   {activeMode === 'home'
-                    ? 'No meals yet. Add some to get started!'
+                    ? recipesPage && recipeSource === 'notion' ? 'Your refreshed Notion recipes will appear here.' : 'No meals yet. Add some to get started!'
                     : 'No takeout categories yet. Add your favorites to get started!'}
                 </p>
-                <button onClick={openAddMeal} className="btn btn-primary">
+                {(!recipesPage || activeMode !== 'home' || recipeSource === 'regular') && <button onClick={openAddMeal} className="btn btn-primary">
                   {activeMode === 'home' ? 'Add Your First Meal' : 'Add Your First Category'}
-                </button>
+                </button>}
               </div>
             )
           ) : (
@@ -812,7 +822,8 @@ export function Dashboard() {
                             {formatLastSelectedAt(meal.lastSelectedAt)}
                           </p>
                         </div>
-                        {!editMode && (
+                        {!editMode && meal.source === 'notion' && meal.notionUrl && <a href={meal.notionUrl} target="_blank" rel="noreferrer" className="min-h-12 underline text-primary-700">Edit in Notion</a>}
+                        {!editMode && meal.source !== 'notion' && (
                           <div className="flex gap-2">
                             <button
                               type="button"
@@ -953,7 +964,17 @@ export function Dashboard() {
       </main>
 
       {showManage && <ModalSheet title="Manage library" busy={saving || libraryTransferLoading} onClose={() => setShowManage(false)}>{error && !showLibraryImport && <p role="alert" className="text-red-800">{error}</p>}<p className="text-muted">Import or export your private recipes and categories, or select options to delete.</p><button className="menu-action" disabled={libraryTransferLoading} onClick={handleExportLibrary}>Export</button><button className="menu-action" disabled={libraryTransferLoading} onClick={() => { setError(''); setShowLibraryImport(true); }}>Import</button><button className="menu-action" disabled={libraryTransferLoading} onClick={() => { setEditMode(true); setSelectedForDeletion([]); setShowManage(false); }}>Select options to delete</button></ModalSheet>}
-      {detailMeal && <ModalSheet title={detailMeal.title} onClose={() => setDetailMeal(null)} busy={saving}>{error && !showEditMeal && !notingMeal && !viewingRecipe && !showDeleteConfirm && <p role="alert" className="text-red-800">{error}</p>}{detailMeal.description && <p className="text-muted">{detailMeal.description}</p>}{detailMeal.type === 'meal' && <><button className="menu-action" onClick={() => openRecipe(detailMeal.id, detailMeal)}>Read recipe</button><AddToWeek mealId={detailMeal.id} title={detailMeal.title} /><button className="menu-action" onClick={() => navigate(weekPath(`/cook/${detailMeal.id}`))}>Cook this recipe</button></>}<button className="menu-action" onClick={() => openEditMeal(detailMeal)}>Edit {detailMeal.type === 'meal' ? 'recipe' : 'category'}</button><button className="menu-action" onClick={() => openNotes(detailMeal)}>Private notes</button><p className="text-sm text-muted">{formatLastSelectedAt(detailMeal.lastSelectedAt)} · Selected {detailMeal.pickCount} times</p><button className="menu-action text-red-700" onClick={() => confirmDeleteSingleMeal(detailMeal)}>Delete {detailMeal.type === 'meal' ? 'recipe' : 'category'}</button></ModalSheet>}
+      {detailMeal && <ModalSheet title={detailMeal.title} onClose={() => setDetailMeal(null)} busy={saving}>
+        {error && !showEditMeal && !notingMeal && !viewingRecipe && !showDeleteConfirm && <p role="alert" className="text-red-800">{error}</p>}
+        {detailMeal.description && <p className="text-muted">{detailMeal.description}</p>}
+        {detailMeal.type === 'meal' && <><button className="menu-action" onClick={() => openRecipe(detailMeal.id, detailMeal)}>Read recipe</button><AddToWeek mealId={detailMeal.id} title={detailMeal.title} /><button className="menu-action" onClick={() => navigate(weekPath(`/cook/${detailMeal.id}`))}>Cook this recipe</button></>}
+        {detailMeal.source === 'notion' ? <a href={detailMeal.notionUrl} target="_blank" rel="noreferrer" className="menu-action">Edit in Notion</a> : <>
+          <button className="menu-action" onClick={() => openEditMeal(detailMeal)}>Edit {detailMeal.type === 'meal' ? 'recipe' : 'category'}</button>
+          <button className="menu-action" onClick={() => openNotes(detailMeal)}>Private notes</button>
+          <button className="menu-action text-red-700" onClick={() => confirmDeleteSingleMeal(detailMeal)}>Delete {detailMeal.type === 'meal' ? 'recipe' : 'category'}</button>
+        </>}
+        <p className="text-sm text-muted">{formatLastSelectedAt(detailMeal.lastSelectedAt)} · Selected {detailMeal.pickCount} times</p>
+      </ModalSheet>}
 
       {viewingRecipe && (
         <RecipeViewer meal={viewingRecipe} onClose={() => setViewingRecipe(null)} />
@@ -1360,9 +1381,10 @@ export function Dashboard() {
                     type="checkbox"
                     checked={selectedMealIds.includes(meal.id)}
                     onChange={() => toggleMealSelection(meal.id)}
-                    className="w-4 h-4 text-primary-600"
+                    className="w-4 h-4 shrink-0 text-primary-600"
                   />
-                  <span className="font-medium">{meal.title}</span>
+                  <span className="font-medium flex-1 min-w-0 break-words">{meal.title}</span>
+                  {meal.source === 'notion' && <span className="shrink-0 rounded-full bg-primary-50 px-2 py-1 text-xs font-medium text-primary-700">Notion</span>}
                 </label>
               ))}
             </div>

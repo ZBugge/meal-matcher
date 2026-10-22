@@ -2,18 +2,37 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Dashboard } from './Dashboard';
-import { mealsApi, sessionsApi, type Meal } from '../api/client';
+import { mealsApi, sessionsApi, notionApi, type Meal } from '../api/client';
 
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'host', email: 'household@example.com' }, logout: vi.fn() }) }));
-vi.mock('../api/client', () => ({ authApi: { updatePreferences: vi.fn() }, mealsApi: { parseRecipe: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), exportLibrary: vi.fn() }, sessionsApi: { list: vi.fn() } }));
+vi.mock('../api/client', () => ({ authApi: { updatePreferences: vi.fn() }, mealsApi: { parseRecipe: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), exportLibrary: vi.fn() }, sessionsApi: { list: vi.fn() }, notionApi: { status: vi.fn(), connect: vi.fn(), refresh: vi.fn(), disconnect: vi.fn() } }));
 const meal: Meal = { id: 'recipe', title: 'Bean stew', description: 'Our favorite', type: 'meal', pickCount: 0, ingredients: [{ amount: 'one generous handful', ingredient: 'Beans' }], instructions: 'Simmer gently.', notes: 'Private family notes' };
 function show() { render(<MemoryRouter initialEntries={['/recipes?week=2026-10-19']}><Dashboard /></MemoryRouter>); }
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(mealsApi.list).mockImplementation(async type => type === 'meal' ? [meal] : []);
   vi.mocked(sessionsApi.list).mockResolvedValue([]);
+  vi.mocked(notionApi.status).mockResolvedValue({ connected: true, sourceUrl: 'https://www.notion.so/123', lastRefreshedAt: '2026-10-19T16:00:00Z', lastError: null, recipeCount: 1 });
 });
 describe('dedicated Recipes destination', () => {
+  it('separates Notion and regular recipes, offers Notion editing and retains accepted copies after a failed refresh', async () => {
+    const linked: Meal = { ...meal, id: 'notion', title: 'Notion soup', source: 'notion', notionUrl: 'https://www.notion.so/456' };
+    vi.mocked(mealsApi.list).mockImplementation(async type => type === 'meal' ? [meal, linked] : []);
+    vi.mocked(notionApi.refresh).mockRejectedValue(new Error('Notion is unavailable.'));
+    show(); await screen.findByRole('button', { name: /Bean stew/ });
+    expect(screen.queryByRole('button', { name: /Notion soup/ })).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Notion recipes' }));
+    expect(await screen.findByRole('button', { name: /Notion soup/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Bean stew/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add recipe' })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Notion is unavailable.');
+    fireEvent.click(screen.getByRole('button', { name: /Notion soup/ }));
+    expect(screen.getByRole('link', { name: 'Edit in Notion' })).toHaveAttribute('href', linked.notionUrl);
+    expect(screen.queryByRole('button', { name: 'Edit recipe' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete recipe' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Private notes' })).toBeNull();
+  });
   it('opens to searchable saved recipes and keeps management out of the list', async () => {
     show(); expect(await screen.findByRole('button', { name: /Bean stew/ })).toBeVisible();
     expect(screen.getByLabelText('Search your recipes')).toBeVisible();

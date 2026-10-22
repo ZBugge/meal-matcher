@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Keep an existing Railway deployment/data in place during the Cloudflare move.
+node scripts/legacy-host-guard.mjs --legacy-entrypoint
+
 echo "Building MealMatch..."
 
 # Install client dependencies and build

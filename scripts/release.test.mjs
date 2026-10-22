@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { releaseSequence } from './release.mjs';
+import { readFile } from 'node:fs/promises';
+
+test('staging CI authority cannot publish production or receive production credentials', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/cloudflare.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /environment: cloudflare-staging/);
+  assert.match(workflow, /MEALMATCH_HOSTED_AUTHORITY: staging-authorized/);
+  assert(!workflow.includes('production-authorized'));
+  assert(!/run:.*deploy:production/.test(workflow));
+});
 
 test('failed identity, recovery or migration prevents Worker release; no automatic retry', async () => {
   for (const failure of ['identity', 'stagingEvidence', 'recovery', 'migrate']) {

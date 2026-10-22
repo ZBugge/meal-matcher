@@ -11,8 +11,27 @@ export default {
         ASSETS: {
             fetch(request: Request): Promise<Response>;
         };
+        RELEASE_ENVIRONMENT?: string;
+        RELEASE_COMMIT?: string;
+        RELEASE_SOURCE_SHA256?: string;
+        RELEASE_WORKER_SHA256?: string;
+        RELEASE_ASSET_SHA256?: string;
     }, ctx: unknown) {
         const url = new URL(request.url);
+        if (url.pathname === '/api/deployment' && request.method === 'GET') {
+            const identity = {
+                environment: runtimeEnv.RELEASE_ENVIRONMENT,
+                commit: runtimeEnv.RELEASE_COMMIT,
+                sourceSha256: runtimeEnv.RELEASE_SOURCE_SHA256,
+                workerSha256: runtimeEnv.RELEASE_WORKER_SHA256,
+                assetSha256: runtimeEnv.RELEASE_ASSET_SHA256,
+            };
+            const configured = Object.values(identity).every(value => typeof value === 'string' && value.length > 0);
+            return Response.json(configured ? identity : { error: 'Deployment identity unavailable' }, {
+                status: configured ? 200 : 503,
+                headers: { 'Cache-Control': 'no-store' },
+            });
+        }
         if (url.pathname !== '/api' && !url.pathname.startsWith('/api/'))
             return runtimeEnv.ASSETS.fetch(request);
         const headers = new Headers(request.headers);

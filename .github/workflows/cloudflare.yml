@@ -67,12 +67,12 @@ jobs:
 
   # Disabled until initial hosted authority/account/secrets/recovery are configured.
   # Forks and pull requests never enter this job or receive deployment secrets.
-  release:
+  staging-release:
     needs: verify
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && vars.MEALMATCH_CLOUDFLARE_RELEASES == 'authorized'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: cloudflare-release
+    environment: cloudflare-staging
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -91,12 +91,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           MEALMATCH_HOSTED_AUTHORITY: staging-authorized
-      # Production intentionally remains blocked until hosted acceptance and a
-      # verified current private recovery export are supplied by the setup runbook.
-      # Do not upload those private files with the public build artifacts.
-      - name: Deploy production after acceptance and recovery gates
-        run: npm run deploy:production -- --execute
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          MEALMATCH_HOSTED_AUTHORITY: production-authorized
+      # No production step: commissioning staging grants no production authority.
+      # A future production job needs separate authorization/environment credentials
+      # and generated private backup/restore evidence before it can be introduced.

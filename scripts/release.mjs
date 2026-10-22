@@ -74,9 +74,15 @@ async function main() {
       async deploy() {
         stage = 'deploy';
         await requireCandidate();
-        await wrangler(stage, ['deploy', '.verification/release-bundle/worker.js', '--no-bundle', '--assets', 'client/dist']);
+        const identity = {
+          RELEASE_ENVIRONMENT: environment, RELEASE_COMMIT: candidate.commit,
+          RELEASE_SOURCE_SHA256: candidate.sourceSha256, RELEASE_WORKER_SHA256: candidate.workerSha256,
+          RELEASE_ASSET_SHA256: candidate.assetSha256,
+        };
+        await wrangler(stage, ['deploy', '.verification/release-bundle/worker.js', '--no-bundle', '--assets', 'client/dist',
+          ...Object.entries(identity).flatMap(([name, value]) => ['--var', `${name}:${value}`])]);
       },
-      async smoke() { stage = 'smoke'; await smoke(target.origin); },
+      async smoke() { stage = 'smoke'; await smoke(target.origin, { environment, ...candidate }); },
       async receipt() {
         const receipt = { success: true, ...target, ...candidate, releasedAt: new Date().toISOString() };
         await writeFile(path.join(directory, 'receipt.json'), JSON.stringify(receipt, null, 2), { flag: 'wx' });

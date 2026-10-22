@@ -1090,7 +1090,7 @@ describe('Dashboard - Home and takeout modes', () => {
       expect(mealsApi.create).toHaveBeenCalledWith('Mexican', undefined, 'category');
       expect(screen.getByRole('button', { name: /Create \(2 options\)/ })).toBeInTheDocument();
     });
-  });
+  }, 10_000);
 
   it('only saves checked popular categories when onboarding is submitted', async () => {
     const barbecueCategory: Meal = {

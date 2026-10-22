@@ -3,19 +3,26 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 import { runChecks, validateTestReport, validateNodeReport } from './verify.mjs';
 import { validateMutationFailure } from './adversarial-report.mjs';
 
-async function assertProcessStopped(pid) {
-  try { process.kill(pid, 0); }
-  catch (error) { assert.equal(error.code, 'ESRCH'); return; }
-  if (process.platform !== 'linux') assert.fail(`Process ${pid} is still running`);
-  try {
-    // A killed orphan can briefly await init's reaper. Z has already released
-    // its resources and cannot execute; every live process state must fail.
-    const stat = await readFile(`/proc/${pid}/stat`, 'utf8');
-    assert.equal(stat.match(/^\d+ \(.+\) ([A-Z])/s)?.[1], 'Z', `Process ${pid} is still running`);
-  } catch (error) { if (!['ENOENT', 'ESRCH'].includes(error.code)) throw error; }
+async function assertProcessStopped(pid, { settleMs = 1_000 } = {}) {
+  const deadline = performance.now() + settleMs;
+  while (true) {
+    try { process.kill(pid, 0); }
+    catch (error) { assert.equal(error.code, 'ESRCH'); return; }
+    if (process.platform === 'linux') {
+      try {
+        // SIGKILL delivery and init's reaping are asynchronous. A zombie has
+        // released its resources; every live state must settle or fail below.
+        const stat = await readFile(`/proc/${pid}/stat`, 'utf8');
+        if (stat.match(/^\d+ \(.+\) ([A-Z])/s)?.[1] === 'Z') return;
+      } catch (error) { if (['ENOENT', 'ESRCH'].includes(error.code)) return; throw error; }
+    }
+    if (performance.now() >= deadline) assert.fail(`Process ${pid} is still running`);
+    await delay(20);
+  }
 }
 
 const browserReport = () => ({ stats: { expected: 39, unexpected: 0, skipped: 0, flaky: 0 }, suites: [{ specs: Array.from({ length: 39 }, () => ({ tests: [{ expectedStatus: 'passed', status: 'expected', results: [{ status: 'passed', retry: 0, errors: [] }] }] })) }] });
@@ -114,5 +121,5 @@ test('the time budget stops a stuck gate and its descendant instead of reporting
   assert.deepEqual(report.cleanupErrors, []);
   const pid = Number(await readFile(descendantPid, 'utf8'));
   await assertProcessStopped(pid);
-  await assert.rejects(assertProcessStopped(process.pid), /still running/);
+  await assert.rejects(assertProcessStopped(process.pid, { settleMs: 0 }), /still running/);
 });

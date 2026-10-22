@@ -28,3 +28,21 @@ test('release rejects stale commit/source, missing gates and over-budget evidenc
   assert.throws(() => releaseEvidence(summary, candidate, 'abc', '?? uncommitted-source.ts'));
   assert.throws(() => releaseEvidence(summary, candidate, 'abc'));
 });
+
+test('remote release rejects shared origins including equivalent URL spellings', () => {
+  for (const origin of ['https://stage.example.test', 'https://STAGE.example.test:443/']) {
+    const { targets, config } = fixture();
+    targets.production.origin = origin;
+    assert.throws(() => releaseTarget(config, targets, 'staging', targets.accountId), /share an origin/);
+  }
+});
+
+test('staging can be commissioned while production remains unconfigured', () => {
+  const { targets, config } = fixture();
+  targets.production.origin = 'UNCONFIGURED';
+  targets.production.databaseId = 'UNCONFIGURED';
+  assert.equal(releaseTarget(config, targets, 'staging', targets.accountId).environment, 'staging');
+  assert.throws(() => releaseTarget(config, targets, 'production', targets.accountId));
+  targets.production.origin = 'malformed';
+  assert.throws(() => releaseTarget(config, targets, 'staging', targets.accountId));
+});

@@ -38,7 +38,14 @@ async function main() {
   console.log(JSON.stringify({ target, commit: candidate.commit, sourceSha256: candidate.sourceSha256, steps: environment === 'production' ? ['identity', 'staging-evidence', 'recovery-export', 'migrations', 'verified-worker-assets', 'read-only-smoke'] : ['identity', 'migrations', 'verified-worker-assets', 'read-only-smoke'], execute: args[2] === '--execute' }));
   if (args[2] !== '--execute') return;
   assert.equal(process.env.MEALMATCH_HOSTED_AUTHORITY, `${environment}-authorized`, 'Hosted authority is not configured for this environment');
-  assert(process.env.CLOUDFLARE_API_TOKEN, 'Scoped Cloudflare CI token required');
+  assert(process.env.CLOUDFLARE_API_TOKEN, 'Cloudflare deploy credential required; Actions must use a scoped CI token');
+  const secretsFile = process.env.MEALMATCH_RUNTIME_SECRETS_FILE;
+  if (secretsFile) {
+    const secrets = JSON.parse(await readFile(secretsFile, 'utf8'));
+    assert.deepEqual(Object.keys(secrets).sort(), ['NOTION_ENCRYPTION_KEY', 'SESSION_SECRET']);
+    assert(typeof secrets.SESSION_SECRET === 'string' && secrets.SESSION_SECRET.length >= 32, 'Strong session secret required');
+    assert(typeof secrets.NOTION_ENCRYPTION_KEY === 'string' && Buffer.from(secrets.NOTION_ENCRYPTION_KEY, 'base64').length === 32, 'Independent 32-byte Notion key required');
+  }
   const directory = path.join(root, '.verification', `release-${environment}-${Date.now()}-${randomUUID()}`);
   await mkdir(directory, { recursive: true });
   const wrangler = async (name, args) => {
@@ -74,9 +81,16 @@ async function main() {
       async deploy() {
         stage = 'deploy';
         await requireCandidate();
-        await wrangler(stage, ['deploy', '.verification/release-bundle/worker.js', '--no-bundle', '--assets', 'client/dist']);
+        const identity = {
+          RELEASE_ENVIRONMENT: environment, RELEASE_COMMIT: candidate.commit,
+          RELEASE_SOURCE_SHA256: candidate.sourceSha256, RELEASE_WORKER_SHA256: candidate.workerSha256,
+          RELEASE_ASSET_SHA256: candidate.assetSha256,
+        };
+        await wrangler(stage, ['deploy', '.verification/release-bundle/worker.js', '--no-bundle', '--assets', 'client/dist',
+          ...(secretsFile ? ['--secrets-file', secretsFile] : []),
+          ...Object.entries(identity).flatMap(([name, value]) => ['--var', `${name}:${value}`])]);
       },
-      async smoke() { stage = 'smoke'; await smoke(target.origin); },
+      async smoke() { stage = 'smoke'; await smoke(target.origin, { environment, ...candidate }); },
       async receipt() {
         const receipt = { success: true, ...target, ...candidate, releasedAt: new Date().toISOString() };
         await writeFile(path.join(directory, 'receipt.json'), JSON.stringify(receipt, null, 2), { flag: 'wx' });

@@ -15,6 +15,11 @@ export function releaseTarget(config, targets, environment, expectedAccount) {
   assert.equal(url.protocol, 'https:');
   assert.equal(url.origin, target.origin, 'Expected a bare HTTPS origin');
   assert(!url.username && !url.password);
+  const other = targets[environment === 'production' ? 'staging' : 'production'];
+  // Staging can be commissioned before any production resources exist.
+  if (environment === 'production' || other.origin !== 'UNCONFIGURED') {
+    assert.notEqual(url.origin, new URL(other.origin).origin, 'Staging and production cannot share an origin');
+  }
   const selected = config.env?.[environment];
   assert(selected && selected.name === target.worker && selected.account_id === targets.accountId, 'Wrangler environment account/Worker mismatch');
   assert(selected.preview_urls === false, 'Disable version preview exposure');

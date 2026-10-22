@@ -42,7 +42,9 @@ async function smoke() {
   const secrets = { SESSION_SECRET: randomBytes(48).toString('base64'), NOTION_ENCRYPTION_KEY: randomBytes(32).toString('base64') };
   let active;
   try {
-    active = await startLocalWorker({ directory, secrets });
+    const identity = { environment: 'staging', commit: 'synthetic-commit', sourceSha256: 'synthetic-source', workerSha256: 'synthetic-worker', assetSha256: 'synthetic-assets' };
+    const releaseBindings = Object.fromEntries(Object.entries(identity).map(([name, value]) => [{ environment: 'RELEASE_ENVIRONMENT', commit: 'RELEASE_COMMIT', sourceSha256: 'RELEASE_SOURCE_SHA256', workerSha256: 'RELEASE_WORKER_SHA256', assetSha256: 'RELEASE_ASSET_SHA256' }[name], value]));
+    active = await startLocalWorker({ directory, secrets: { ...secrets, ...releaseBindings } });
     const base = new URL(active.url).origin;
     const port = Number(new URL(base).port);
     const html = await readFile(path.join(root, 'client/dist/index.html'), 'utf8');
@@ -58,6 +60,11 @@ async function smoke() {
       assert(Date.now() < deadline, 'Compiled production server readiness timed out');
       await delay(50);
     }
+    const deployment = await request('/api/deployment');
+    assert.equal(deployment.status, 200);
+    assert.equal(deployment.headers.get('cache-control'), 'no-store');
+    assert.match(deployment.headers.get('content-type') ?? '', /application\/json/);
+    assert.deepEqual(await deployment.json(), identity, 'Actual packaged Worker must expose only the configured public identity');
     for (const route of ['/', '/week', '/shopping', '/recipes', '/join/SMOKE2', '/results/production-smoke']) {
       const response = await request(route);
       assert.equal(response.status, 200, `SPA route failed: ${route}`);

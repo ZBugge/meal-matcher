@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "accountId": "UNCONFIGURED",
+  "accountId": "69e98acbb77b54ebfc07ccfd0ed0822e",
   "staging": {
     "worker": "mealmatch-staging",
     "database": "mealmatch-staging",
-    "databaseId": "UNCONFIGURED",
-    "origin": "UNCONFIGURED"
+    "databaseId": "8b93c499-b5a4-4a2a-af2a-5375853ba53a",
+    "origin": "https://mealmatch-staging.zach-bugge.workers.dev"
   },
   "production": {
     "worker": "mealmatch-production",

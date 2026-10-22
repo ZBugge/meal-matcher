@@ -149,6 +149,7 @@ test('actual D1 full runtime snapshot restores every table/column/rowid and serv
   await stage('actual compiled Worker reads restored private recipe and excludes it from public results',async()=>{
     const active=await startLocalWorker({root,directory:target,migrate:false,secrets:{SESSION_SECRET:secret,NOTION_ENCRYPTION_KEY:key.toString('base64')}});
     try {
+      const identity=await fetch(new URL('/api/deployment',active.url));assert.equal(identity.status,503);assert.equal(identity.headers.get('cache-control'),'no-store');assert.deepEqual(await identity.json(),{error:'Deployment identity unavailable'});
       const signature=createHmac('sha256',secret).update('synthetic-session').digest('base64').replace(/=+$/,'');
       const cookie='connect.sid='+encodeURIComponent('s:synthetic-session.'+signature);
       const response=await fetch(new URL('/api/meals/m',active.url),{headers:{cookie}});assert.equal(response.status,200);const recipe=await response.json();assert.equal(recipe.instructions.length,privateText.length);assert.equal(createHash('sha256').update(recipe.instructions).digest('hex'),sha);assert.equal(recipe.notes,'Private note');

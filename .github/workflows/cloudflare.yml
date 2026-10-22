@@ -86,11 +86,24 @@ jobs:
       - name: Restore verification pointer
         run: node -e "require('node:fs').writeFileSync('.verification/latest.json',JSON.stringify({summary:'.verification/release-summary.json'}))"
       - name: Deploy isolated staging
-        run: npm run deploy:staging -- --execute
+        run: |
+          node -e "const fs=require('node:fs');fs.writeFileSync('.verification/runtime-secrets.private.json',JSON.stringify({SESSION_SECRET:process.env.SESSION_SECRET,NOTION_ENCRYPTION_KEY:process.env.NOTION_ENCRYPTION_KEY}),{mode:0o600})"
+          npm run deploy:staging -- --execute
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           MEALMATCH_HOSTED_AUTHORITY: staging-authorized
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          NOTION_ENCRYPTION_KEY: ${{ secrets.NOTION_ENCRYPTION_KEY }}
+          MEALMATCH_RUNTIME_SECRETS_FILE: .verification/runtime-secrets.private.json
+      - name: Retain public staging release receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-receipt-${{ github.sha }}
+          include-hidden-files: true
+          retention-days: 30
+          if-no-files-found: error
+          path: .verification/staging-release.json
       # No production step: commissioning staging grants no production authority.
       # A future production job needs separate authorization/environment credentials
       # and generated private backup/restore evidence before it can be introduced.

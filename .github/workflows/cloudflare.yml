@@ -16,9 +16,9 @@ concurrency:
 
 jobs:
   verify:
-    # Standard public-repository runner; native workerd/Chromium ARM64 binaries.
+    # Standard public-repository runner; native workerd/Chromium x64 binaries.
     # Pin the image while ubuntu-latest transitions between Ubuntu releases.
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

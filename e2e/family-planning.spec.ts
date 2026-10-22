@@ -224,11 +224,12 @@ test('phone plans tonight, saves dinner staples, repeats reviewed meals and shop
   await page.reload(); await expect(page.getByRole('heading', { name: 'Pantry', exact: true })).toBeVisible(); await copyList(page, 'Mystery sauce');
   await testInfo.attach('shop-phone', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
   await page.getByRole('navigation', { name: 'Family kitchen' }).getByRole('link', { name: 'Plan', exact: true }).click(); await dinner(page, 'Salmon bowls'); await page.getByRole('button', { name: 'Remove Salmon bowls', exact: true }).click(); await page.getByRole('button', { name: 'Remove dinner · keep groceries', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Dinner removed; groceries kept.');
   const kept = await (await page.request.get(`/api/plans/${targetWeek}`)).json(); expect(kept.shopping.filter((row: { entryId: string | null; sourceTitle: string }) => row.entryId === null && row.sourceTitle === 'Salmon bowls')).toHaveLength(2);
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   try {
     const phone = await context.newPage(); await phone.goto('/login'); await phone.locator('#email').fill(email); await phone.locator('#password').fill(password); await phone.getByRole('button', { name: 'Sign In' }).click();
-    await dinnerIdeas(phone); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).toBeVisible(); await phone.getByRole('button', { name: 'Remove staple Asian tofu' }).click(); await phone.reload(); await dinnerIdeas(phone); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).not.toBeVisible();
+    await dinnerIdeas(phone); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).toBeVisible(); await phone.getByRole('button', { name: 'Remove staple Asian tofu' }).click(); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).not.toBeVisible(); await phone.reload(); await dinnerIdeas(phone); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).not.toBeVisible();
     await phone.goto(`/shopping?week=${targetWeek}`); await expect(phone.getByText('Completed (2) · at home & bought', { exact: true })).toBeVisible(); await expect(phone.getByRole('heading', { name: 'Pantry', exact: true })).toBeVisible();
     expect(await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   } finally { await context.close(); }

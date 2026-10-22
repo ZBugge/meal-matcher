@@ -3,9 +3,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { runChecks } from './verify.mjs';
-import { buildWorker, applicationRoot, clientFingerprint, assetFingerprint } from './worker-build.mjs';
+import { buildWorker, requireCandidate, applicationRoot, clientFingerprint, assetFingerprint } from './worker-build.mjs';
 import { validateMutationFailure } from './adversarial-report.mjs';
 import { privateDirectory } from './local-paths.mjs';
+import { cloneEmptyTestState } from './test-state.mjs';
 
 export const mutations = [
   { id: 'invalid-vote', file: 'server/src/routes/swipes.ts', from: '![0, 1, 2].includes(swipe.vote)', to: '![0, 1, 2, 3].includes(swipe.vote)' },
@@ -29,7 +30,7 @@ async function workerProbe() {
   const { startLocalWorker } = await import('./worker-local.mjs');
   const root = process.env.MEALMATCH_TEST_ROOT;
   if (!root || path.resolve(root) !== path.resolve(import.meta.dirname, '..')) throw new Error('Copied test root required');
-  const options = { root, directory: path.join(root, '.verification/s'), bundleDirectory: process.env.MEALMATCH_TEST_BUNDLE_DIRECTORY };
+  const options = { root, directory: path.join(root, '.verification/s'), bundleDirectory: process.env.MEALMATCH_TEST_BUNDLE_DIRECTORY, migrate: process.env.MEALMATCH_AUDIT_PREPARED_STATE !== '1' };
   let active = await startLocalWorker(options);
   const assertions = [];
   function client() {
@@ -112,6 +113,20 @@ export function auditCasePaths(treeDirectory, mutation) {
   return { id: mutation?.id ?? 'control', copiedRoot, bundleDirectory: path.join(copiedRoot, '.verification/b'), stateDirectory: path.join(copiedRoot, '.verification/s') };
 }
 
+// Source mutations deliberately differ from the original candidate. Reusing its
+// closed seed is valid only when every Cloudflare source and config byte matches.
+export function assertAuditSeedCompatibility(originalCandidate, copiedCandidate) {
+  const select = candidate => candidate.files.filter(([name]) => name.startsWith('cloudflare/') || name === 'wrangler.jsonc');
+  const original = select(originalCandidate), copied = select(copiedCandidate);
+  if (!original.some(([name]) => name === 'wrangler.jsonc') || !original.some(([name]) => name.startsWith('cloudflare/migrations/'))
+      || JSON.stringify(original) !== JSON.stringify(copied)) throw new Error('Audit copy has different Cloudflare sources, migrations or bindings; seed reuse refused');
+}
+
+export async function prepareAuditSeed({ root, template, stateDirectory, originalCandidate, copiedCandidate }) {
+  assertAuditSeedCompatibility(originalCandidate, copiedCandidate);
+  return cloneEmptyTestState(root, template, stateDirectory, { verifiedSourceSha256: originalCandidate.sourceSha256 });
+}
+
 // A normal checkout has a .git directory; a worktree has a pointer file whose
 // relative target must be resolved before moving the pointer into a copied tree.
 export async function writeAuditGitPointer(root, copiedRoot) {
@@ -145,7 +160,8 @@ export async function prepareAuditTree(root, directory, id, mutation) {
   return copiedRoot;
 }
 
-export async function audit({ root = applicationRoot, directory = path.join(root, '.verification', `audit-${Date.now()}-${randomUUID().slice(0, 8)}`) } = {}) {
+export async function audit({ root = applicationRoot, directory = path.join(root, '.verification', `audit-${Date.now()}-${randomUUID().slice(0, 8)}`), template = process.env.MEALMATCH_TEST_EMPTY_STATE } = {}) {
+  const originalCandidate = template ? await requireCandidate({ root }) : undefined;
   const relative = path.relative(path.join(root, '.verification'), directory);
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Audit directory must be a new child of checkout .verification');
   await privateDirectory(root, path.dirname(directory));
@@ -162,12 +178,15 @@ export async function audit({ root = applicationRoot, directory = path.join(root
   let controlCount;
   await runAuditCases(async mutation => {
     const id = mutation?.id ?? 'control';
-    const { copiedRoot, bundleDirectory } = cases.find(value => value.id === id);
+    const { copiedRoot, bundleDirectory, stateDirectory } = cases.find(value => value.id === id);
     await prepareAuditTree(root, treeDirectory, path.basename(copiedRoot), mutation);
     // Compilation failure fails the audit; it cannot kill a mutant.
-    await buildWorker({ root: copiedRoot, directory: bundleDirectory });
+    const { artifact: copiedCandidate } = await buildWorker({ root: copiedRoot, directory: bundleDirectory });
+    if (template) {
+      await prepareAuditSeed({ root, template, stateDirectory, originalCandidate, copiedCandidate });
+    }
     const reportPath = path.join(directory, `${id}.json`);
-    const execution = await runChecks([{ id, name: id, cwd: copiedRoot, args: [path.join(copiedRoot, 'scripts/audit-worker-probe.mjs')], env: { ...process.env, MEALMATCH_TEST_ROOT: copiedRoot, MEALMATCH_TEST_BUNDLE_DIRECTORY: bundleDirectory, MEALMATCH_AUDIT_REPORT: reportPath } }], { directory, budgetMs: 60000 });
+    const execution = await runChecks([{ id, name: id, cwd: copiedRoot, args: [path.join(copiedRoot, 'scripts/audit-worker-probe.mjs')], env: { ...process.env, MEALMATCH_TEST_ROOT: copiedRoot, MEALMATCH_TEST_BUNDLE_DIRECTORY: bundleDirectory, MEALMATCH_AUDIT_REPORT: reportPath, MEALMATCH_AUDIT_PREPARED_STATE: template ? '1' : '0' } }], { directory, budgetMs: 60000 });
     if (execution.timedOut || execution.interrupted || execution.cleanupErrors.length) throw new Error(`${id}: probe infrastructure failed`);
     const report = JSON.parse(await readFile(reportPath, 'utf8'));
     if (!mutation) {

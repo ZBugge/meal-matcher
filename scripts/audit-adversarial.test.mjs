@@ -1,10 +1,60 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMutation, mutations, probeSource, runAuditCases, auditCasePaths, writeAuditGitPointer } from './audit-adversarial.mjs';
+import { applyMutation, mutations, probeSource, runAuditCases, auditCasePaths, writeAuditGitPointer, assertAuditSeedCompatibility, prepareAuditSeed } from './audit-adversarial.mjs';
+import { sourceFingerprint } from './worker-build.mjs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { validateMutationFailure } from './adversarial-report.mjs';
+
+test('audit seed cloning rejects stale provenance, existing targets and changed closed state', async () => {
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), 'mealmatch-audit-seed-')));
+  try {
+    await mkdir(path.join(root, 'cloudflare/migrations'), { recursive: true });
+    await writeFile(path.join(root, 'cloudflare/migrations/0001.sql'), 'CREATE TABLE synthetic(id TEXT)');
+    await writeFile(path.join(root, 'wrangler.jsonc'), '{"synthetic":"guard fixture only"}');
+    const originalCandidate = await sourceFingerprint(root);
+    const copiedCandidate = { ...originalCandidate, sourceSha256: 'route-mutant' };
+    const template = path.join(root, '.verification/template');
+    const state = path.join(template, 'state');
+    await mkdir(state, { recursive: true });
+    const bytes = 'Synthetic guard bytes only; never opened as a database';
+    const hash = value => createHash('sha256').update(value).digest('hex');
+    await writeFile(path.join(state, 'guard.sqlite'), bytes);
+    const payload = { version: 1, kind: 'closed-empty-migrated-d1-test-state', sourceSha256: originalCandidate.sha256, schemaSha256: hash(JSON.stringify(originalCandidate.files.filter(([name]) => name.startsWith('cloudflare/migrations/')))), files: [{ path: 'guard.sqlite', sha256: hash(bytes) }] };
+    const manifest = path.join(template, 'empty-test-state.json');
+    const writeManifest = async value => writeFile(manifest, JSON.stringify({ ...value, sha256: hash(JSON.stringify(value)) }));
+    const options = { root, template, originalCandidate: { ...originalCandidate, sourceSha256: originalCandidate.sha256 }, copiedCandidate, stateDirectory: path.join(root, '.verification/clone') };
+    await writeManifest({ ...payload, sourceSha256: 'stale source' });
+    await assert.rejects(prepareAuditSeed(options), /Stale test template/);
+    await writeManifest(payload);
+    await prepareAuditSeed(options);
+    assert.equal(await readFile(path.join(options.stateDirectory, 'state/guard.sqlite'), 'utf8'), bytes);
+    await assert.rejects(prepareAuditSeed(options), /EEXIST/);
+    await writeFile(path.join(state, 'guard.sqlite'), 'changed seed');
+    await assert.rejects(prepareAuditSeed({ ...options, stateDirectory: path.join(root, '.verification/changed') }), /Changed test template/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('audit seed reuse permits route mutants but rejects changed schema, bindings and Cloudflare code', () => {
+  const original = { files: [['cloudflare/migrations/0001.sql', 'schema'], ['cloudflare/worker.ts', 'worker'], ['server/src/routes/swipes.ts', 'route'], ['wrangler.jsonc', 'bindings']] };
+  const mutant = structuredClone(original);
+  mutant.files.find(([name]) => name === 'server/src/routes/swipes.ts')[1] = 'mutated route';
+  assert.doesNotThrow(() => assertAuditSeedCompatibility(original, mutant));
+  for (const filename of ['cloudflare/migrations/0001.sql', 'cloudflare/worker.ts', 'wrangler.jsonc']) {
+    const changed = structuredClone(mutant);
+    changed.files.find(([name]) => name === filename)[1] = 'tampered';
+    assert.throws(() => assertAuditSeedCompatibility(original, changed), /seed reuse refused/);
+    const missing = { files: mutant.files.filter(([name]) => name !== filename) };
+    assert.throws(() => assertAuditSeedCompatibility(original, missing), /seed reuse refused/);
+  }
+  const added = { files: [...mutant.files, ['cloudflare/migrations/0002.sql', 'new schema']] };
+  assert.throws(() => assertAuditSeedCompatibility(original, added), /seed reuse refused/);
+  for (const incomplete of [{ files: [] }, { files: [['wrangler.jsonc', 'bindings']] }]) {
+    assert.throws(() => assertAuditSeedCompatibility(incomplete, incomplete), /seed reuse refused/);
+  }
+});
 
 test('copied audit Git metadata supports ordinary checkouts and absolute or relative worktree pointers', async () => {
   const fixture = await mkdtemp(path.join(tmpdir(), 'mealmatch-audit-git-'));
@@ -99,6 +149,7 @@ test('failed control prevents mutants and a failed mutant drains active work', a
 test('probe selects copied compiled Worker and restarts persisted D1', () => {
   assert.match(probeSource, /MEALMATCH_TEST_ROOT/); assert.match(probeSource, /MEALMATCH_TEST_BUNDLE_DIRECTORY/);
   assert.match(probeSource, /getD1Database\('DB'\)/); assert.match(probeSource, /migrate: false/);
+  assert.match(probeSource, /migrate: process\.env\.MEALMATCH_AUDIT_PREPARED_STATE !== '1'/);
   assert.doesNotMatch(probeSource, /sql\.js|\.skip\(/);
   for (const mutation of mutations) assert.ok(probeSource.includes(`probe('${mutation.id}'`));
 });

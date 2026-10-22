@@ -208,7 +208,7 @@ async function main() {
       { id: 'worker-build', name: 'Shipped Worker bundle', cwd: root, dependsOn: ['client-build', 'server-build'], args: [node('scripts', 'worker-build.mjs')] },
       { id: 'test-state', name: 'Isolated migrated test template', cwd: root, args: [node('scripts', 'test-state.mjs'), '--prepare', emptyUnitState] },
       { id: 'production-smoke', name: 'Built production runtime', cwd: root, dependsOn: ['worker-build', 'test-state'], args: [node('scripts', 'production-smoke.mjs'), '--output', path.join(directory, 'production-results.json')], env: { MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
-      { id: 'adversarial-audit', name: 'Adversarial mutation checks', cwd: root, dependsOn: ['worker-build'], args: [node('scripts', 'audit-adversarial.mjs'), '--directory', path.join(directory, 'mutations')] },
+      { id: 'adversarial-audit', name: 'Adversarial mutation checks', cwd: root, dependsOn: ['worker-build', 'test-state'], args: [node('scripts', 'audit-adversarial.mjs'), '--directory', path.join(directory, 'mutations')], env: { MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
       { id: 'browser-tests', name: 'Full browser suite + phone check', cwd: root, dependsOn: ['worker-build', 'test-state'], args: [node('node_modules', '@playwright', 'test', 'cli.js'), 'test', '--config=playwright.verify.config.ts'], env: {
         MEALMATCH_VERIFY_CLIENT_PORT: String(clientPort),
         MEALMATCH_VERIFY_DIRECTORY: directory,
@@ -232,7 +232,7 @@ async function main() {
       if (!Array.isArray(renames)) throw new Error(`Missing ${label} historical mappings`);
       counts[label === 'server' ? 'historical' : `${label}Historical`] = validateHistoricalCoverage(label === 'browser' ? browserCoverageReport(data) : data, JSON.parse(await readFile(node('docs', inventory), 'utf8')), { version: mappings.version, renames }).historicalAssertions;
     }
-    for (const [id, minimum] of [['verification-tests', 66], ['runtime-regressions', 35]]) {
+    for (const [id, minimum] of [['verification-tests', 68], ['runtime-regressions', 35]]) {
       const result = report.results.find(result => result.id === id);
       if (result?.passed) counts[id] = validateNodeReport(await readFile(result.log, 'utf8'), minimum);
     }

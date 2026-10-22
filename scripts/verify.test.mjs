@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import { runChecks, validateTestReport, validateNodeReport } from './verify.mjs';
+import { runChecks, validateTestReport, validateNodeReport, validateRuntimeReports } from './verify.mjs';
 import { validateMutationFailure } from './adversarial-report.mjs';
 
 async function assertProcessStopped(pid, { settleMs = 1_000 } = {}) {
@@ -43,6 +43,15 @@ test('Node regression reports cannot hide skips, cancellation or missing asserti
   assert.throws(() => validateNodeReport(report.replace('# skipped 0', '# skipped 1'), 48), /skipped/);
   assert.throws(() => validateNodeReport(report.replace('# cancelled 0', '# cancelled 1'), 48), /cancelled/);
   assert.throws(() => validateNodeReport(report.replace('# tests 48', '# tests 0'), 48), /missing/);
+});
+
+test('runtime foundation totals cannot conceal missing restored-application coverage', () => {
+  const report = count => `# tests ${count}\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n`;
+  assert.deepEqual(validateRuntimeReports(report(28), report(7)), { foundations: 28, recovery: 7, total: 35 });
+  assert.throws(() => validateRuntimeReports(report(35), report(0)), /missing/);
+  assert.throws(() => validateRuntimeReports(report(27), report(8)), /missing/);
+  assert.throws(() => validateRuntimeReports(report(28), ''), /missing/);
+  assert.throws(() => validateRuntimeReports(report(28), report(7).replace('# skipped 0', '# skipped 1')), /skipped/);
 });
 
 test('a mutant setup error or unrelated mismatch cannot count as an assertion detecting the bug', () => {

@@ -43,6 +43,12 @@ export function validateNodeReport(output, minimum) {
   return tests;
 }
 
+export function validateRuntimeReports(foundationOutput, recoveryOutput) {
+  const foundations = validateNodeReport(foundationOutput, 28);
+  const recovery = validateNodeReport(recoveryOutput, 7);
+  return { foundations, recovery, total: foundations + recovery };
+}
+
 async function freePort(exclude = []) {
   const port = await new Promise((resolve, reject) => {
     const server = createServer();
@@ -199,7 +205,8 @@ async function main() {
     const sourceBefore = await sourceFingerprint(root);
     const checks = [
       { id: 'verification-tests', name: 'Verification and delivery tool tests', cwd: root, args: ['--test', '--test-concurrency=2', node('scripts', 'verify.test.mjs'), node('scripts', 'delivery-contract.test.mjs'), node('scripts', 'delivery-metrics.test.mjs'), node('scripts', 'delivery-handoff.test.mjs'), node('scripts', 'worker-build.test.mjs'), node('scripts', 'worker-local.test.mjs'), node('scripts', 'local-paths.test.mjs'), node('scripts', 'legacy-host-guard.test.mjs'), node('scripts', 'test-coverage.test.mjs'), node('scripts', 'audit-adversarial.test.mjs'), node('scripts', 'release-target.test.mjs'), node('scripts', 'release.test.mjs')] },
-      { id: 'runtime-regressions', name: 'Worker/D1 compatibility and migration recovery', cwd: root, dependsOn: ['worker-build'], args: ['--test', '--test-concurrency=2', node('compatibility', 'proof.test.mjs'), node('migration', 'preflight.test.mjs'), node('migration', 'check-credentials.test.mjs'), node('migration', 'd1-rehearsal.test.mjs'), node('migration', 'full-backup.test.mjs'), node('migration', 'remote-backup.test.mjs'), node('scripts', 'test-state.test.mjs')] },
+      { id: 'runtime-foundations', name: 'Worker/D1 compatibility and migration foundations', cwd: root, args: ['--test', '--test-concurrency=2', node('compatibility', 'proof.test.mjs'), node('migration', 'preflight.test.mjs'), node('migration', 'check-credentials.test.mjs'), node('migration', 'd1-rehearsal.test.mjs'), node('migration', 'remote-backup.test.mjs'), node('scripts', 'test-state.test.mjs')] },
+      { id: 'runtime-recovery', name: 'Full runtime backup and restored application', cwd: root, dependsOn: ['worker-build'], args: ['--test', node('migration', 'full-backup.test.mjs')] },
       { id: 'server-tests', name: 'Server tests', cwd: server, dependsOn: ['test-state', 'worker-build'], args: [node('server', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=3', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'server-results.json')}`], env: { MEALMATCH_TEST_ROOT: root, MEALMATCH_TEST_BUNDLE_DIRECTORY: node('.verification', 'release-bundle'), MEALMATCH_TEST_EMPTY_STATE: emptyUnitState } },
       { id: 'client-tests', name: 'Client tests', cwd: client, args: [node('client', 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--maxWorkers=2', '--minWorkers=1', '--allowOnly=false', '--reporter=json', `--outputFile=${path.join(directory, 'client-results.json')}`] },
       { id: 'lint', name: 'Client lint', cwd: client, args: [node('client', 'node_modules', 'eslint', 'bin', 'eslint.js'), 'src'] },
@@ -232,9 +239,17 @@ async function main() {
       if (!Array.isArray(renames)) throw new Error(`Missing ${label} historical mappings`);
       counts[label === 'server' ? 'historical' : `${label}Historical`] = validateHistoricalCoverage(label === 'browser' ? browserCoverageReport(data) : data, JSON.parse(await readFile(node('docs', inventory), 'utf8')), { version: mappings.version, renames }).historicalAssertions;
     }
-    for (const [id, minimum] of [['verification-tests', 68], ['runtime-regressions', 35]]) {
+    for (const [id, minimum] of [['verification-tests', 69]]) {
       const result = report.results.find(result => result.id === id);
       if (result?.passed) counts[id] = validateNodeReport(await readFile(result.log, 'utf8'), minimum);
+    }
+    const foundation = report.results.find(result => result.id === 'runtime-foundations');
+    const recovery = report.results.find(result => result.id === 'runtime-recovery');
+    if (foundation?.passed && recovery?.passed) {
+      const runtime = validateRuntimeReports(await readFile(foundation.log, 'utf8'), await readFile(recovery.log, 'utf8'));
+      counts['runtime-foundations'] = runtime.foundations;
+      counts['runtime-recovery'] = runtime.recovery;
+      counts['runtime-regressions'] = runtime.total;
     }
     const candidate = report.results.find(result => result.id === 'worker-build')?.passed ? await requireCandidate() : undefined;
     if (sourceBefore.sha256 !== (await sourceFingerprint(root)).sha256) throw new Error('Source changed during verification; results are stale');

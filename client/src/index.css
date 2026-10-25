@@ -50,3 +50,5 @@
 .modal-sheet-editor .sheet-content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px; scroll-padding-block: 1rem; }
 .sheet-footer { flex-shrink: 0; border-top: 1px solid #dfd7e8; padding-top: 1rem; margin-top: 1rem; }
 @media (max-width: 640px), (max-height: 500px) { .modal-sheet-editor[open] { height: var(--sheet-height, 100dvh); max-height: var(--sheet-height, 100dvh); margin: 0 auto; border-radius: 0; } }
+
+.family-content .voting-submit { bottom: calc(5rem + env(safe-area-inset-bottom)); }

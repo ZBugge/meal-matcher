@@ -17,6 +17,7 @@ test.describe('Quick Session Flow', () => {
 
     // When: User starts swiping
     await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await page.getByRole('button', { name: 'Swipe', exact: true }).click();
 
     // Then: User is on swipe page
     await expect(page).toHaveURL(/\/session\/.*\/swipe/);
@@ -53,6 +54,7 @@ test.describe('Quick Session Flow', () => {
     // And: Enters their name and starts swiping
     await participantPage.fill('#name', 'Participant');
     await participantPage.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await participantPage.getByRole('button', { name: 'Swipe', exact: true }).click();
 
     // And: Swipes on the meal
     await participantPage.locator('[data-testid="swipe-yes"]').click();

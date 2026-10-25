@@ -113,7 +113,7 @@ export function SwipeDeck({
           {editMode ? 'Edit Your Choices' : 'Your Choices'}
         </h2>
         <p className="text-gray-600 text-center mb-6">
-          {editMode ? 'Tap any meal to change your vote' : canRetry ? 'Your votes have not been submitted. Try again.' : 'Your votes have been submitted'}
+          {canRetry ? 'Your votes have not been submitted. Try again.' : editMode ? 'Tap any meal to change your vote' : 'Your votes have been submitted'}
         </p>
 
         <div className="space-y-3 mb-8">
@@ -168,7 +168,7 @@ export function SwipeDeck({
               Back
             </button>
             <button onClick={handleSubmit} className="btn btn-success flex-1 py-4 text-lg">
-              Submit Votes
+              {canRetry ? 'Retry Submission' : 'Submit Votes'}
             </button>
           </div>
         ) : (

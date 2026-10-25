@@ -15,8 +15,8 @@ vi.mock('../api/client', () => ({
 }));
 
 // Mock SwipeDeck component
-vi.mock('../components/SwipeDeck', () => ({
-  SwipeDeck: ({ editMode, hintStyle, initialIndex, onComplete }: any) => (
+vi.mock('../components/VotingChooser', () => ({
+  VotingChooser: ({ editMode, hintStyle, initialIndex, onComplete }: any) => (
     <div data-testid="swipe-deck">
       <div data-testid="edit-mode">{editMode ? 'edit' : 'normal'}</div>
       <div data-testid="hint-style">{hintStyle}</div>

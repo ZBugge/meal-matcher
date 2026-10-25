@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { participantApi } from '../api/client';
 import type { SessionMode } from '../api/client';
-import { SwipeDeck } from '../components/SwipeDeck';
+import { VotingChooser } from '../components/VotingChooser';
 import { useSwipeProgress } from '../hooks/useLocalStorage';
 
 interface SessionData {
@@ -49,6 +49,16 @@ function SwipeSessionContent({ sessionId }: { sessionId: string | undefined }) {
     displayName,
     sessionData?.participantId
   );
+
+  const votingModeKey = `voting_mode_${sessionId}_${sessionData?.participantId || ''}`;
+  const [votingMode, setVotingMode] = useState<'list' | 'swipe'>(() => {
+    try { return sessionStorage.getItem(votingModeKey) === 'swipe' ? 'swipe' : 'list'; }
+    catch { return 'list'; }
+  });
+  const handleModeChange = (mode: 'list' | 'swipe') => {
+    setVotingMode(mode);
+    try { sessionStorage.setItem(votingModeKey, mode); } catch { /* Keep this visit usable. */ }
+  };
 
   const active = useRef(false);
   useEffect(() => {
@@ -176,7 +186,7 @@ function SwipeSessionContent({ sessionId }: { sessionId: string | undefined }) {
           <p className="text-gray-600 text-sm mt-1">
             {editMode
               ? `Update your choices, ${sessionData.displayName}!`
-              : `Hey ${sessionData.displayName}! Swipe right on ${
+              : `Hey ${sessionData.displayName}! Choose the ${
                   sessionData.mode === 'takeout' ? 'food categories' : 'meals'
                 } you'd like.`}
           </p>
@@ -192,11 +202,12 @@ function SwipeSessionContent({ sessionId }: { sessionId: string | undefined }) {
         {/* Swipe deck */}
         {submitting && <p role="status" className="text-center mb-4">Submitting your votes...</p>}
         <fieldset disabled={submitting} className={submitting ? 'pointer-events-none opacity-50' : ''}>
-        <SwipeDeck
+        <VotingChooser
           meals={sessionData.meals}
           initialSwipes={initialSwipes}
           initialIndex={initialIndex}
-          onSwipe={() => {}}
+          initialMode={votingMode}
+          onModeChange={handleModeChange}
           onProgressChange={handleProgress}
           canRetry={!!error}
           onComplete={handleComplete}

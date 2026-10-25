@@ -8,6 +8,7 @@ test('a failed submission keeps choices and waits for an explicit retry', async 
   await page.getByPlaceholder('Option 1').fill('Pizza');
   await page.getByRole('button', { name: 'Create Session', exact: true }).click();
   await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await page.getByRole('button', { name: 'Swipe', exact: true }).click();
   let submissions = 0;
   await page.route('**/api/swipes/*', async route => {
     submissions++;
@@ -61,6 +62,7 @@ test('two phones preserve partial swipes, back navigation, and submitted choice 
     await partner.goto(inviteUrl);
     await partner.locator('#name').fill('Sam');
     await partner.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await partner.getByRole('button', { name: 'Swipe', exact: true }).click();
     await expect(partner.getByText('1 / 3', { exact: true })).toBeVisible();
     const partnerVotes = { Pizza: 'yes', Tacos: 'maybe', Sushi: 'no' } as const;
     const firstTitle = await partner.locator('h2').innerText();
@@ -83,6 +85,7 @@ test('two phones preserve partial swipes, back navigation, and submitted choice 
     await expect(partner.getByRole('button', { name: 'End Session & Show Results' })).toHaveCount(0);
 
     await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await page.getByRole('button', { name: 'Swipe', exact: true }).click();
     await voteRemaining(page, { Pizza: 'yes', Tacos: 'yes', Sushi: 'no' }, 3);
     await expect(page).toHaveURL(/\/results\//);
     await expect(page.getByText('2 of 2 people have finished voting')).toBeVisible();
@@ -90,6 +93,10 @@ test('two phones preserve partial swipes, back navigation, and submitted choice 
     await expect(page.getByText('Sam', { exact: true })).toBeVisible();
 
     await partner.getByRole('button', { name: 'Update Your Choices' }).click();
+    await partner.getByRole('button', { name: 'List', exact: true }).click();
+    await expect(partner.getByRole('checkbox', { name: 'Tacos', exact: true })).toHaveAccessibleDescription('Maybe');
+    await expect(partner.getByText('1 selected Yes · 1 Maybe', { exact: true })).toBeVisible();
+    await partner.getByRole('button', { name: 'Swipe', exact: true }).click();
     await expect(partner.getByRole('button', { name: 'Pizza YES' })).toBeVisible();
     await expect(partner.getByRole('button', { name: 'Sushi NO' })).toBeVisible();
     await partner.getByRole('button', { name: 'Tacos MAYBE' }).click();

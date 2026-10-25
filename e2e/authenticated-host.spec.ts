@@ -77,6 +77,7 @@ test.describe('Authenticated Host Flow', () => {
     // Participant enters name
     await participantPage.fill('#name', 'Family Member');
     await participantPage.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await participantPage.getByRole('button', { name: 'Swipe', exact: true }).click();
 
     await voteByTitle(participantPage, { 'Homemade Pizza': 'yes', 'Thai Curry': 'no', 'Grilled Salmon': 'yes' });
 
@@ -90,6 +91,7 @@ test.describe('Authenticated Host Flow', () => {
     // Host enters name and swipes
     await hostSwipePage.fill('#name', 'Host');
     await hostSwipePage.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await hostSwipePage.getByRole('button', { name: 'Swipe', exact: true }).click();
 
     await voteByTitle(hostSwipePage, { 'Homemade Pizza': 'yes', 'Thai Curry': 'yes', 'Grilled Salmon': 'no' });
 

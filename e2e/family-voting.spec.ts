@@ -55,6 +55,7 @@ test('a family can search the library, collapse it, and plan several voted meals
     await partner.goto(invite);
     await partner.locator('#name').fill('Partner');
     await partner.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await partner.getByRole('button', { name: 'Swipe', exact: true }).click();
     for (let index = 0; index < 2; index++) {
       await expect(partner.getByText('👆 Swipe to vote', { exact: true })).toBeVisible();
       await expect(partner.locator('[data-swipe-intro="true"]')).toHaveCount(0);
@@ -98,6 +99,7 @@ test('voted quick results keep a noncurrent planning week', async ({ page }) => 
   await page.getByRole('button', { name: 'Create Session', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/share\\?week=${week}$`));
   await page.getByRole('button', { name: /Start Swiping|Start voting|Continue to/i }).click();
+    await page.getByRole('button', { name: 'Swipe', exact: true }).click();
   await page.getByTestId('swipe-yes').click();
   await expect(page).toHaveURL(new RegExp(`/results/[^?]+\\?week=${week}$`));
   await page.getByRole('button', { name: 'Update Your Choices', exact: true }).click();
@@ -131,12 +133,14 @@ test('a signed-in host can end voting from their results tab', async ({ page, br
     await guest.goto(`/join/${session.inviteCode}`);
     await guest.locator('#name').fill('Still deciding');
     await guest.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await guest.getByRole('button', { name: 'Swipe', exact: true }).click();
     await guest.goto(`/results/${session.id}`);
     await expect(guest.getByRole('heading', { name: 'Waiting for Votes' })).toBeVisible();
     await expect(guest.getByRole('button', { name: 'End Session & Show Results' })).toHaveCount(0);
     await page.goto(`/join/${session.inviteCode}?week=2030-01-07`);
     await page.locator('#name').fill('Host');
     await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await page.getByRole('button', { name: 'Swipe', exact: true }).click();
     await page.getByTestId('swipe-yes').click();
     await expect(page).toHaveURL(`/results/${session.id}?week=2030-01-07`);
     await page.getByRole('button', { name: 'End Session & Show Results' }).click();

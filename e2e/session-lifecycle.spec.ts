@@ -17,6 +17,7 @@ test.describe('Session Lifecycle (#1)', () => {
 
     // Host starts swiping and finishes
     await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await page.getByRole('button', { name: 'Swipe', exact: true }).click();
     await page.locator('[data-testid="swipe-yes"]').click();
     await page.locator('[data-testid="swipe-yes"]').click();
     await expect(page).toHaveURL(/\/results\//, { timeout: 5000 });
@@ -26,6 +27,7 @@ test.describe('Session Lifecycle (#1)', () => {
     await participantPage.goto(`/join/${inviteCode}`);
     await participantPage.fill('#name', 'Slow Participant');
     await participantPage.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await participantPage.getByRole('button', { name: 'Swipe', exact: true }).click();
 
     // Participant is on swipe page
     await expect(participantPage).toHaveURL(/\/session\/.*\/swipe/);
@@ -65,6 +67,7 @@ test.describe('Session Lifecycle (#1)', () => {
 
     // Host finishes swiping
     await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await page.getByRole('button', { name: 'Swipe', exact: true }).click();
     await page.locator('[data-testid="swipe-yes"]').click();
     await expect(page).toHaveURL(/\/results\//, { timeout: 5000 });
 
@@ -73,6 +76,7 @@ test.describe('Session Lifecycle (#1)', () => {
     await participantPage.goto(`/join/${inviteCode}`);
     await participantPage.fill('#name', 'Waiting Participant');
     await participantPage.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await participantPage.getByRole('button', { name: 'Swipe', exact: true }).click();
 
     // Wait for participant to show up in the session
     await expect(page.getByText('1 of 2 people have finished voting')).toBeVisible();
@@ -105,6 +109,7 @@ test.describe('Session Lifecycle (#1)', () => {
 
     // Host finishes swiping and goes to results
     await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await page.getByRole('button', { name: 'Swipe', exact: true }).click();
     await page.locator('[data-testid="swipe-yes"]').click();
     await expect(page).toHaveURL(/\/results\//, { timeout: 5000 });
 
@@ -115,6 +120,7 @@ test.describe('Session Lifecycle (#1)', () => {
     await participant1.goto(`/join/${inviteCode}`);
     await participant1.fill('#name', 'Participant 1');
     await participant1.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await participant1.getByRole('button', { name: 'Swipe', exact: true }).click();
     await expect(page.getByText('1 of 2 people have finished voting')).toBeVisible();
     await participant1.locator('[data-testid="swipe-yes"]').click();
     await expect(participant1).toHaveURL(/\/results\//, { timeout: 5000 });
@@ -137,6 +143,7 @@ test.describe('Session Lifecycle (#1)', () => {
 
     // Host swipes
     await page.getByRole('button', { name: /Start Swiping|Start voting/i }).click();
+    await page.getByRole('button', { name: 'Swipe', exact: true }).click();
     await page.locator('[data-testid="swipe-yes"]').click();
     await expect(page).toHaveURL(/\/results\//, { timeout: 5000 });
 

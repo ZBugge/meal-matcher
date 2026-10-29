@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { planningApi, type WeekPlan, type ShoppingItem, type RecurringGrocery } from '../api/planning';
 import { aisles, itemAisle, shoppingGroups, type ShoppingGroup } from '../lib/shopping';
-import { selectedWeek, dateLabel } from '../lib/week';
+import { currentWeekStart, selectedWeek, shiftWeek, dateLabel } from '../lib/week';
 import { ModalSheet } from '../components/ModalSheet';
 
 type ItemUpdate = Partial<Pick<ShoppingItem, 'ingredient' | 'amount' | 'state' | 'aisle'>>;
@@ -62,12 +62,39 @@ function ItemRow({ item, busy, update, remove }: { item: ShoppingItem; busy: boo
 }
 export function ShoppingList() {
   const [params] = useSearchParams();
-  const week = selectedWeek(params.get('week'));
+  const [currentWeek, setCurrentWeek] = useState(currentWeekStart);
+  useEffect(() => {
+    // Browsers suspend timers in sleeping tabs; also check when returning to the list.
+    const refreshWeek = () => setCurrentWeek(currentWeekStart());
+    const nextMonday = new Date(`${shiftWeek(currentWeek, 1)}T00:00:00`);
+    const timer = window.setTimeout(refreshWeek, Math.max(0, nextMonday.getTime() - Date.now()));
+    window.addEventListener('focus', refreshWeek);
+    document.addEventListener('visibilitychange', refreshWeek);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('focus', refreshWeek);
+      document.removeEventListener('visibilitychange', refreshWeek);
+    };
+  }, [currentWeek]);
+  const week = selectedWeek(params.get('week') ?? currentWeek);
   return <ShoppingListContent key={week} week={week} />;
 }
 
 function ShoppingListContent({ week }: { week: string }) {
-  const [plan, setPlan] = useState<WeekPlan | null>(null);
+  const [params] = useSearchParams();
+  const [snapshot, setSnapshot] = useState<{ plan: WeekPlan | null; groups: ShoppingGroup[] }>({ plan: null, groups: [] });
+  const plan = snapshot.plan;
+  const setPlan = useCallback((value: WeekPlan) => {
+    setSnapshot(current => {
+      // Recompute membership after every accepted change, including detail
+      // edits that split a row. New additions stay separate until reopening.
+      const memberships = Object.fromEntries(current.groups.flatMap(group => {
+        const key = JSON.stringify(group.items.map(item => item.id));
+        return group.items.map(item => [item.id, key]);
+      }));
+      return { plan: value, groups: shoppingGroups(value.shopping, memberships) };
+    });
+  }, []);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -86,16 +113,15 @@ function ShoppingListContent({ week }: { week: string }) {
     setLoading(true); setError('');
     planningApi.getWeek(week).then(value => { if (active) setPlan(value); }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [week, reload]);
+  }, [week, reload, setPlan]);
   async function save(action: () => Promise<WeekPlan>, message = ''): Promise<boolean> {
     setBusy(true); setError(''); setCopied(false); setNotice('');
     try { setPlan(await action()); setNotice(message); return true; }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not save. Try again.'); return false; }
     finally { setBusy(false); }
   }
-  const groups = shoppingGroups(plan?.shopping ?? []);
+  const groups = snapshot.groups;
   const needed = groups.filter(group => group.state === 'needed');
-  const completed = groups.filter(group => group.state !== 'needed');
   const copyText = needed.map(group => `${group.amount} ${group.ingredient}`.trim() + (group.items.length > 1 ? '\n' + group.items.map(item => `  ${item.sourceTitle ?? 'Extra items'}: ${item.amount} ${item.ingredient}`.trimEnd()).join('\n') : '')).join('\n');
   const detailItems = plan?.shopping.filter(item => detail?.ids.includes(item.id)) ?? [];
   const errorMessage = error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{error}</p>;
@@ -103,30 +129,30 @@ function ShoppingListContent({ week }: { week: string }) {
   function renderGroup(group: ShoppingGroup) {
     const ids = group.items.map(item => item.id);
     const checked = ids.every(id => selected.includes(id));
+    const completed = checking[group.key] ?? group.state !== 'needed';
     const manyAmounts = group.items.length > 1 && group.amount.length > 52 && group.amount.includes(' + ');
     const amountLabel = manyAmounts ? `${group.items.length} ${group.items.some(item => item.sourceTitle) ? 'recipe' : 'item'} amounts` : group.amount;
-    return <li className="flex items-center gap-2 border-b border-stone-200 last:border-0 py-2" key={group.key}>
+    return <li className="flex items-center gap-2 border-b border-stone-200 last:border-0 py-2" key={JSON.stringify(ids)}>
       <label className={`flex flex-1 min-w-0 gap-3 items-center min-h-12 py-2 ${pantry && group.state !== 'needed' ? 'opacity-60' : 'cursor-pointer'}`}>
         {pantry && group.state === 'needed' ? <input type="checkbox" aria-label={`Already have ${group.ingredient}`} checked={checked} disabled={busy} onChange={e => setSelected(current => e.target.checked ? [...new Set([...current, ...ids])] : current.filter(id => !ids.includes(id)))}/> :
-          <input type="checkbox" aria-label={`${group.state === 'have' ? 'Already have' : 'Purchased'} ${group.ingredient}`} checked={checking[group.key] ?? group.state !== 'needed'} disabled={busy || pantry} onChange={async e => { const value = e.target.checked; setChecking(current => ({ ...current, [group.key]: value })); await save(() => planningApi.bulkItems(week, ids, value ? 'bought' : 'needed')); setChecking(current => { const next = { ...current }; delete next[group.key]; return next; }); }}/>}
-        <span className="min-w-0 flex-1"><span className={`block font-semibold break-words ${group.state !== 'needed' ? 'text-muted' : ''}`}>{group.ingredient}</span>{amountLabel && <span className="block text-sm text-muted break-words">{amountLabel}</span>}{group.state !== 'needed' && <span className="block text-xs text-muted mt-1">{group.state === 'have' ? 'Already have · at home' : 'Purchased · bought'}</span>}</span>
+          <input type="checkbox" aria-label={`${group.state === 'have' ? 'Already have' : 'Purchased'} ${group.ingredient}`} checked={completed} disabled={busy || pantry} onChange={async e => { const value = e.target.checked; setChecking(current => ({ ...current, [group.key]: value })); await save(() => planningApi.bulkItems(week, ids, value ? 'bought' : 'needed')); setChecking(current => { const next = { ...current }; delete next[group.key]; return next; }); }}/>}
+        <span className="min-w-0 flex-1"><span className={`block font-semibold break-words ${completed ? 'text-muted line-through' : ''}`}>{group.ingredient}</span>{amountLabel && <span className={`block text-sm text-muted break-words ${completed ? 'line-through' : ''}`}>{amountLabel}</span>}{completed && <span className="block text-xs text-muted mt-1">{group.state === 'have' ? 'Already have · at home' : 'Purchased · bought'}</span>}</span>
       </label>
       <button className="min-h-12 min-w-12 px-2 text-sm text-primary-700 rounded-lg hover:bg-primary-50" aria-label={`Details & edit ${group.ingredient}`} disabled={busy || pantry} onClick={() => { setError(''); setDetail({ ingredient: group.ingredient, ids }); }}>Details</button>
     </li>;
   }
   return <main className={`family-page ${pantry ? 'pb-36' : ''}`}>
     <div className="flex items-start justify-between gap-3"><div><p className="eyebrow">Your family kitchen</p><h1 className="page-title mt-1">Shopping list</h1></div><button className="btn btn-primary" disabled={busy || pantry || loading || !plan} onClick={() => openSheet('extra')}>Add item</button></div>
-    <div><p className="font-semibold">Week of {dateLabel(week)}</p><p className="text-muted text-sm mt-1">{needed.length} {needed.length === 1 ? 'line' : 'lines'} left to buy</p></div>
+    <div className="space-y-2"><nav className="flex flex-wrap items-center gap-3" aria-label="Shopping week"><Link className="btn btn-secondary" aria-label="Previous shopping week" to={`/shopping?week=${shiftWeek(week, -1)}`}>←</Link><p className="font-semibold flex-1">Week of {dateLabel(week)}</p><Link className="btn btn-secondary" aria-label="Next shopping week" to={`/shopping?week=${shiftWeek(week, 1)}`}>→</Link><Link className="text-sm text-primary-700 underline" to="/shopping">This week</Link></nav><p className="text-muted text-sm">{needed.length} {needed.length === 1 ? 'line' : 'lines'} left to buy</p><p className="text-muted text-sm">Tap to cross off; tap again to restore. Items stay in this week. A fresh week starts Monday.</p></div>
     {!sheet && !detail && !pantry && errorMessage}
     {!plan && !loading && error && <button className="btn btn-secondary" onClick={() => setReload(value => value + 1)}>Retry loading</button>}
     {!sheet && !detail && notice && <p role="status" className="text-primary-700">{notice}</p>}
     {loading ? <p role="status">Loading your shopping list…</p> : plan && <>
       {pantry ? <section className="rounded-2xl bg-primary-50 border border-primary-200 p-4" aria-label="Pantry review"><h2 className="font-semibold text-xl">Pantry review</h2><p className="text-muted mt-2">Select ingredients you already have at home. Apply your choices below; nothing changes until then.</p></section> : <div className="flex flex-wrap gap-3 border-y border-stone-200 py-3"><button className="btn btn-secondary" disabled={busy || !needed.length} onClick={() => { setError(''); setNotice(''); setPantry(true); setSelected([]); }}>Review pantry</button><button className="btn btn-secondary" disabled={busy} onClick={() => openSheet('usual')}>Usual groceries</button><button className="btn btn-secondary" disabled={busy || !needed.length} onClick={() => openSheet('copy')}>Copy list</button></div>}
       {!plan.shopping.length && <p className="py-4 text-muted">Add recipes to your week to create a shopping list, or add an extra item.</p>}
-      {!!plan.shopping.length && !needed.length && <p className="py-4 text-primary-700">Everything is covered. Your completed items are below.</p>}
-      {aisles.filter(aisle => needed.some(group => group.aisle === aisle)).map(aisle => <section key={aisle} aria-label={aisle}><h2 className="eyebrow pb-2 border-b border-stone-200">{aisle}</h2><ul>{needed.filter(group => group.aisle === aisle).map(renderGroup)}</ul></section>)}
-      {!!completed.length && <details className="border-t border-stone-200 pt-3"><summary className="font-semibold cursor-pointer py-3">Completed ({completed.length}) · at home & bought</summary><ul>{completed.map(renderGroup)}</ul></details>}
-      <Link className="btn btn-secondary w-full" to={`/week?week=${week}`}>Back to week plan</Link>
+      {aisles.filter(aisle => groups.some(group => group.aisle === aisle)).map(aisle => <section key={aisle} aria-label={aisle}><h2 className="eyebrow pb-2 border-b border-stone-200">{aisle}</h2><ul>{groups.filter(group => group.aisle === aisle).map(renderGroup)}</ul></section>)}
+      {!!plan.shopping.length && !needed.length && <p className="py-4 text-primary-700">Everything is covered. Tap any checked item to put it back on your list.</p>}
+      <Link className="btn btn-secondary w-full" to={params.get('week') ? `/week?week=${week}` : '/week'}>Back to week plan</Link>
       {pantry && <section aria-label="Apply pantry review" className="fixed z-40 inset-x-0 border-t border-primary-200 bg-paper p-3" style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom))' }}><div className="max-w-3xl mx-auto flex flex-wrap gap-3 items-center">{errorMessage}<p className="w-full text-sm font-semibold">Pantry review · {selected.length} ingredients selected</p><button className="btn btn-primary flex-1" aria-label={`Already have selected (${selected.length})`} disabled={busy || !selected.length} onClick={async () => { if (await save(() => planningApi.bulkItems(week, selected, 'have'), 'Pantry review applied.')) { setSelected([]); setPantry(false); } }}>Apply ({selected.length})</button><button className="btn btn-secondary flex-1" disabled={busy} onClick={() => { setSelected([]); setPantry(false); setError(''); }}>Cancel pantry review</button></div></section>}
     </>}
     {sheet === 'usual' && <ModalSheet title="Usual groceries" busy={busy} onClose={() => setSheet(null)}><UsualGroceries week={week} busy={busy} setBusy={setBusy} applied={value => { setPlan(value); setSheet(null); setNotice('Usual groceries added.'); }}/></ModalSheet>}

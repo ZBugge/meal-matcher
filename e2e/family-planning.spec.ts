@@ -6,7 +6,6 @@ async function itemStatus(page: Page, name: string) {
   if (await status.isVisible()) { await expect(status).toBeEnabled(); return status; }
   if (await page.getByRole('dialog').count()) await page.keyboard.press('Escape');
   const details = page.getByRole('button', { name: `Details & edit ${name}`, exact: true });
-  if (!await details.isVisible()) await page.getByText(/^Completed \(/).click();
   await details.click();
   await expect(status).toBeVisible();
   await expect(status).toBeEnabled();
@@ -230,7 +229,7 @@ test('phone plans tonight, saves dinner staples, repeats reviewed meals and shop
   try {
     const phone = await context.newPage(); await phone.goto('/login'); await phone.locator('#email').fill(email); await phone.locator('#password').fill(password); await phone.getByRole('button', { name: 'Sign In' }).click();
     await dinnerIdeas(phone); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).toBeVisible(); await phone.getByRole('button', { name: 'Remove staple Asian tofu' }).click(); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).not.toBeVisible(); await phone.reload(); await dinnerIdeas(phone); await expect(phone.getByRole('button', { name: 'Choose recipe for Asian tofu' })).not.toBeVisible();
-    await phone.goto(`/shopping?week=${targetWeek}`); await expect(phone.getByText('Completed (2) · at home & bought', { exact: true })).toBeVisible(); await expect(phone.getByRole('heading', { name: 'Pantry', exact: true })).toBeVisible();
+    await phone.goto(`/shopping?week=${targetWeek}`); await expect(phone.getByRole('checkbox', { name: 'Already have Beans', exact: true })).toBeVisible(); await expect(phone.getByRole('checkbox', { name: 'Purchased Spinach', exact: true })).toBeVisible(); await expect(phone.getByRole('heading', { name: 'Pantry', exact: true })).toBeVisible();
     expect(await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   } finally { await context.close(); }
 });

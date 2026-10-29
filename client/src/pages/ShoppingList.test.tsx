@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { Link, MemoryRouter } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { ShoppingList } from './ShoppingList';
 import { planningApi, type ShoppingItem, type WeekPlan } from '../api/planning';
 
@@ -11,6 +11,7 @@ const secondAmount = 'another large handful, washed and drained thoroughly';
 const item = (id: string, data: Partial<ShoppingItem> = {}): ShoppingItem => ({ id, entryId: `dinner-${id}`, sourceTitle: `Recipe ${id}`, amount: '2 cans', ingredient: 'Beans', state: 'needed', aisle: null, displayOrder: Number(id) || 0, ...data });
 const initial: WeekPlan = { week, entries: [], shopping: [item('1', { amount: firstAmount }), item('2', { amount: secondAmount }), item('3', { ingredient: 'Milk', amount: '1 carton', state: 'have' }), item('4', { ingredient: 'Rice', amount: '1 bag', state: 'bought' })] };
 function show() { render(<MemoryRouter initialEntries={[`/shopping?week=${week}`]}><ShoppingList /></MemoryRouter>); }
+afterEach(() => { vi.useRealTimers(); });
 beforeEach(() => {
   vi.resetAllMocks();
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
@@ -19,6 +20,113 @@ beforeEach(() => {
   vi.mocked(planningApi.recurring).mockResolvedValue([{ id: "usual-1", ingredient: "Tea", amount: "2 boxes" }]);
 });
 describe('compact shopping', () => {
+  it('keeps a mistapped ingredient visible in its aisle and restores it with the same checkbox', async () => {
+    vi.mocked(planningApi.bulkItems).mockImplementation(async (_week, ids, state) => ({ ...initial, shopping: initial.shopping.map(row => ids.includes(row.id) ? { ...row, state } : row) }));
+    show();
+    const checkbox = await screen.findByRole('checkbox', { name: 'Purchased Beans' });
+    const aisle = screen.getByRole('region', { name: 'Pantry' });
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(checkbox).toBeEnabled());
+    expect(checkbox).toBeVisible(); expect(checkbox).toBeChecked();
+    expect(aisle).toContainElement(checkbox);
+    expect(within(aisle).getByText('Beans')).toHaveClass('line-through');
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(checkbox).toBeEnabled());
+    expect(checkbox).not.toBeChecked(); expect(checkbox).toBeVisible();
+    expect(within(aisle).getByText('Beans')).not.toHaveClass('line-through');
+    expect(planningApi.bulkItems).toHaveBeenLastCalledWith(week, ['1', '2'], 'needed');
+  });
+
+  it('keeps checked purchases and pantry items visible after loading, with one-tap restoration', async () => {
+    vi.mocked(planningApi.bulkItems).mockImplementation(async (_week, ids, state) => ({ ...initial, shopping: initial.shopping.map(row => ids.includes(row.id) ? { ...row, state } : row) }));
+    show();
+    const milk = await screen.findByRole('checkbox', { name: 'Already have Milk' });
+    expect(milk).toBeVisible(); expect(milk).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Purchased Rice' })).toBeVisible();
+    fireEvent.click(milk);
+    await screen.findByRole('checkbox', { name: 'Purchased Milk' });
+    expect(planningApi.bulkItems).toHaveBeenLastCalledWith(week, ['3'], 'needed');
+  });
+
+  it('reverses only the tapped row when the same ingredient was already bought or at home', async () => {
+    let saved: WeekPlan = { ...initial, shopping: [item('1'), item('2', { state: 'bought', amount: '1 can' }), item('3', { state: 'have', amount: '4 cans' })] };
+    vi.mocked(planningApi.getWeek).mockResolvedValue(saved);
+    vi.mocked(planningApi.bulkItems).mockImplementation(async (_week, ids, state) => {
+      saved = { ...saved, shopping: saved.shopping.map(row => ids.includes(row.id) ? { ...row, state } : row) };
+      return saved;
+    });
+    show();
+    await screen.findByText('2 cans');
+    const row = screen.getByText('2 cans').closest('li')!;
+    const checkbox = within(row).getByRole('checkbox');
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(checkbox).toBeEnabled());
+    expect(checkbox).toBeVisible(); expect(checkbox).toBeChecked();
+    expect(screen.getByText('1 cans')).toBeVisible();
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(checkbox).toBeEnabled());
+    expect(checkbox).not.toBeChecked();
+    expect(saved.shopping.map(value => value.state)).toEqual(['needed', 'bought', 'have']);
+    expect(planningApi.bulkItems).toHaveBeenLastCalledWith(week, ['1'], 'needed');
+  });
+
+  it('keeps split contributions separate when another contribution is checked later', async () => {
+    let saved: WeekPlan = { ...initial, shopping: [item('1'), item('2', { amount: '1 can' })] };
+    vi.mocked(planningApi.getWeek).mockResolvedValue(saved);
+    vi.mocked(planningApi.updateItem).mockImplementation(async (_week, id, data) => {
+      saved = { ...saved, shopping: saved.shopping.map(row => row.id === id ? { ...row, ...data } : row) };
+      return saved;
+    });
+    vi.mocked(planningApi.bulkItems).mockImplementation(async (_week, ids, state) => {
+      saved = { ...saved, shopping: saved.shopping.map(row => ids.includes(row.id) ? { ...row, state } : row) };
+      return saved;
+    });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Details & edit Beans' }));
+    fireEvent.change(screen.getAllByLabelText('Status for Beans')[0], { target: { value: 'bought' } });
+    await screen.findByText('Item saved.');
+    fireEvent.click(screen.getByRole('button', { name: 'Close Beans details' }));
+    const checkbox = within(screen.getByText('1 cans').closest('li')!).getByRole('checkbox');
+    fireEvent.click(checkbox); await waitFor(() => expect(checkbox).toBeEnabled());
+    expect(checkbox).toBeChecked(); expect(checkbox).toBeVisible();
+    fireEvent.click(checkbox); await waitFor(() => expect(checkbox).toBeEnabled());
+    expect(saved.shopping.map(value => value.state)).toEqual(['bought', 'needed']);
+  });
+
+  it('advances the default list on Monday while keeping the previous week accessible', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-18T23:59:50'));
+    vi.mocked(planningApi.getWeek).mockImplementation(async value => ({ ...initial, week: value, shopping: value === week ? initial.shopping : [] }));
+    render(<MemoryRouter initialEntries={['/shopping']}><ShoppingList /></MemoryRouter>);
+    await act(async () => {});
+    expect(screen.getByRole('checkbox', { name: 'Purchased Rice' })).toBeVisible();
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(planningApi.getWeek).toHaveBeenLastCalledWith('2026-10-19');
+    expect(screen.queryByRole('checkbox', { name: 'Purchased Rice' })).toBeNull();
+    expect(screen.getByText(/Add recipes to your week/)).toBeVisible();
+    fireEvent.click(screen.getByRole('link', { name: 'Previous shopping week' }));
+    await act(async () => {});
+    expect(screen.getByRole('checkbox', { name: 'Purchased Rice' })).toBeVisible();
+    expect(planningApi.bulkItems).not.toHaveBeenCalled();
+    vi.setSystemTime(new Date('2026-10-26T08:00:00'));
+    fireEvent.focus(window);
+    await act(async () => {});
+    expect(planningApi.getWeek).toHaveBeenLastCalledWith(week);
+  });
+
+  it('refreshes the default week when returning to a sleeping tab', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-18T23:59:50'));
+    vi.mocked(planningApi.getWeek).mockImplementation(async value => ({ ...initial, week: value, shopping: value === week ? initial.shopping : [] }));
+    render(<MemoryRouter initialEntries={['/shopping']}><ShoppingList /></MemoryRouter>);
+    await act(async () => {});
+    vi.setSystemTime(new Date('2026-10-19T08:00:00'));
+    fireEvent.focus(window);
+    await act(async () => {});
+    expect(planningApi.getWeek).toHaveBeenLastCalledWith('2026-10-19');
+    expect(screen.queryByRole('checkbox', { name: 'Purchased Rice' })).toBeNull();
+  });
+
   it('keeps compact rows and opens exact ordered contributions only on request', async () => {
     show(); await screen.findByRole('checkbox', { name: 'Purchased Beans' });
     expect(screen.getByText('2 recipe amounts')).toBeVisible();
@@ -45,7 +153,6 @@ describe('compact shopping', () => {
   it('applies pantry selections as have, disables completed purchases during review, and cancels without writes', async () => {
     vi.mocked(planningApi.bulkItems).mockResolvedValue({ ...initial, shopping: initial.shopping.map(row => row.state === 'needed' ? { ...row, state: 'have' } : row) });
     show(); fireEvent.click(await screen.findByRole('button', { name: 'Review pantry' }));
-    fireEvent.click(screen.getByText(/^Completed/));
     expect(screen.getByRole('checkbox', { name: 'Purchased Rice' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Already have Milk' })).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Already have Beans' }));
@@ -166,7 +273,7 @@ describe('compact shopping', () => {
     let finish!: (plan: WeekPlan) => void;
     vi.mocked(planningApi.applyRecurring).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
     vi.mocked(planningApi.getWeek).mockImplementation(async value => ({ ...initial, week: value, shopping: value === week ? initial.shopping : [] }));
-    render(<MemoryRouter initialEntries={[`/shopping?week=${week}`]}><Link to="/shopping?week=2026-10-19">Next shopping week</Link><ShoppingList /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={[`/shopping?week=${week}`]}><ShoppingList /></MemoryRouter>);
     fireEvent.click(await screen.findByRole('button', { name: 'Usual groceries' }));
     fireEvent.click(await screen.findByLabelText('Add usual Tea'));
     fireEvent.click(screen.getByRole('button', { name: 'Add selected to this week (1)' }));

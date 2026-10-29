@@ -50,7 +50,7 @@ test('usual groceries explicitly populate selected weeks and retain old shopping
   await page.getByRole('button', { name: 'Close Usual groceries' }).click();
   await expect(page.getByRole('checkbox', { name: 'Purchased Oat milk', exact: true })).toBeVisible();
   await page.goto('/shopping?week=2026-10-12');
-  await page.getByText(/^Completed \(/).click();
+  await expect(page.getByRole('checkbox', { name: 'Purchased Milk', exact: true })).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Purchased Milk', exact: true })).toBeChecked();
   expect((await (await page.request.get('/api/plans/2026-10-12')).json()).shopping[0].id).toBe(oldId);
 });

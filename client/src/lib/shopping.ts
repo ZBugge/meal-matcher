@@ -33,10 +33,12 @@ export function combinedAmount(items: ShoppingItem[]): string {
   return output.map(part => 'raw' in part ? part.raw : `${sums.get(part.unit)!.total / 1000000} ${sums.get(part.unit)!.label}`.trim()).join(' + ');
 }
 export interface ShoppingGroup { key: string; ingredient: string; aisle: string; state: ShoppingItem['state']; items: ShoppingItem[]; amount: string }
-export function shoppingGroups(items: ShoppingItem[]): ShoppingGroup[] {
+export function shoppingGroups(items: ShoppingItem[], memberships?: Readonly<Record<string, string>>): ShoppingGroup[] {
   const groups = new Map<string, ShoppingGroup>();
   for (const item of items) {
-    const aisle = itemAisle(item); const key = JSON.stringify([normalize(item.ingredient), aisle, item.state]);
+    // Keep previously separate rows apart while shopping so checking and
+    // restoring one row never absorbs an already purchased amount.
+    const aisle = itemAisle(item); const key = JSON.stringify([normalize(item.ingredient), aisle, item.state, ...(memberships ? [memberships[item.id] ?? null] : [])]);
     if (!groups.has(key)) groups.set(key, { key, ingredient: item.ingredient.trim(), aisle, state: item.state, items: [], amount: '' });
     groups.get(key)!.items.push(item);
   }

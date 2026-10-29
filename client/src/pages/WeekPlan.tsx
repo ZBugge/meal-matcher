@@ -14,7 +14,7 @@ export function WeekPlan() {
 type Sheet = 'add' | 'recipe' | 'takeout' | 'tools' | 'staples' | 'repeat' | null;
 
 function WeekPlanContent({ week }: { week: string }) {
-  const [, setParams] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [library, setLibrary] = useState<Meal[]>([]);
@@ -94,7 +94,7 @@ function WeekPlanContent({ week }: { week: string }) {
         <section aria-label="Flexible meals" className="border-t border-stone-200 pt-4"><h3 className="font-semibold">Flexible meals</h3><p className="text-sm text-muted mb-2">Good ideas without a fixed night.</p>{plan.entries.filter(entry => !entry.date).map(entry => entryButton(entry))}{!plan.entries.some(entry => !entry.date) && <p className="text-muted py-3">Room for a change of plans.</p>}</section>
       </section>
       <p className="text-sm text-muted">Usual dinner ideas and Repeat a week are in Week tools.</p>
-      <Link className="btn btn-secondary w-full" to={`/shopping?week=${week}`}>Open shopping list</Link>
+      <Link className="btn btn-secondary w-full" to={params.get('week') ? `/shopping?week=${week}` : '/shopping'}>Open shopping list</Link>
     </>}
     {sheet && <ModalSheet title={sheetTitle[sheet]} busy={busy} onClose={closeSheet}>{errorMessage}
       {sheet === 'add' && <><p className="text-muted">{addDate ? `For ${dateLabel(addDate)}. You can change the night before adding.` : 'Pick a night or leave dinner flexible.'}</p><button className="menu-action" onClick={() => setSheet('recipe')}>Saved recipe <span aria-hidden="true">→</span></button><button className="menu-action" onClick={() => setSheet('takeout')}>Takeout night <span aria-hidden="true">→</span></button><Link className="menu-action" to={`/dashboard?week=${week}`}>Choose together <span aria-hidden="true">→</span></Link></>}
